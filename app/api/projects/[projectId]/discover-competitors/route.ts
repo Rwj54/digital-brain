@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import {
   createProjectJob,
   finishProjectJobFailed,
@@ -12,26 +13,25 @@ function getProjectIdFromUrl(req: Request): string {
   // Expected path: /api/projects/<projectId>/discover-competitors
   const url = new URL(req.url);
   const parts = url.pathname.split("/").filter(Boolean);
-
   const idx = parts.indexOf("projects");
   if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
-
   return "";
 }
 
 export async function POST(
-  req: Request,
-  { params }: { params: { projectId?: string } }
+  req: NextRequest,
+  context: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    // Use Next params if present, else parse from URL
+    const { projectId: paramProjectId } = await context.params;
+
     const projectId =
-      (typeof params?.projectId === "string" && params.projectId.trim()) ||
+      (typeof paramProjectId === "string" && paramProjectId.trim()) ||
       getProjectIdFromUrl(req);
 
     if (!projectId) {
       return NextResponse.json(
-        { ok: false, error: "Missing projectId (route params + URL parse both empty)" },
+        { ok: false, error: "Missing projectId" },
         { status: 400 }
       );
     }
@@ -77,7 +77,6 @@ export async function POST(
   } catch (outer: any) {
     const msg = outer?.message ?? "Unknown route crash";
     console.error("[discover-competitors] route crash:", outer);
-
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
