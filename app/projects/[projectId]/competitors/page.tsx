@@ -1,21 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 export default function ProjectCompetitorsPage() {
   const params = useParams();
 
-  // Robust projectId extraction:
-  // - useParams() can return string | string[] | undefined
-  // - fallback to parsing window.location.pathname
   const projectId = useMemo(() => {
     const raw = (params as any)?.projectId;
 
     if (typeof raw === "string" && raw.trim()) return raw.trim();
     if (Array.isArray(raw) && typeof raw[0] === "string" && raw[0].trim()) return raw[0].trim();
 
-    // Fallback: /projects/<projectId>/competitors
     if (typeof window !== "undefined") {
       const parts = window.location.pathname.split("/").filter(Boolean);
       const idx = parts.indexOf("projects");
@@ -28,11 +24,6 @@ export default function ProjectCompetitorsPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [debug, setDebug] = useState<string>("");
-
-  useEffect(() => {
-    setDebug(`projectId detected: ${projectId || "(empty)"}`);
-  }, [projectId]);
 
   async function runDiscovery() {
     try {
@@ -41,7 +32,7 @@ export default function ProjectCompetitorsPage() {
       setResult(null);
 
       if (!projectId) {
-        setStatus("Failed: projectId is empty on the page. (See debug line.)");
+        setStatus("Failed: projectId is empty on the page.");
         return;
       }
 
@@ -93,10 +84,6 @@ export default function ProjectCompetitorsPage() {
       <p className="text-sm text-gray-600 mt-1">
         Manual discovery run for this project (Google Maps via DataForSEO).
       </p>
-
-      <div className="mt-3 text-xs text-gray-600 border rounded-md p-2">
-        {debug}
-      </div>
 
       <div className="mt-4">
         <button
