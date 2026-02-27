@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type Project = {
@@ -147,17 +147,7 @@ function computeCapacityAwareTargets90d(args: {
   const realistic90dGain = Math.max(0, Math.min(ruleTargetGain, capacity90d));
   const weeklyNeeded = Math.ceil(realistic90dGain / 13);
 
-  const timeToCloseFullGapDays =
-    expectedPerMonth > 0 ? Math.ceil((gap / expectedPerMonth) * 30) : null;
-
-  return {
-    gap,
-    ruleTargetGain,
-    capacity90d,
-    realistic90dGain,
-    weeklyNeeded,
-    timeToCloseFullGapDays,
-  };
+  return { gap, ruleTargetGain, capacity90d, realistic90dGain, weeklyNeeded };
 }
 
 function medianInt(values: number[]) {
@@ -169,6 +159,9 @@ function medianInt(values: number[]) {
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
+  const router = useRouter();
+
+  const [authed, setAuthed] = useState(false);
 
   const [project, setProject] = useState<Project | null>(null);
   const [competitors, setCompetitors] = useState<CompetitorMetric[]>([]);
@@ -195,6 +188,19 @@ export default function CompetitorsPage() {
     return medianInt(vals);
   }, [top3]);
 
+  async function requireAuth() {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      setStatus(`Auth error: ${error.message}`);
+      return false;
+    }
+    if (!data.session) {
+      router.replace("/login");
+      return false;
+    }
+    return true;
+  }
+
   async function loadProject() {
     const { data, error } = await supabase
       .from("projects")
@@ -205,9 +211,9 @@ export default function CompetitorsPage() {
       .limit(1);
 
     if (error) throw new Error(`Project load failed: ${error.message}`);
+
     const row = (data ?? [])[0] as Project | undefined;
-    if (!row) throw new Error("Project not found (0 rows).");
-    return row;
+    return row ?? null;
   }
 
   async function loadCompetitors() {
@@ -242,43 +248,15 @@ export default function CompetitorsPage() {
     return (data as CompetitorSnapshot[]) ?? [];
   }
 
-  /**
-   * ✅ Correct and simple for your schema:
-   * Order by last_fetched_at (freshest), fallback created_at.
-   * We SELECT BOTH so we can display "From latest GBP snapshot" accurately later.
-   */
   async function loadInputs() {
     setInputsMessage(null);
 
-    // Try last_fetched_at first
-    let res = await supabase
+    // Your schema: last_fetched_at + created_at exist
+    const res = await supabase
       .from("gbp_profiles")
       .select("total_reviews, last_fetched_at, created_at")
       .eq("project_id", projectId)
       .order("last_fetched_at", { ascending: false })
-      .limit(1);
-
-    // If last_fetched_at is null for all rows, fallback to created_at ordering
-    if (!res.error) {
-      const row = (res.data ?? [])[0] as any | undefined;
-      const reviews = row?.total_reviews;
-      if (typeof reviews === "number") {
-        setYourCurrentReviews(reviews);
-        return;
-      }
-    } else {
-      // If somehow column missing or permissions, show real error
-      setYourCurrentReviews(null);
-      setInputsMessage(`Error: ${res.error.message}`);
-      return;
-    }
-
-    // Fallback: created_at
-    res = await supabase
-      .from("gbp_profiles")
-      .select("total_reviews, last_fetched_at, created_at")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
       .limit(1);
 
     if (res.error) {
@@ -295,6 +273,28 @@ export default function CompetitorsPage() {
       return;
     }
 
+    // Fallback: created_at
+    const res2 = await supabase
+      .from("gbp_profiles")
+      .select("total_reviews, last_fetched_at, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (res2.error) {
+      setYourCurrentReviews(null);
+      setInputsMessage(`Error: ${res2.error.message}`);
+      return;
+    }
+
+    const row2 = (res2.data ?? [])[0] as any | undefined;
+    const reviews2 = row2?.total_reviews;
+
+    if (typeof reviews2 === "number") {
+      setYourCurrentReviews(reviews2);
+      return;
+    }
+
     setYourCurrentReviews(null);
     setInputsMessage(
       "Note: I couldn’t find your current review count from gbp_profiles. Make sure your GBP profile row has total_reviews."
@@ -306,8 +306,24 @@ export default function CompetitorsPage() {
     setStatus(null);
 
     try {
-      const [proj, comps] = await Promise.all([loadProject(), loadCompetitors()]);
+      const proj = await loadProject();
+
+      // ✅ If project is null, it’s almost always RLS/auth. Give a clear message.
+      if (!proj) {
+        setProject(null);
+        setCompetitors([]);
+        setSnapshotsForThreshold([]);
+        setYourCurrentReviews(null);
+        setInputsMessage(null);
+        setStatus(
+          "I can’t access this project. This usually means you are logged out or Row Level Security is blocking the current user."
+        );
+        return;
+      }
+
       setProject(proj);
+
+      const comps = await loadCompetitors();
       setCompetitors(comps);
 
       const top3Local = comps.slice(0, 3);
@@ -324,8 +340,18 @@ export default function CompetitorsPage() {
     }
   }
 
+  // ✅ Auth gate
   useEffect(() => {
-    refreshAll();
+    (async () => {
+      setLoading(true);
+      const ok = await requireAuth();
+      if (!ok) {
+        setLoading(false);
+        return;
+      }
+      setAuthed(true);
+      await refreshAll();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -390,7 +416,7 @@ export default function CompetitorsPage() {
 
         <button
           onClick={runDiscovery}
-          disabled={running}
+          disabled={running || !authed || !project}
           className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium bg-black text-white disabled:opacity-60"
         >
           {running ? "Running…" : "Run discovery"}
@@ -457,6 +483,7 @@ export default function CompetitorsPage() {
             onClick={loadInputs}
             className="text-sm underline text-gray-700 hover:text-black"
             type="button"
+            disabled={!authed || !project}
           >
             Refresh inputs
           </button>
