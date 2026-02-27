@@ -29,15 +29,18 @@ type CompetitorSnapshot = {
   captured_at: string;
 };
 
+type ObservedLabel = "Observed (90d)" | "Observed (30d)" | "Observed (14d)";
+type EstimatedLabel = "Estimated";
+
 type VelocityResult =
   | {
       kind: "observed";
-      confidenceLabel: "Observed (90d)" | "Observed (30d)" | "Observed (14d)";
+      confidenceLabel: ObservedLabel;
       marketGrowth90d: number;
     }
   | {
       kind: "estimated";
-      confidenceLabel: "Estimated";
+      confidenceLabel: EstimatedLabel;
       marketGrowth90d: number;
     };
 
@@ -89,7 +92,7 @@ function computeVelocityAutoUpgrade(
 
   const horizons: Array<{
     h: 90 | 30 | 14;
-    label: VelocityResult["confidenceLabel"];
+    label: ObservedLabel;
     maxDaysAway: number;
   }> = [
     { h: 90, label: "Observed (90d)", maxDaysAway: 10 },
@@ -152,9 +155,7 @@ export default function CompetitorsPage() {
   const [snapshotsForTop, setSnapshotsForTop] = useState<CompetitorSnapshot[]>([]);
 
   const [yourCurrentReviews, setYourCurrentReviews] = useState<number | null>(null);
-
   const [inputsError, setInputsError] = useState<string | null>(null);
-  const [inputsNote, setInputsNote] = useState<string | null>(null);
 
   const [status, setStatus] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -210,9 +211,7 @@ export default function CompetitorsPage() {
 
   async function loadInputs() {
     setInputsError(null);
-    setInputsNote(null);
 
-    // SAFE: order + limit(1). NO .single()
     const { data, error } = await supabase
       .from("gbp_profiles")
       .select("total_reviews, captured_at")
@@ -233,7 +232,7 @@ export default function CompetitorsPage() {
       setYourCurrentReviews(reviews);
     } else {
       setYourCurrentReviews(null);
-      setInputsNote(
+      setInputsError(
         "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
       );
     }
@@ -306,7 +305,6 @@ export default function CompetitorsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      {/* BIG PROOF TAG */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
         Build tag: <span className="font-mono font-semibold">{BUILD_TAG}</span>
       </div>
@@ -343,7 +341,6 @@ export default function CompetitorsPage() {
         </div>
 
         {inputsError && <div className="mt-3 text-sm text-red-600">{inputsError}</div>}
-        {inputsNote && <div className="mt-3 text-sm text-orange-600">{inputsNote}</div>}
 
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
           <div className="rounded-lg border border-gray-200 p-3">
