@@ -243,39 +243,61 @@ export default function CompetitorsPage() {
   }
 
   /**
-   * ✅ Correct for your schema:
-   * gbp_profiles has last_fetched_at + created_at (NOT captured_at)
+   * ✅ Correct and simple for your schema:
+   * Order by last_fetched_at (freshest), fallback created_at.
+   * We SELECT BOTH so we can display "From latest GBP snapshot" accurately later.
    */
   async function loadInputs() {
     setInputsMessage(null);
 
-    // Try last_fetched_at first (best), then created_at.
-    for (const col of ["last_fetched_at", "created_at"] as const) {
-      const { data, error } = await supabase
-        .from("gbp_profiles")
-        .select("total_reviews")
-        .eq("project_id", projectId)
-        .order(col, { ascending: false })
-        .limit(1);
+    // Try last_fetched_at first
+    let res = await supabase
+      .from("gbp_profiles")
+      .select("total_reviews, last_fetched_at, created_at")
+      .eq("project_id", projectId)
+      .order("last_fetched_at", { ascending: false })
+      .limit(1);
 
-      if (error) {
-        setYourCurrentReviews(null);
-        setInputsMessage(`Error: ${error.message}`);
-        return;
-      }
-
-      const row = (data ?? [])[0] as any | undefined;
+    // If last_fetched_at is null for all rows, fallback to created_at ordering
+    if (!res.error) {
+      const row = (res.data ?? [])[0] as any | undefined;
       const reviews = row?.total_reviews;
-
       if (typeof reviews === "number") {
         setYourCurrentReviews(reviews);
         return;
       }
+    } else {
+      // If somehow column missing or permissions, show real error
+      setYourCurrentReviews(null);
+      setInputsMessage(`Error: ${res.error.message}`);
+      return;
+    }
+
+    // Fallback: created_at
+    res = await supabase
+      .from("gbp_profiles")
+      .select("total_reviews, last_fetched_at, created_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (res.error) {
+      setYourCurrentReviews(null);
+      setInputsMessage(`Error: ${res.error.message}`);
+      return;
+    }
+
+    const row = (res.data ?? [])[0] as any | undefined;
+    const reviews = row?.total_reviews;
+
+    if (typeof reviews === "number") {
+      setYourCurrentReviews(reviews);
+      return;
     }
 
     setYourCurrentReviews(null);
     setInputsMessage(
-      "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
+      "Note: I couldn’t find your current review count from gbp_profiles. Make sure your GBP profile row has total_reviews."
     );
   }
 
@@ -381,6 +403,7 @@ export default function CompetitorsPage() {
         </div>
       )}
 
+      {/* Market velocity */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Market velocity</div>
@@ -420,6 +443,7 @@ export default function CompetitorsPage() {
         </div>
       </div>
 
+      {/* Review gap & 90-day target */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
@@ -477,6 +501,7 @@ export default function CompetitorsPage() {
         </div>
       </div>
 
+      {/* Discovered competitors */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold">Discovered competitors</div>
 
