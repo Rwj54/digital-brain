@@ -78,10 +78,6 @@ function findClosestSnapshotToDate(
   return best;
 }
 
-/**
- * Velocity confidence auto-upgrade (90d -> 30d -> 14d -> Estimated)
- * Uses ONE competitor's snapshots (the "threshold competitor").
- */
 function computeVelocityAutoUpgrade(
   competitorForVelocity: CompetitorMetric | null,
   snapshotsDesc: CompetitorSnapshot[]
@@ -134,15 +130,9 @@ function computeVelocityAutoUpgrade(
   return estimated;
 }
 
-/**
- * Review target rules (must preserve):
- * - If gap > 100: close 25% in 90 days
- * - If gap <= 100: close 50% in 90 days
- * - Capacity cap: monthly_customer_events * review_conversion_rate * 3
- */
 function computeCapacityAwareTargets90d(args: {
   yourReviews: number;
-  thresholdCompetitorReviews: number; // <-- Top 3 median reviews
+  thresholdCompetitorReviews: number;
   monthlyCustomerEvents: number;
   reviewConversionRate: number; // 0..1
 }) {
@@ -173,8 +163,7 @@ function computeCapacityAwareTargets90d(args: {
 function medianInt(values: number[]) {
   if (!values.length) return 0;
   const sorted = values.slice().sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted[mid];
+  return sorted[Math.floor(sorted.length / 2)];
 }
 
 export default function CompetitorsPage() {
@@ -192,22 +181,15 @@ export default function CompetitorsPage() {
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Top competitor (rank #1) remains useful for display
-  const topCompetitor = competitors[0] ?? null;
-
-  // Top 3 set (stable threshold calculations)
   const top3 = useMemo(() => competitors.slice(0, 3), [competitors]);
 
-  // Threshold competitor = median of top3 (rank #2 when 3 exist)
   const thresholdCompetitor = useMemo(() => {
     if (top3.length === 0) return null;
-    // If 1 => index 0, if 2 => index 0 (lower/safer), if 3 => index 1 (median)
     const idx = top3.length === 3 ? 1 : 0;
     return top3[idx] ?? null;
   }, [top3]);
 
   const thresholdReviews = useMemo(() => {
-    // Use median reviews of top3 if possible; otherwise fallback to best available
     const vals = top3.map((c) => c.total_reviews ?? 0).filter((n) => Number.isFinite(n));
     if (!vals.length) return 0;
     return medianInt(vals);
@@ -260,14 +242,55 @@ export default function CompetitorsPage() {
     return (data as CompetitorSnapshot[]) ?? [];
   }
 
+  /**
+   * ✅ Resilient "latest GBP snapshot" fetch:
+   * Some installs use created_at or updated_at instead of captured_at.
+   */
   async function loadInputs() {
     setInputsMessage(null);
 
+    const orderCandidates = ["captured_at", "created_at", "updated_at"] as const;
+
+    for (const col of orderCandidates) {
+      const { data, error } = await supabase
+        .from("gbp_profiles")
+        .select("total_reviews")
+        .eq("project_id", projectId)
+        .order(col, { ascending: false })
+        .limit(1);
+
+      if (error) {
+        // If this column doesn't exist, try the next candidate.
+        const msg = (error.message || "").toLowerCase();
+        if (msg.includes("does not exist") && msg.includes(col)) continue;
+
+        // Otherwise, it's a real error (RLS, permissions, etc.)
+        setYourCurrentReviews(null);
+        setInputsMessage(`Error: ${error.message}`);
+        return;
+      }
+
+      const row = (data ?? [])[0] as any | undefined;
+      const reviews = row?.total_reviews;
+
+      if (typeof reviews === "number") {
+        setYourCurrentReviews(reviews);
+        return;
+      }
+
+      // Column exists, but no usable reviews yet
+      setYourCurrentReviews(null);
+      setInputsMessage(
+        "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
+      );
+      return;
+    }
+
+    // None of the timestamp columns exist (or table is non-standard)
     const { data, error } = await supabase
       .from("gbp_profiles")
-      .select("total_reviews, captured_at")
+      .select("total_reviews")
       .eq("project_id", projectId)
-      .order("captured_at", { ascending: false })
       .limit(1);
 
     if (error) {
@@ -299,7 +322,6 @@ export default function CompetitorsPage() {
       setProject(proj);
       setCompetitors(comps);
 
-      // Load snapshots for threshold competitor (median of top 3)
       const top3Local = comps.slice(0, 3);
       const thresholdLocal = top3Local.length === 3 ? top3Local[1] : top3Local[0] ?? null;
 
@@ -319,7 +341,6 @@ export default function CompetitorsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  // Velocity now based on threshold competitor (median of top 3)
   const velocity = useMemo(() => {
     return computeVelocityAutoUpgrade(thresholdCompetitor, snapshotsForThreshold);
   }, [thresholdCompetitor, snapshotsForThreshold]);
@@ -394,7 +415,6 @@ export default function CompetitorsPage() {
         </div>
       )}
 
-      {/* Market velocity */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Market velocity</div>
@@ -429,13 +449,11 @@ export default function CompetitorsPage() {
           </div>
         </div>
 
-        {/* Tiny stability hint, no layout change */}
         <div className="mt-3 text-xs text-gray-500">
           Using <span className="font-medium">Top 3 median</span> competitor for stability.
         </div>
       </div>
 
-      {/* Review gap & 90-day target */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
@@ -490,49 +508,9 @@ export default function CompetitorsPage() {
             <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
             <div className="text-xs text-gray-500">Market + capacity constrained</div>
           </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Rule target (90d)</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.ruleTargetGain}
-            </div>
-            <div className="text-xs text-gray-500">Your baseline rule</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Capacity (90d)</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.capacity90d}
-            </div>
-            <div className="text-xs text-gray-500">
-              {(project?.monthly_customer_events ?? "—")} / month × 3 ×{" "}
-              {(project?.review_conversion_rate ?? "—")}
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Weekly requirement</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
-            </div>
-            <div className="text-xs text-gray-500">~13 weeks in 90 days</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Time to close full gap</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null
-                ? "—"
-                : reviewModel.timeToCloseFullGapDays == null
-                ? "—"
-                : `${reviewModel.timeToCloseFullGapDays}d`}
-            </div>
-            <div className="text-xs text-gray-500">At current capacity</div>
-          </div>
         </div>
       </div>
 
-      {/* Discovered competitors */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold">Discovered competitors</div>
 
