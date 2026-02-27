@@ -4,592 +4,363 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-type CompetitorRow = {
-  id: string;
-  project_id: string;
-  name: string | null;
-  competitor_name: string | null;
-  competitor_domain: string;
-  domain: string | null;
-  rating: number | null;
-  total_reviews: number | null;
-  last_seen_at: string | null;
-  source: string | null;
-  place_id: string | null;
-};
+const BUILD_TAG = "PHASE_2C_COMPETITORS__2026-02-27__TAG_001";
 
-type ProjectRow = {
+type Project = {
   id: string;
   monthly_customer_events: number | null;
   review_conversion_rate: number | null;
 };
 
-type GbpProfileRow = {
-  id: string;
+type CompetitorMetric = {
   project_id: string;
-  created_at: string | null;
-  [key: string]: any;
+  competitor_domain: string;
+  place_id: string | null;
+  name: string | null;
+  rating: number | null;
+  total_reviews: number | null;
+  last_seen_at: string | null;
 };
 
-type SnapshotRow = {
+type CompetitorSnapshot = {
+  project_id: string;
   competitor_domain: string;
   total_reviews: number | null;
   captured_at: string;
 };
 
-type VelocityMode = "estimated" | "observed_14d" | "observed_30d" | "observed_90d";
+type VelocityResult =
+  | {
+      kind: "observed";
+      confidenceLabel: "Observed (90d)" | "Observed (30d)" | "Observed (14d)";
+      marketGrowth90d: number;
+    }
+  | {
+      kind: "estimated";
+      confidenceLabel: "Estimated";
+      marketGrowth90d: number;
+    };
 
-function toNumberOrNull(v: any): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-  return Number.isFinite(n) ? n : null;
+function clampInt(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(n)));
 }
 
-function normalizeConversionRate(v: number | null): number | null {
-  if (v === null) return null;
-  if (v > 1) return v / 100;
-  if (v < 0) return null;
-  return v;
+function daysBetween(aIso: string, bIso: string) {
+  const a = new Date(aIso).getTime();
+  const b = new Date(bIso).getTime();
+  return Math.abs(a - b) / (1000 * 60 * 60 * 24);
 }
 
-function pickCurrentReviewsFromProfile(profile: GbpProfileRow | null): number | null {
-  if (!profile) return null;
+function findClosestSnapshotToDate(
+  snapshotsDesc: CompetitorSnapshot[],
+  targetDate: Date,
+  maxDaysAway: number
+) {
+  let best: CompetitorSnapshot | null = null;
+  let bestDiff = Infinity;
 
-  const candidateKeys = ["total_reviews", "reviews", "review_count", "reviewCount", "gbp_total_reviews"];
-  for (const k of candidateKeys) {
-    const n = toNumberOrNull(profile[k]);
-    if (n !== null) return n;
-  }
-  for (const [k, v] of Object.entries(profile)) {
-    if (!k.toLowerCase().includes("review")) continue;
-    const n = toNumberOrNull(v);
-    if (n !== null) return n;
-  }
-  return null;
-}
-
-function fmtInt(n: number | null) {
-  if (n === null) return "—";
-  return Intl.NumberFormat().format(Math.round(n));
-}
-
-function fmtPct(n: number | null, digits = 2) {
-  if (n === null) return "—";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-function median(nums: number[]): number | null {
-  if (!nums.length) return null;
-  const a = [...nums].sort((x, y) => x - y);
-  const mid = Math.floor(a.length / 2);
-  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
-}
-
-function closestByDate(rows: SnapshotRow[], targetMs: number): SnapshotRow | null {
-  if (!rows.length) return null;
-  let best: SnapshotRow | null = null;
-  let bestDist = Infinity;
-
-  for (const r of rows) {
-    const ms = new Date(r.captured_at).getTime();
-    const dist = Math.abs(ms - targetMs);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = r;
+  for (const s of snapshotsDesc) {
+    const t = new Date(s.captured_at).getTime();
+    const diffDays = Math.abs(t - targetDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays <= maxDaysAway && diffDays < bestDiff) {
+      best = s;
+      bestDiff = diffDays;
     }
   }
+
   return best;
 }
 
-function confidenceLabel(mode: VelocityMode): string {
-  if (mode === "observed_90d") return "Observed (90d)";
-  if (mode === "observed_30d") return "Observed (30d)";
-  if (mode === "observed_14d") return "Observed (14d)";
-  return "Estimated (no history yet)";
+function computeVelocityAutoUpgrade(
+  topCompetitor: CompetitorMetric | null,
+  snapshotsDesc: CompetitorSnapshot[]
+): VelocityResult {
+  const estimated: VelocityResult = {
+    kind: "estimated",
+    confidenceLabel: "Estimated",
+    marketGrowth90d: clampInt(((topCompetitor?.total_reviews ?? 0) * 0.06) / 1, 12, 180),
+  };
+
+  if (!topCompetitor) return estimated;
+  if (!snapshotsDesc.length) return estimated;
+
+  const latest = snapshotsDesc[0];
+  if (latest.total_reviews == null) return estimated;
+
+  const horizons: Array<{
+    h: 90 | 30 | 14;
+    label: VelocityResult["confidenceLabel"];
+    maxDaysAway: number;
+  }> = [
+    { h: 90, label: "Observed (90d)", maxDaysAway: 10 },
+    { h: 30, label: "Observed (30d)", maxDaysAway: 6 },
+    { h: 14, label: "Observed (14d)", maxDaysAway: 4 },
+  ];
+
+  for (const { h, label, maxDaysAway } of horizons) {
+    const target = new Date(latest.captured_at);
+    target.setDate(target.getDate() - h);
+
+    const past = findClosestSnapshotToDate(snapshotsDesc, target, maxDaysAway);
+    if (!past) continue;
+    if (past.total_reviews == null) continue;
+
+    const observedDays = daysBetween(latest.captured_at, past.captured_at);
+    if (observedDays < h * 0.7) continue;
+
+    const delta = (latest.total_reviews ?? 0) - (past.total_reviews ?? 0);
+    if (delta <= 0) continue;
+
+    const perDay = delta / observedDays;
+    const projected90 = clampInt(perDay * 90, 0, 9999);
+
+    return {
+      kind: "observed",
+      confidenceLabel: label,
+      marketGrowth90d: projected90,
+    };
+  }
+
+  return estimated;
 }
 
-export default function ProjectCompetitorsPage() {
-  const params = useParams();
+function computeCapacityAwareTargets90d(args: {
+  yourReviews: number;
+  topCompetitorReviews: number;
+  monthlyCustomerEvents: number;
+  reviewConversionRate: number; // 0..1
+}) {
+  const gap = Math.max(0, args.topCompetitorReviews - args.yourReviews);
+  const closePct = gap > 100 ? 0.25 : 0.5;
+  const ruleTargetGain = Math.ceil(gap * closePct);
 
-  const projectId = useMemo(() => {
-    const raw = (params as any)?.projectId;
-    if (typeof raw === "string" && raw.trim()) return raw.trim();
-    if (Array.isArray(raw) && typeof raw[0] === "string" && raw[0].trim()) return raw[0].trim();
+  const expectedPerMonth = args.monthlyCustomerEvents * args.reviewConversionRate;
+  const capacity90d = Math.floor(expectedPerMonth * 3);
 
-    if (typeof window !== "undefined") {
-      const parts = window.location.pathname.split("/").filter(Boolean);
-      const idx = parts.indexOf("projects");
-      if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
-    }
-    return "";
-  }, [params]);
+  const realisticTarget90d = Math.max(0, Math.min(ruleTargetGain, capacity90d));
+  const weeklyNeeded = Math.ceil(realisticTarget90d / 13);
 
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  return { gap, ruleTargetGain, capacity90d, realisticTarget90d, weeklyNeeded };
+}
 
-  const [loadingList, setLoadingList] = useState(false);
-  const [rows, setRows] = useState<CompetitorRow[]>([]);
-  const [listError, setListError] = useState<string | null>(null);
+export default function CompetitorsPage() {
+  const params = useParams<{ projectId: string }>();
+  const projectId = params.projectId;
 
-  const [loadingInputs, setLoadingInputs] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
+  const [competitors, setCompetitors] = useState<CompetitorMetric[]>([]);
+  const [snapshotsForTop, setSnapshotsForTop] = useState<CompetitorSnapshot[]>([]);
+
+  const [yourCurrentReviews, setYourCurrentReviews] = useState<number | null>(null);
+
   const [inputsError, setInputsError] = useState<string | null>(null);
+  const [inputsNote, setInputsNote] = useState<string | null>(null);
 
-  const [project, setProject] = useState<ProjectRow | null>(null);
-  const [gbpProfile, setGbpProfile] = useState<GbpProfileRow | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [loadingVelocity, setLoadingVelocity] = useState(false);
-  const [velocityError, setVelocityError] = useState<string | null>(null);
-  const [marketGrowth90, setMarketGrowth90] = useState<number | null>(null);
-  const [velocityMode, setVelocityMode] = useState<VelocityMode>("estimated");
+  const topCompetitor = competitors[0] ?? null;
+
+  async function loadProject() {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("id, monthly_customer_events, review_conversion_rate")
+      .eq("id", projectId)
+      .limit(1);
+
+    if (error) throw new Error(`Project load failed: ${error.message}`);
+
+    const row = (data ?? [])[0] as Project | undefined;
+    if (!row) throw new Error("Project not found (0 rows).");
+    return row;
+  }
 
   async function loadCompetitors() {
-    if (!projectId) return;
-
-    setLoadingList(true);
-    setListError(null);
-
     const { data, error } = await supabase
       .from("gbp_competitor_metrics")
-      .select(
-        "id, project_id, name, competitor_name, competitor_domain, domain, rating, total_reviews, last_seen_at, source, place_id"
-      )
+      .select("project_id, competitor_domain, place_id, name, rating, total_reviews, last_seen_at")
+      .eq("project_id", projectId);
+
+    if (error) throw new Error(`Competitors load failed: ${error.message}`);
+
+    const sorted = (data as CompetitorMetric[]).slice().sort((a, b) => {
+      const ar = a.total_reviews ?? 0;
+      const br = b.total_reviews ?? 0;
+      return br - ar;
+    });
+
+    return sorted;
+  }
+
+  async function loadSnapshotsForTopCompetitor(top: CompetitorMetric | null) {
+    if (!top) return [];
+
+    const { data, error } = await supabase
+      .from("gbp_competitor_snapshots")
+      .select("project_id, competitor_domain, total_reviews, captured_at")
       .eq("project_id", projectId)
-      .order("total_reviews", { ascending: false, nullsFirst: false });
+      .eq("competitor_domain", top.competitor_domain)
+      .order("captured_at", { ascending: false })
+      .limit(400);
 
-    if (error) {
-      setListError(error.message);
-      setRows([]);
-    } else {
-      setRows((data ?? []) as CompetitorRow[]);
-    }
-
-    setLoadingList(false);
+    if (error) return [];
+    return (data as CompetitorSnapshot[]) ?? [];
   }
 
   async function loadInputs() {
-    if (!projectId) return;
-
-    setLoadingInputs(true);
     setInputsError(null);
+    setInputsNote(null);
 
-    try {
-      const { data: proj, error: projErr } = await supabase
-        .from("projects")
-        .select("id, monthly_customer_events, review_conversion_rate")
-        .eq("id", projectId)
-        .single();
-      if (projErr) throw new Error(projErr.message);
-      setProject((proj ?? null) as ProjectRow | null);
+    // SAFE: order + limit(1). NO .single()
+    const { data, error } = await supabase
+      .from("gbp_profiles")
+      .select("total_reviews, captured_at")
+      .eq("project_id", projectId)
+      .order("captured_at", { ascending: false })
+      .limit(1);
 
-      const { data: prof, error: profErr } = await supabase
-        .from("gbp_profiles")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    if (error) {
+      setYourCurrentReviews(null);
+      setInputsError(`Error: ${error.message}`);
+      return;
+    }
 
-      if (profErr) setGbpProfile(null);
-      else setGbpProfile((prof ?? null) as GbpProfileRow | null);
-    } catch (e: any) {
-      setInputsError(e?.message ?? "Failed to load inputs");
-    } finally {
-      setLoadingInputs(false);
+    const row = (data ?? [])[0] as any | undefined;
+    const reviews = row?.total_reviews;
+
+    if (typeof reviews === "number") {
+      setYourCurrentReviews(reviews);
+    } else {
+      setYourCurrentReviews(null);
+      setInputsNote(
+        "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
+      );
     }
   }
 
-  async function loadVelocity() {
-    if (!projectId) return;
-
-    setLoadingVelocity(true);
-    setVelocityError(null);
-
+  async function refreshAll() {
+    setLoading(true);
     try {
-      const top3 = rows.slice(0, 3).filter((r) => r.competitor_domain);
-      const competitorDomains = top3.map((c) => c.competitor_domain);
+      const [proj, comps] = await Promise.all([loadProject(), loadCompetitors()]);
+      setProject(proj);
+      setCompetitors(comps);
 
-      const now = new Date();
-      const windowStart = new Date(now.getTime() - 110 * 24 * 60 * 60 * 1000); // enough for 90d +/- buffer
+      const snaps = await loadSnapshotsForTopCompetitor(comps[0] ?? null);
+      setSnapshotsForTop(snaps);
 
-      const { data: snaps, error: snapsErr } = await supabase
-        .from("gbp_competitor_snapshots")
-        .select("competitor_domain,total_reviews,captured_at")
-        .eq("project_id", projectId)
-        .in("competitor_domain", competitorDomains.length ? competitorDomains : ["__none__"])
-        .gte("captured_at", windowStart.toISOString())
-        .lte("captured_at", now.toISOString())
-        .order("captured_at", { ascending: true });
-
-      if (snapsErr) throw new Error(snapsErr.message);
-
-      const byDomain = new Map<string, SnapshotRow[]>();
-      (snaps ?? []).forEach((s: any) => {
-        const d = String(s.competitor_domain);
-        const arr = byDomain.get(d) ?? [];
-        arr.push({
-          competitor_domain: d,
-          total_reviews: typeof s.total_reviews === "number" ? s.total_reviews : toNumberOrNull(s.total_reviews),
-          captured_at: String(s.captured_at),
-        });
-        byDomain.set(d, arr);
-      });
-
-      const horizons: Array<{ days: 90 | 30 | 14; minCompetitors: number; mode: VelocityMode }> = [
-        { days: 90, minCompetitors: 2, mode: "observed_90d" },
-        { days: 30, minCompetitors: 2, mode: "observed_30d" },
-        { days: 14, minCompetitors: 2, mode: "observed_14d" },
-      ];
-
-      for (const h of horizons) {
-        const targetThenMs = now.getTime() - h.days * 24 * 60 * 60 * 1000;
-
-        const velocities: number[] = [];
-
-        for (const d of competitorDomains) {
-          const arr = byDomain.get(d) ?? [];
-          if (arr.length < 2) continue;
-
-          const nowPoint = arr[arr.length - 1];
-          const thenPoint = closestByDate(arr, targetThenMs);
-
-          const nowReviews = nowPoint?.total_reviews;
-          const thenReviews = thenPoint?.total_reviews;
-
-          if (nowReviews === null || thenReviews === null) continue;
-
-          const v = Math.max(0, nowReviews - thenReviews);
-          velocities.push(v);
-        }
-
-        const med = median(velocities);
-
-        if (med !== null && velocities.length >= h.minCompetitors) {
-          const scaled90 = Math.round(med * (90 / h.days));
-          setMarketGrowth90(scaled90);
-          setVelocityMode(h.mode);
-          setLoadingVelocity(false);
-          return;
-        }
-      }
-
-      // Estimated fallback
-      const top3Reviews = rows.slice(0, 3).map((r) => (typeof r.total_reviews === "number" ? r.total_reviews : 0));
-      const top3Avg =
-        top3Reviews.length ? top3Reviews.reduce((a, b) => a + b, 0) / Math.max(1, top3Reviews.length) : 0;
-
-      const top10 = rows.slice(0, 10).map((r) => (typeof r.total_reviews === "number" ? r.total_reviews : 0));
-      const med10 = median(top10) ?? 0;
-
-      const spread = Math.max(0, top3Avg - med10);
-
-      const k = 0.12;
-      const est90 = Math.round(spread * k);
-
-      setMarketGrowth90(est90);
-      setVelocityMode("estimated");
+      await loadInputs();
     } catch (e: any) {
-      setVelocityError(e?.message ?? "Failed to compute velocity");
-      setMarketGrowth90(null);
-      setVelocityMode("estimated");
+      setStatus(e?.message ?? "Unknown load error");
     } finally {
-      setLoadingVelocity(false);
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadInputs();
-    loadCompetitors();
+    refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  useEffect(() => {
-    if (rows.length) loadVelocity();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.length]);
+  const velocity = useMemo(() => {
+    return computeVelocityAutoUpgrade(topCompetitor, snapshotsForTop);
+  }, [topCompetitor, snapshotsForTop]);
+
+  const catchUpFactor = 0.35;
+  const marketBasedTarget90d = Math.max(0, Math.ceil(velocity.marketGrowth90d * catchUpFactor));
+
+  const reviewModel = useMemo(() => {
+    return computeCapacityAwareTargets90d({
+      yourReviews: yourCurrentReviews ?? 0,
+      topCompetitorReviews: topCompetitor?.total_reviews ?? 0,
+      monthlyCustomerEvents: project?.monthly_customer_events ?? 0,
+      reviewConversionRate: project?.review_conversion_rate ?? 0,
+    });
+  }, [yourCurrentReviews, topCompetitor, project]);
+
+  const finalTarget90d =
+    yourCurrentReviews == null
+      ? null
+      : Math.min(reviewModel.realisticTarget90d, marketBasedTarget90d);
 
   async function runDiscovery() {
+    setRunning(true);
+    setStatus("Running discovery…");
     try {
-      setBusy(true);
-      setStatus("Running discovery…");
-
-      if (!projectId) {
-        setStatus("Failed: projectId is empty on the page.");
-        return;
-      }
-
       const res = await fetch(`/api/projects/${projectId}/discover-competitors`, { method: "POST" });
       const text = await res.text();
-
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = null;
-      }
-
       if (!res.ok) {
-        const msg =
-          (json && (json.error || json.message)) || (text ? text.slice(0, 400) : "Empty response body");
-        setStatus(`Failed: ${msg}`);
+        setStatus(`Discovery failed (${res.status}): ${text}`);
         return;
       }
-
-      if (!json || !json.ok) {
-        const msg =
-          (json && (json.error || json.message)) || (text ? text.slice(0, 400) : "Empty/invalid JSON response");
-        setStatus(`Failed: ${msg}`);
-        return;
-      }
-
-      setStatus(
-        `Success: found ${json.result.found}, upserted ${json.result.upserted}, cost $${Number(
-          json.result.costUsd ?? 0
-        ).toFixed(4)}`
-      );
-
-      await loadCompetitors();
-      await loadVelocity();
+      setStatus(text || "Discovery complete.");
+      await refreshAll();
     } catch (e: any) {
-      setStatus(`Failed: ${e?.message ?? "Unknown error"}`);
+      setStatus(`Discovery error: ${e?.message ?? "Unknown error"}`);
     } finally {
-      setBusy(false);
+      setRunning(false);
     }
   }
 
-  const currentReviews = useMemo(() => pickCurrentReviewsFromProfile(gbpProfile), [gbpProfile]);
-
-  const leaderReviews = useMemo(() => {
-    const max = rows.reduce((acc, r) => {
-      const n = typeof r.total_reviews === "number" ? r.total_reviews : null;
-      if (n === null) return acc;
-      return acc === null ? n : Math.max(acc, n);
-    }, null as number | null);
-    return max;
-  }, [rows]);
-
-  const gap = useMemo(() => {
-    if (currentReviews === null || leaderReviews === null) return null;
-    return Math.max(0, leaderReviews - currentReviews);
-  }, [currentReviews, leaderReviews]);
-
-  const targetCloseByRule = useMemo(() => {
-    if (gap === null) return null;
-    if (gap === 0) return 0;
-    const pct = gap > 100 ? 0.25 : 0.5;
-    return Math.ceil(gap * pct);
-  }, [gap]);
-
-  const conv = useMemo(() => normalizeConversionRate(project?.review_conversion_rate ?? null), [project?.review_conversion_rate]);
-  const monthlyVolume = project?.monthly_customer_events ?? null;
-
-  const capacity90 = useMemo(() => {
-    if (monthlyVolume === null || conv === null) return null;
-    return Math.floor(monthlyVolume * 3 * conv);
-  }, [monthlyVolume, conv]);
-
-  const marketTarget90 = useMemo(() => {
-    if (marketGrowth90 === null) return null;
-    const catchupFactor = gap !== null && gap > 200 ? 0.5 : 0.7;
-    return Math.max(0, Math.round(marketGrowth90 * catchupFactor));
-  }, [marketGrowth90, gap]);
-
-  const realistic90 = useMemo(() => {
-    if (targetCloseByRule === null) return null;
-    const candidates: number[] = [targetCloseByRule];
-    if (capacity90 !== null) candidates.push(capacity90);
-    if (marketTarget90 !== null) candidates.push(marketTarget90);
-    if (gap !== null) candidates.push(gap);
-    return Math.min(...candidates);
-  }, [targetCloseByRule, capacity90, marketTarget90, gap]);
-
-  const weeklyNeeded = useMemo(() => {
-    if (realistic90 === null) return null;
-    return realistic90 === 0 ? 0 : Math.ceil(realistic90 / 13);
-  }, [realistic90]);
-
-  const conf = confidenceLabel(velocityMode);
+  if (loading) return <div className="p-4 text-sm text-gray-500">Loading…</div>;
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4">
+      {/* BIG PROOF TAG */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        Build tag: <span className="font-mono font-semibold">{BUILD_TAG}</span>
+      </div>
+
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Competitors</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <div className="text-sm text-gray-500">
             Google Maps competitor discovery (DataForSEO). Sorted by total reviews.
-          </p>
+          </div>
         </div>
 
         <button
           onClick={runDiscovery}
-          disabled={busy}
-          className="px-4 py-2 rounded-md bg-black text-white disabled:opacity-50 whitespace-nowrap"
+          disabled={running}
+          className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium bg-black text-white disabled:opacity-60"
         >
-          {busy ? "Running…" : "Run discovery"}
+          {running ? "Running…" : "Run discovery"}
         </button>
       </div>
 
       {status && (
-        <div className="mt-4 p-3 rounded-md border">
-          <div className="text-sm whitespace-pre-wrap">{status}</div>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          {status}
         </div>
       )}
 
-      <div className="mt-6 border rounded-md p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold">Market velocity</div>
-            <div className="text-xs text-gray-600 mt-1">
-              {conf} • Automatically improves as nightly snapshots accumulate.
-            </div>
-          </div>
-          <button onClick={loadVelocity} disabled={loadingVelocity} className="text-sm underline disabled:opacity-50">
-            {loadingVelocity ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-
-        {velocityError && <div className="mt-3 text-sm text-red-600">Error: {velocityError}</div>}
-
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Market growth (90d)</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(marketGrowth90)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Market-based target (90d)</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(marketTarget90)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Confidence</div>
-            <div className="text-lg font-semibold mt-1">{conf}</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 border rounded-md p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold">Review gap & 90-day target</div>
-            <div className="text-xs text-gray-600 mt-1">
-              Final target = min(rule target, market target, capacity).
-            </div>
-          </div>
-          <button onClick={loadInputs} disabled={loadingInputs} className="text-sm underline disabled:opacity-50">
-            {loadingInputs ? "Refreshing…" : "Refresh inputs"}
-          </button>
-        </div>
-
-        {inputsError && <div className="mt-3 text-sm text-red-600">Error: {inputsError}</div>}
-
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Your current reviews</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(currentReviews)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Top competitor reviews</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(leaderReviews)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Review gap</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(gap)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Rule target (90d)</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(targetCloseByRule)}</div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Capacity (90d)</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(capacity90)}</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {fmtInt(monthlyVolume)} / month × 3 × {fmtPct(conv)}
-            </div>
-          </div>
-
-          <div className="border rounded-md p-3">
-            <div className="text-xs text-gray-600">Realistic target (90d)</div>
-            <div className="text-lg font-semibold mt-1">{fmtInt(realistic90)}</div>
-          </div>
-        </div>
-
-        <div className="mt-4 border rounded-md p-3">
-          <div className="text-xs text-gray-600">Weekly requirement</div>
-          <div className="text-lg font-semibold mt-1">{fmtInt(weeklyNeeded)}</div>
-          <div className="text-xs text-gray-500 mt-1">~13 weeks in 90 days</div>
-        </div>
-
-        {currentReviews === null && (
-          <div className="mt-4 text-sm text-amber-700">
-            Note: I couldn’t find your current review count from <code>gbp_profiles</code>. Add/confirm your latest GBP
-            snapshot so targets are accurate.
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Discovered competitors</h2>
-          <button onClick={loadCompetitors} disabled={loadingList} className="text-sm underline disabled:opacity-50">
-            {loadingList ? "Refreshing…" : "Refresh"}
+          <div className="text-sm font-semibold">Review gap & 90-day target</div>
+          <button onClick={loadInputs} className="text-sm underline text-gray-700 hover:text-black">
+            Refresh inputs
           </button>
         </div>
 
-        {listError && (
-          <div className="mt-3 p-3 rounded-md border">
-            <div className="text-sm text-red-600">Failed to load: {listError}</div>
-          </div>
-        )}
+        {inputsError && <div className="mt-3 text-sm text-red-600">{inputsError}</div>}
+        {inputsNote && <div className="mt-3 text-sm text-orange-600">{inputsNote}</div>}
 
-        {rows.length > 0 && (
-          <div className="mt-3 overflow-x-auto border rounded-md">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left p-3">Name</th>
-                  <th className="text-right p-3">Reviews</th>
-                  <th className="text-right p-3">Rating</th>
-                  <th className="text-left p-3">Domain</th>
-                  <th className="text-left p-3">Last seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const displayName = (r.name ?? r.competitor_name ?? "Unknown").trim();
-                  const displayDomain = (r.domain ?? r.competitor_domain ?? "").trim();
-                  const reviews = typeof r.total_reviews === "number" ? r.total_reviews : null;
-                  const rating = typeof r.rating === "number" ? r.rating : null;
-
-                  return (
-                    <tr key={r.id} className="border-t">
-                      <td className="p-3">
-                        <div className="font-medium">{displayName}</div>
-                        {r.place_id && <div className="text-xs text-gray-500">place_id: {r.place_id}</div>}
-                      </td>
-                      <td className="p-3 text-right">{reviews ?? "—"}</td>
-                      <td className="p-3 text-right">{rating ?? "—"}</td>
-                      <td className="p-3">
-                        <div className="truncate max-w-[240px]">{displayDomain || "—"}</div>
-                      </td>
-                      <td className="p-3">{r.last_seen_at ? new Date(r.last_seen_at).toLocaleString() : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs text-gray-500">Your current reviews</div>
+            <div className="text-xl font-semibold">{yourCurrentReviews ?? "—"}</div>
           </div>
-        )}
 
-        {!listError && rows.length === 0 && (
-          <div className="mt-3 p-3 rounded-md border">
-            <div className="text-sm text-gray-700">
-              No competitors yet. Click <strong>Run discovery</strong>.
-            </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs text-gray-500">Top competitor reviews</div>
+            <div className="text-xl font-semibold">{topCompetitor?.total_reviews ?? 0}</div>
           </div>
-        )}
+
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs text-gray-500">Realistic target (90d)</div>
+            <div className="text-xl font-semibold">{finalTarget90d ?? "—"}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
