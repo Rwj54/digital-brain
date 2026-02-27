@@ -1,65 +1,75 @@
 import { supabaseServer } from "../supabase/server";
-import type { CompetitorCandidate } from "./types";
 
-function normalizeDomain(input: string | null): string {
-  if (!input) return "";
-  const s = input.trim().toLowerCase();
-  return s;
-}
+type PersistCandidate = {
+  project_id: string;
+  competitor_domain: string;
+  place_id: string | null;
+  name: string | null;
+  rating: number | null;
+  total_reviews: number | null;
+  source: string;
+  last_seen_at: string;
+  raw_provider?: any;
+};
 
-/**
- * Your existing schema has a UNIQUE constraint on (project_id, competitor_domain).
- * DataForSEO often returns no domain, so empty string would collide.
- *
- * Strategy:
- * - If domain exists: competitor_domain = domain (normalized)
- * - Else: competitor_domain = "place_id:<placeId>" (unique + stable)
- *
- * Then upsert on (project_id, competitor_domain) so we respect your existing unique index.
- */
 export async function upsertCompetitorsIntoGbpCompetitorMetrics(
-  candidates: CompetitorCandidate[]
-) {
-  if (candidates.length === 0) return 0;
+  candidates: PersistCandidate[]
+): Promise<number> {
+  if (!candidates.length) return 0;
 
   const supabase = supabaseServer();
 
-  const rows = candidates.map((c) => {
-    const domain = normalizeDomain(c.domain);
-    const competitorDomain = domain ? domain : `place_id:${c.placeId}`;
+  const nowIso = new Date().toISOString();
 
-    return {
-      project_id: c.projectId,
-
-      // existing NOT NULL + UNIQUE (with project_id)
-      competitor_domain: competitorDomain,
-
-      // discovery identity (we added this column)
-      place_id: c.placeId,
-
-      // keep name for UI
-      name: c.name,
-
-      // added/ensured columns
-      rating: c.rating,
-      total_reviews: c.totalReviews,
-      source: c.source,
-      last_seen_at: c.lastSeenAt,
-      raw_provider: c.rawProvider ?? null,
-    };
-  });
-
-  const { error, data } = await supabase
+  // 1️⃣ Upsert latest state table (existing behavior)
+  const { error: upsertError } = await supabase
     .from("gbp_competitor_metrics")
-    .upsert(rows, {
-      onConflict: "project_id,competitor_domain",
-      ignoreDuplicates: false,
-    })
-    .select("project_id,competitor_domain");
+    .upsert(
+      candidates.map((c) => ({
+        project_id: c.project_id,
+        competitor_domain: c.competitor_domain,
+        place_id: c.place_id,
+        name: c.name,
+        rating: c.rating,
+        total_reviews: c.total_reviews,
+        source: c.source,
+        last_seen_at: nowIso,
+        captured_at: nowIso,
+        raw_provider: c.raw_provider ?? null,
+      })),
+      {
+        onConflict: "project_id,competitor_domain",
+      }
+    );
 
-  if (error) {
-    throw new Error(`Supabase upsert gbp_competitor_metrics failed: ${error.message}`);
+  if (upsertError) {
+    throw new Error(
+      `Supabase upsert gbp_competitor_metrics failed: ${upsertError.message}`
+    );
   }
 
-  return data?.length ?? 0;
+  // 2️⃣ Insert time-series snapshot rows (NEW)
+  const snapshotRows = candidates.map((c) => ({
+    project_id: c.project_id,
+    competitor_domain: c.competitor_domain,
+    place_id: c.place_id,
+    name: c.name,
+    rating: c.rating,
+    total_reviews: c.total_reviews,
+    source: c.source,
+    captured_at: nowIso,
+    raw_provider: c.raw_provider ?? null,
+  }));
+
+  const { error: snapshotError } = await supabase
+    .from("gbp_competitor_snapshots")
+    .insert(snapshotRows);
+
+  if (snapshotError) {
+    throw new Error(
+      `Supabase insert gbp_competitor_snapshots failed: ${snapshotError.message}`
+    );
+  }
+
+  return candidates.length;
 }
