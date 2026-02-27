@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
-const BUILD_TAG = "PHASE_2C_COMPETITORS__2026-02-27__TAG_001";
-
 type Project = {
   id: string;
+  primary_category: string | null;
+  target_metro: string | null;
+  target_radius_miles: number | null;
   monthly_customer_events: number | null;
   review_conversion_rate: number | null;
 };
@@ -37,11 +38,14 @@ type VelocityResult =
       kind: "observed";
       confidenceLabel: ObservedLabel;
       marketGrowth90d: number;
+      observedDeltaReviews: number;
+      observedDays: number;
     }
   | {
       kind: "estimated";
       confidenceLabel: EstimatedLabel;
       marketGrowth90d: number;
+      note: string;
     };
 
 function clampInt(n: number, min: number, max: number) {
@@ -82,6 +86,7 @@ function computeVelocityAutoUpgrade(
     kind: "estimated",
     confidenceLabel: "Estimated",
     marketGrowth90d: clampInt(((topCompetitor?.total_reviews ?? 0) * 0.06) / 1, 12, 180),
+    note: "Not enough snapshot history yet. This will automatically upgrade after 2–4 weeks.",
   };
 
   if (!topCompetitor) return estimated;
@@ -90,11 +95,7 @@ function computeVelocityAutoUpgrade(
   const latest = snapshotsDesc[0];
   if (latest.total_reviews == null) return estimated;
 
-  const horizons: Array<{
-    h: 90 | 30 | 14;
-    label: ObservedLabel;
-    maxDaysAway: number;
-  }> = [
+  const horizons: Array<{ h: 90 | 30 | 14; label: ObservedLabel; maxDaysAway: number }> = [
     { h: 90, label: "Observed (90d)", maxDaysAway: 10 },
     { h: 30, label: "Observed (30d)", maxDaysAway: 6 },
     { h: 14, label: "Observed (14d)", maxDaysAway: 4 },
@@ -121,12 +122,20 @@ function computeVelocityAutoUpgrade(
       kind: "observed",
       confidenceLabel: label,
       marketGrowth90d: projected90,
+      observedDeltaReviews: delta,
+      observedDays: Math.round(observedDays),
     };
   }
 
   return estimated;
 }
 
+/**
+ * Review target rules (must preserve):
+ * - If gap > 100: close 25% in 90 days
+ * - If gap <= 100: close 50% in 90 days
+ * - Capacity cap: monthly_customer_events * review_conversion_rate * 3
+ */
 function computeCapacityAwareTargets90d(args: {
   yourReviews: number;
   topCompetitorReviews: number;
@@ -140,10 +149,20 @@ function computeCapacityAwareTargets90d(args: {
   const expectedPerMonth = args.monthlyCustomerEvents * args.reviewConversionRate;
   const capacity90d = Math.floor(expectedPerMonth * 3);
 
-  const realisticTarget90d = Math.max(0, Math.min(ruleTargetGain, capacity90d));
-  const weeklyNeeded = Math.ceil(realisticTarget90d / 13);
+  const realistic90dGain = Math.max(0, Math.min(ruleTargetGain, capacity90d));
+  const weeklyNeeded = Math.ceil(realistic90dGain / 13);
 
-  return { gap, ruleTargetGain, capacity90d, realisticTarget90d, weeklyNeeded };
+  const timeToCloseFullGapDays =
+    expectedPerMonth > 0 ? Math.ceil((gap / expectedPerMonth) * 30) : null;
+
+  return {
+    gap,
+    ruleTargetGain,
+    capacity90d,
+    realistic90dGain,
+    weeklyNeeded,
+    timeToCloseFullGapDays,
+  };
 }
 
 export default function CompetitorsPage() {
@@ -155,7 +174,7 @@ export default function CompetitorsPage() {
   const [snapshotsForTop, setSnapshotsForTop] = useState<CompetitorSnapshot[]>([]);
 
   const [yourCurrentReviews, setYourCurrentReviews] = useState<number | null>(null);
-  const [inputsError, setInputsError] = useState<string | null>(null);
+  const [inputsMessage, setInputsMessage] = useState<string | null>(null);
 
   const [status, setStatus] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -164,14 +183,16 @@ export default function CompetitorsPage() {
   const topCompetitor = competitors[0] ?? null;
 
   async function loadProject() {
+    // SAFE: no .single()
     const { data, error } = await supabase
       .from("projects")
-      .select("id, monthly_customer_events, review_conversion_rate")
+      .select(
+        "id, primary_category, target_metro, target_radius_miles, monthly_customer_events, review_conversion_rate"
+      )
       .eq("id", projectId)
       .limit(1);
 
     if (error) throw new Error(`Project load failed: ${error.message}`);
-
     const row = (data ?? [])[0] as Project | undefined;
     if (!row) throw new Error("Project not found (0 rows).");
     return row;
@@ -210,8 +231,9 @@ export default function CompetitorsPage() {
   }
 
   async function loadInputs() {
-    setInputsError(null);
+    setInputsMessage(null);
 
+    // SAFE: order + limit(1). NO .single()
     const { data, error } = await supabase
       .from("gbp_profiles")
       .select("total_reviews, captured_at")
@@ -221,7 +243,7 @@ export default function CompetitorsPage() {
 
     if (error) {
       setYourCurrentReviews(null);
-      setInputsError(`Error: ${error.message}`);
+      setInputsMessage(`Error: ${error.message}`);
       return;
     }
 
@@ -230,16 +252,19 @@ export default function CompetitorsPage() {
 
     if (typeof reviews === "number") {
       setYourCurrentReviews(reviews);
-    } else {
-      setYourCurrentReviews(null);
-      setInputsError(
-        "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
-      );
+      return;
     }
+
+    setYourCurrentReviews(null);
+    setInputsMessage(
+      "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
+    );
   }
 
   async function refreshAll() {
     setLoading(true);
+    setStatus(null);
+
     try {
       const [proj, comps] = await Promise.all([loadProject(), loadCompetitors()]);
       setProject(proj);
@@ -280,18 +305,21 @@ export default function CompetitorsPage() {
   const finalTarget90d =
     yourCurrentReviews == null
       ? null
-      : Math.min(reviewModel.realisticTarget90d, marketBasedTarget90d);
+      : Math.min(reviewModel.realistic90dGain, marketBasedTarget90d);
 
   async function runDiscovery() {
     setRunning(true);
     setStatus("Running discovery…");
+
     try {
       const res = await fetch(`/api/projects/${projectId}/discover-competitors`, { method: "POST" });
       const text = await res.text();
+
       if (!res.ok) {
         setStatus(`Discovery failed (${res.status}): ${text}`);
         return;
       }
+
       setStatus(text || "Discovery complete.");
       await refreshAll();
     } catch (e: any) {
@@ -305,16 +333,18 @@ export default function CompetitorsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-        Build tag: <span className="font-mono font-semibold">{BUILD_TAG}</span>
-      </div>
-
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Competitors</h1>
           <div className="text-sm text-gray-500">
             Google Maps competitor discovery (DataForSEO). Sorted by total reviews.
           </div>
+          {project && (
+            <div className="text-xs text-gray-500 mt-1">
+              {project.primary_category ?? "Category"} • {project.target_metro ?? "Metro"} •{" "}
+              {project.target_radius_miles ?? "—"} mi
+            </div>
+          )}
         </div>
 
         <button
@@ -332,33 +362,185 @@ export default function CompetitorsPage() {
         </div>
       )}
 
+      {/* Market velocity */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Review gap & 90-day target</div>
-          <button onClick={loadInputs} className="text-sm underline text-gray-700 hover:text-black">
+          <div className="text-sm font-semibold">Market velocity</div>
+          <div className="text-xs text-gray-500">
+            {velocity.confidenceLabel} • Automatically improves as nightly snapshots accumulate.
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Market growth (90d)</div>
+            <div className="text-lg font-semibold">{velocity.marketGrowth90d}</div>
+            {velocity.kind === "observed" ? (
+              <div className="text-xs text-gray-500">
+                +{velocity.observedDeltaReviews} over {velocity.observedDays}d
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">{velocity.note}</div>
+            )}
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Market-based target (90d)</div>
+            <div className="text-lg font-semibold">{marketBasedTarget90d}</div>
+            <div className="text-xs text-gray-500">Catch-up factor applied</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Confidence</div>
+            <div className="text-lg font-semibold">{velocity.confidenceLabel}</div>
+            <div className="text-xs text-gray-500">Will upgrade over time</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Review gap & 90-day target */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold">Review gap & 90-day target</div>
+            <div className="text-xs text-gray-500">
+              Final target = min(rule target, market target, capacity).
+            </div>
+          </div>
+
+          <button
+            onClick={loadInputs}
+            className="text-sm underline text-gray-700 hover:text-black"
+            type="button"
+          >
             Refresh inputs
           </button>
         </div>
 
-        {inputsError && <div className="mt-3 text-sm text-red-600">{inputsError}</div>}
+        {inputsMessage && (
+          <div
+            className={`mt-3 text-sm ${
+              inputsMessage.startsWith("Error:") ? "text-red-600" : "text-orange-600"
+            }`}
+          >
+            {inputsMessage}
+          </div>
+        )}
 
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-gray-200 p-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Your current reviews</div>
-            <div className="text-xl font-semibold">{yourCurrentReviews ?? "—"}</div>
+            <div className="text-lg font-semibold">{yourCurrentReviews ?? "—"}</div>
+            <div className="text-xs text-gray-500">From latest GBP snapshot</div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-3">
+          <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Top competitor reviews</div>
-            <div className="text-xl font-semibold">{topCompetitor?.total_reviews ?? 0}</div>
+            <div className="text-lg font-semibold">{topCompetitor?.total_reviews ?? 0}</div>
+            <div className="text-xs text-gray-500">From discovered set</div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-3">
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Review gap</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.gap}
+            </div>
+            <div className="text-xs text-gray-500">Top competitor − you</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Realistic target (90d)</div>
-            <div className="text-xl font-semibold">{finalTarget90d ?? "—"}</div>
+            <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
+            <div className="text-xs text-gray-500">Market + capacity constrained</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Rule target (90d)</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.ruleTargetGain}
+            </div>
+            <div className="text-xs text-gray-500">Your baseline rule</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Capacity (90d)</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.capacity90d}
+            </div>
+            <div className="text-xs text-gray-500">
+              {(project?.monthly_customer_events ?? "—")} / month × 3 ×{" "}
+              {(project?.review_conversion_rate ?? "—")}
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Weekly requirement</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
+            </div>
+            <div className="text-xs text-gray-500">~13 weeks in 90 days</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Time to close full gap</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null
+                ? "—"
+                : reviewModel.timeToCloseFullGapDays == null
+                ? "—"
+                : `${reviewModel.timeToCloseFullGapDays}d`}
+            </div>
+            <div className="text-xs text-gray-500">At current capacity</div>
           </div>
         </div>
       </div>
+
+      {/* Discovered competitors */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="text-sm font-semibold">Discovered competitors</div>
+
+        {competitors.length === 0 ? (
+          <div className="mt-3 text-sm text-gray-500">
+            No competitors found yet. Click <span className="font-medium">Run discovery</span>.
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500">
+                  <th className="py-2 pr-4">Name</th>
+                  <th className="py-2 pr-4">Reviews</th>
+                  <th className="py-2 pr-4">Rating</th>
+                  <th className="py-2 pr-4">Domain</th>
+                  <th className="py-2 pr-4">Last seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {competitors.map((c) => (
+                  <tr key={c.competitor_domain} className="border-t border-gray-100">
+                    <td className="py-2 pr-4">
+                      <div className="font-medium">{c.name ?? "—"}</div>
+                      <div className="text-xs text-gray-500 truncate max-w-[420px]">
+                        {c.place_id ?? c.competitor_domain}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4 font-medium">{c.total_reviews ?? 0}</td>
+                    <td className="py-2 pr-4">{c.rating ?? "—"}</td>
+                    <td className="py-2 pr-4 text-xs text-gray-700">
+                      {c.competitor_domain?.startsWith("place_id:") ? "—" : c.competitor_domain ?? "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-xs text-gray-700">
+                      {c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="h-10" />
     </div>
   );
 }
