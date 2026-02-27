@@ -78,18 +78,22 @@ function findClosestSnapshotToDate(
   return best;
 }
 
+/**
+ * Velocity confidence auto-upgrade (90d -> 30d -> 14d -> Estimated)
+ * Uses ONE competitor's snapshots (the "threshold competitor").
+ */
 function computeVelocityAutoUpgrade(
-  topCompetitor: CompetitorMetric | null,
+  competitorForVelocity: CompetitorMetric | null,
   snapshotsDesc: CompetitorSnapshot[]
 ): VelocityResult {
   const estimated: VelocityResult = {
     kind: "estimated",
     confidenceLabel: "Estimated",
-    marketGrowth90d: clampInt(((topCompetitor?.total_reviews ?? 0) * 0.06) / 1, 12, 180),
+    marketGrowth90d: clampInt(((competitorForVelocity?.total_reviews ?? 0) * 0.06) / 1, 12, 180),
     note: "Not enough snapshot history yet. This will automatically upgrade after 2–4 weeks.",
   };
 
-  if (!topCompetitor) return estimated;
+  if (!competitorForVelocity) return estimated;
   if (!snapshotsDesc.length) return estimated;
 
   const latest = snapshotsDesc[0];
@@ -138,11 +142,12 @@ function computeVelocityAutoUpgrade(
  */
 function computeCapacityAwareTargets90d(args: {
   yourReviews: number;
-  topCompetitorReviews: number;
+  thresholdCompetitorReviews: number; // <-- Top 3 median reviews
   monthlyCustomerEvents: number;
   reviewConversionRate: number; // 0..1
 }) {
-  const gap = Math.max(0, args.topCompetitorReviews - args.yourReviews);
+  const gap = Math.max(0, args.thresholdCompetitorReviews - args.yourReviews);
+
   const closePct = gap > 100 ? 0.25 : 0.5;
   const ruleTargetGain = Math.ceil(gap * closePct);
 
@@ -165,13 +170,20 @@ function computeCapacityAwareTargets90d(args: {
   };
 }
 
+function medianInt(values: number[]) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted[mid];
+}
+
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
 
   const [project, setProject] = useState<Project | null>(null);
   const [competitors, setCompetitors] = useState<CompetitorMetric[]>([]);
-  const [snapshotsForTop, setSnapshotsForTop] = useState<CompetitorSnapshot[]>([]);
+  const [snapshotsForThreshold, setSnapshotsForThreshold] = useState<CompetitorSnapshot[]>([]);
 
   const [yourCurrentReviews, setYourCurrentReviews] = useState<number | null>(null);
   const [inputsMessage, setInputsMessage] = useState<string | null>(null);
@@ -180,10 +192,28 @@ export default function CompetitorsPage() {
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Top competitor (rank #1) remains useful for display
   const topCompetitor = competitors[0] ?? null;
 
+  // Top 3 set (stable threshold calculations)
+  const top3 = useMemo(() => competitors.slice(0, 3), [competitors]);
+
+  // Threshold competitor = median of top3 (rank #2 when 3 exist)
+  const thresholdCompetitor = useMemo(() => {
+    if (top3.length === 0) return null;
+    // If 1 => index 0, if 2 => index 0 (lower/safer), if 3 => index 1 (median)
+    const idx = top3.length === 3 ? 1 : 0;
+    return top3[idx] ?? null;
+  }, [top3]);
+
+  const thresholdReviews = useMemo(() => {
+    // Use median reviews of top3 if possible; otherwise fallback to best available
+    const vals = top3.map((c) => c.total_reviews ?? 0).filter((n) => Number.isFinite(n));
+    if (!vals.length) return 0;
+    return medianInt(vals);
+  }, [top3]);
+
   async function loadProject() {
-    // SAFE: no .single()
     const { data, error } = await supabase
       .from("projects")
       .select(
@@ -215,14 +245,14 @@ export default function CompetitorsPage() {
     return sorted;
   }
 
-  async function loadSnapshotsForTopCompetitor(top: CompetitorMetric | null) {
-    if (!top) return [];
+  async function loadSnapshotsForCompetitor(c: CompetitorMetric | null) {
+    if (!c) return [];
 
     const { data, error } = await supabase
       .from("gbp_competitor_snapshots")
       .select("project_id, competitor_domain, total_reviews, captured_at")
       .eq("project_id", projectId)
-      .eq("competitor_domain", top.competitor_domain)
+      .eq("competitor_domain", c.competitor_domain)
       .order("captured_at", { ascending: false })
       .limit(400);
 
@@ -233,7 +263,6 @@ export default function CompetitorsPage() {
   async function loadInputs() {
     setInputsMessage(null);
 
-    // SAFE: order + limit(1). NO .single()
     const { data, error } = await supabase
       .from("gbp_profiles")
       .select("total_reviews, captured_at")
@@ -270,8 +299,12 @@ export default function CompetitorsPage() {
       setProject(proj);
       setCompetitors(comps);
 
-      const snaps = await loadSnapshotsForTopCompetitor(comps[0] ?? null);
-      setSnapshotsForTop(snaps);
+      // Load snapshots for threshold competitor (median of top 3)
+      const top3Local = comps.slice(0, 3);
+      const thresholdLocal = top3Local.length === 3 ? top3Local[1] : top3Local[0] ?? null;
+
+      const snaps = await loadSnapshotsForCompetitor(thresholdLocal ?? null);
+      setSnapshotsForThreshold(snaps);
 
       await loadInputs();
     } catch (e: any) {
@@ -286,9 +319,10 @@ export default function CompetitorsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  // Velocity now based on threshold competitor (median of top 3)
   const velocity = useMemo(() => {
-    return computeVelocityAutoUpgrade(topCompetitor, snapshotsForTop);
-  }, [topCompetitor, snapshotsForTop]);
+    return computeVelocityAutoUpgrade(thresholdCompetitor, snapshotsForThreshold);
+  }, [thresholdCompetitor, snapshotsForThreshold]);
 
   const catchUpFactor = 0.35;
   const marketBasedTarget90d = Math.max(0, Math.ceil(velocity.marketGrowth90d * catchUpFactor));
@@ -296,16 +330,14 @@ export default function CompetitorsPage() {
   const reviewModel = useMemo(() => {
     return computeCapacityAwareTargets90d({
       yourReviews: yourCurrentReviews ?? 0,
-      topCompetitorReviews: topCompetitor?.total_reviews ?? 0,
+      thresholdCompetitorReviews: thresholdReviews,
       monthlyCustomerEvents: project?.monthly_customer_events ?? 0,
       reviewConversionRate: project?.review_conversion_rate ?? 0,
     });
-  }, [yourCurrentReviews, topCompetitor, project]);
+  }, [yourCurrentReviews, thresholdReviews, project]);
 
   const finalTarget90d =
-    yourCurrentReviews == null
-      ? null
-      : Math.min(reviewModel.realistic90dGain, marketBasedTarget90d);
+    yourCurrentReviews == null ? null : Math.min(reviewModel.realistic90dGain, marketBasedTarget90d);
 
   async function runDiscovery() {
     setRunning(true);
@@ -396,6 +428,11 @@ export default function CompetitorsPage() {
             <div className="text-xs text-gray-500">Will upgrade over time</div>
           </div>
         </div>
+
+        {/* Tiny stability hint, no layout change */}
+        <div className="mt-3 text-xs text-gray-500">
+          Using <span className="font-medium">Top 3 median</span> competitor for stability.
+        </div>
       </div>
 
       {/* Review gap & 90-day target */}
@@ -435,9 +472,9 @@ export default function CompetitorsPage() {
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Top competitor reviews</div>
-            <div className="text-lg font-semibold">{topCompetitor?.total_reviews ?? 0}</div>
-            <div className="text-xs text-gray-500">From discovered set</div>
+            <div className="text-xs text-gray-500">Top 3 median reviews</div>
+            <div className="text-lg font-semibold">{thresholdReviews}</div>
+            <div className="text-xs text-gray-500">Stable benchmark</div>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
@@ -445,7 +482,7 @@ export default function CompetitorsPage() {
             <div className="text-lg font-semibold">
               {yourCurrentReviews == null ? "—" : reviewModel.gap}
             </div>
-            <div className="text-xs text-gray-500">Top competitor − you</div>
+            <div className="text-xs text-gray-500">Top 3 median − you</div>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
