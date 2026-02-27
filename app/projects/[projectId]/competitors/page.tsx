@@ -37,6 +37,8 @@ type SnapshotRow = {
   captured_at: string;
 };
 
+type VelocityMode = "estimated" | "observed_14d" | "observed_30d" | "observed_90d";
+
 function toNumberOrNull(v: any): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
   return Number.isFinite(n) ? n : null;
@@ -98,6 +100,13 @@ function closestByDate(rows: SnapshotRow[], targetMs: number): SnapshotRow | nul
   return best;
 }
 
+function confidenceLabel(mode: VelocityMode): string {
+  if (mode === "observed_90d") return "Observed (90d)";
+  if (mode === "observed_30d") return "Observed (30d)";
+  if (mode === "observed_14d") return "Observed (14d)";
+  return "Estimated (no history yet)";
+}
+
 export default function ProjectCompetitorsPage() {
   const params = useParams();
 
@@ -130,7 +139,7 @@ export default function ProjectCompetitorsPage() {
   const [loadingVelocity, setLoadingVelocity] = useState(false);
   const [velocityError, setVelocityError] = useState<string | null>(null);
   const [marketGrowth90, setMarketGrowth90] = useState<number | null>(null);
-  const [velocityMode, setVelocityMode] = useState<"estimated" | "observed_14d">("estimated");
+  const [velocityMode, setVelocityMode] = useState<VelocityMode>("estimated");
 
   async function loadCompetitors() {
     if (!projectId) return;
@@ -179,11 +188,8 @@ export default function ProjectCompetitorsPage() {
         .limit(1)
         .maybeSingle();
 
-      if (profErr) {
-        setGbpProfile(null);
-      } else {
-        setGbpProfile((prof ?? null) as GbpProfileRow | null);
-      }
+      if (profErr) setGbpProfile(null);
+      else setGbpProfile((prof ?? null) as GbpProfileRow | null);
     } catch (e: any) {
       setInputsError(e?.message ?? "Failed to load inputs");
     } finally {
@@ -201,13 +207,8 @@ export default function ProjectCompetitorsPage() {
       const top3 = rows.slice(0, 3).filter((r) => r.competitor_domain);
       const competitorDomains = top3.map((c) => c.competitor_domain);
 
-      // Observed 14d logic:
-      // Get snapshots for these competitors over last 21 days, then:
-      // - nowPoint = latest snapshot in that set
-      // - thenPoint = snapshot closest to (now - 14d) within window
-      // Velocity = now - then
       const now = new Date();
-      const windowStart = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000);
+      const windowStart = new Date(now.getTime() - 110 * 24 * 60 * 60 * 1000); // enough for 90d +/- buffer
 
       const { data: snaps, error: snapsErr } = await supabase
         .from("gbp_competitor_snapshots")
@@ -232,33 +233,42 @@ export default function ProjectCompetitorsPage() {
         byDomain.set(d, arr);
       });
 
-      const targetThenMs = now.getTime() - 14 * 24 * 60 * 60 * 1000;
+      const horizons: Array<{ days: 90 | 30 | 14; minCompetitors: number; mode: VelocityMode }> = [
+        { days: 90, minCompetitors: 2, mode: "observed_90d" },
+        { days: 30, minCompetitors: 2, mode: "observed_30d" },
+        { days: 14, minCompetitors: 2, mode: "observed_14d" },
+      ];
 
-      const velocities14: number[] = [];
-      for (const d of competitorDomains) {
-        const arr = byDomain.get(d) ?? [];
-        if (arr.length < 2) continue;
+      for (const h of horizons) {
+        const targetThenMs = now.getTime() - h.days * 24 * 60 * 60 * 1000;
 
-        const nowPoint = arr[arr.length - 1];
-        const thenPoint = closestByDate(arr, targetThenMs);
+        const velocities: number[] = [];
 
-        const nowReviews = nowPoint?.total_reviews;
-        const thenReviews = thenPoint?.total_reviews;
+        for (const d of competitorDomains) {
+          const arr = byDomain.get(d) ?? [];
+          if (arr.length < 2) continue;
 
-        if (nowReviews === null || thenReviews === null) continue;
+          const nowPoint = arr[arr.length - 1];
+          const thenPoint = closestByDate(arr, targetThenMs);
 
-        const v = Math.max(0, nowReviews - thenReviews);
-        velocities14.push(v);
-      }
+          const nowReviews = nowPoint?.total_reviews;
+          const thenReviews = thenPoint?.total_reviews;
 
-      const med14 = median(velocities14);
+          if (nowReviews === null || thenReviews === null) continue;
 
-      if (med14 !== null && velocities14.length >= 2) {
-        const scaled90 = Math.round(med14 * (90 / 14));
-        setMarketGrowth90(scaled90);
-        setVelocityMode("observed_14d");
-        setLoadingVelocity(false);
-        return;
+          const v = Math.max(0, nowReviews - thenReviews);
+          velocities.push(v);
+        }
+
+        const med = median(velocities);
+
+        if (med !== null && velocities.length >= h.minCompetitors) {
+          const scaled90 = Math.round(med * (90 / h.days));
+          setMarketGrowth90(scaled90);
+          setVelocityMode(h.mode);
+          setLoadingVelocity(false);
+          return;
+        }
       }
 
       // Estimated fallback
@@ -396,7 +406,7 @@ export default function ProjectCompetitorsPage() {
     return realistic90 === 0 ? 0 : Math.ceil(realistic90 / 13);
   }, [realistic90]);
 
-  const confidenceLabel = velocityMode === "observed_14d" ? "Observed (14d)" : "Estimated (no history yet)";
+  const conf = confidenceLabel(velocityMode);
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -428,14 +438,10 @@ export default function ProjectCompetitorsPage() {
           <div>
             <div className="text-sm font-semibold">Market velocity</div>
             <div className="text-xs text-gray-600 mt-1">
-              {confidenceLabel} • Automatically improves as nightly snapshots accumulate.
+              {conf} • Automatically improves as nightly snapshots accumulate.
             </div>
           </div>
-          <button
-            onClick={loadVelocity}
-            disabled={loadingVelocity}
-            className="text-sm underline disabled:opacity-50"
-          >
+          <button onClick={loadVelocity} disabled={loadingVelocity} className="text-sm underline disabled:opacity-50">
             {loadingVelocity ? "Refreshing…" : "Refresh"}
           </button>
         </div>
@@ -455,7 +461,7 @@ export default function ProjectCompetitorsPage() {
 
           <div className="border rounded-md p-3">
             <div className="text-xs text-gray-600">Confidence</div>
-            <div className="text-lg font-semibold mt-1">{confidenceLabel}</div>
+            <div className="text-lg font-semibold mt-1">{conf}</div>
           </div>
         </div>
       </div>
@@ -468,11 +474,7 @@ export default function ProjectCompetitorsPage() {
               Final target = min(rule target, market target, capacity).
             </div>
           </div>
-          <button
-            onClick={loadInputs}
-            disabled={loadingInputs}
-            className="text-sm underline disabled:opacity-50"
-          >
+          <button onClick={loadInputs} disabled={loadingInputs} className="text-sm underline disabled:opacity-50">
             {loadingInputs ? "Refreshing…" : "Refresh inputs"}
           </button>
         </div>
@@ -531,11 +533,7 @@ export default function ProjectCompetitorsPage() {
       <div className="mt-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Discovered competitors</h2>
-          <button
-            onClick={loadCompetitors}
-            disabled={loadingList}
-            className="text-sm underline disabled:opacity-50"
-          >
+          <button onClick={loadCompetitors} disabled={loadingList} className="text-sm underline disabled:opacity-50">
             {loadingList ? "Refreshing…" : "Refresh"}
           </button>
         </div>
@@ -543,14 +541,6 @@ export default function ProjectCompetitorsPage() {
         {listError && (
           <div className="mt-3 p-3 rounded-md border">
             <div className="text-sm text-red-600">Failed to load: {listError}</div>
-          </div>
-        )}
-
-        {!listError && rows.length === 0 && (
-          <div className="mt-3 p-3 rounded-md border">
-            <div className="text-sm text-gray-700">
-              No competitors yet. Click <strong>Run discovery</strong>.
-            </div>
           </div>
         )}
 
@@ -590,6 +580,14 @@ export default function ProjectCompetitorsPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!listError && rows.length === 0 && (
+          <div className="mt-3 p-3 rounded-md border">
+            <div className="text-sm text-gray-700">
+              No competitors yet. Click <strong>Run discovery</strong>.
+            </div>
           </div>
         )}
       </div>
