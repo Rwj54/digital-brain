@@ -243,15 +243,14 @@ export default function CompetitorsPage() {
   }
 
   /**
-   * ✅ Resilient "latest GBP snapshot" fetch:
-   * Some installs use created_at or updated_at instead of captured_at.
+   * ✅ Correct for your schema:
+   * gbp_profiles has last_fetched_at + created_at (NOT captured_at)
    */
   async function loadInputs() {
     setInputsMessage(null);
 
-    const orderCandidates = ["captured_at", "created_at", "updated_at"] as const;
-
-    for (const col of orderCandidates) {
+    // Try last_fetched_at first (best), then created_at.
+    for (const col of ["last_fetched_at", "created_at"] as const) {
       const { data, error } = await supabase
         .from("gbp_profiles")
         .select("total_reviews")
@@ -260,11 +259,6 @@ export default function CompetitorsPage() {
         .limit(1);
 
       if (error) {
-        // If this column doesn't exist, try the next candidate.
-        const msg = (error.message || "").toLowerCase();
-        if (msg.includes("does not exist") && msg.includes(col)) continue;
-
-        // Otherwise, it's a real error (RLS, permissions, etc.)
         setYourCurrentReviews(null);
         setInputsMessage(`Error: ${error.message}`);
         return;
@@ -277,34 +271,6 @@ export default function CompetitorsPage() {
         setYourCurrentReviews(reviews);
         return;
       }
-
-      // Column exists, but no usable reviews yet
-      setYourCurrentReviews(null);
-      setInputsMessage(
-        "Note: I couldn’t find your current review count from gbp_profiles. Add/confirm your latest GBP snapshot so targets are accurate."
-      );
-      return;
-    }
-
-    // None of the timestamp columns exist (or table is non-standard)
-    const { data, error } = await supabase
-      .from("gbp_profiles")
-      .select("total_reviews")
-      .eq("project_id", projectId)
-      .limit(1);
-
-    if (error) {
-      setYourCurrentReviews(null);
-      setInputsMessage(`Error: ${error.message}`);
-      return;
-    }
-
-    const row = (data ?? [])[0] as any | undefined;
-    const reviews = row?.total_reviews;
-
-    if (typeof reviews === "number") {
-      setYourCurrentReviews(reviews);
-      return;
     }
 
     setYourCurrentReviews(null);
