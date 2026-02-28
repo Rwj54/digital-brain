@@ -156,6 +156,11 @@ function medianInt(values: number[]) {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+function pct(n: number) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -189,11 +194,7 @@ export default function CompetitorsPage() {
   }, [top3]);
 
   async function requireAuth() {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      setStatus(`Auth error: ${error.message}`);
-      return false;
-    }
+    const { data } = await supabase.auth.getSession();
     if (!data.session) {
       router.replace("/login");
       return false;
@@ -211,7 +212,6 @@ export default function CompetitorsPage() {
       .limit(1);
 
     if (error) throw new Error(`Project load failed: ${error.message}`);
-
     const row = (data ?? [])[0] as Project | undefined;
     return row ?? null;
   }
@@ -251,7 +251,6 @@ export default function CompetitorsPage() {
   async function loadInputs() {
     setInputsMessage(null);
 
-    // Your schema: last_fetched_at + created_at exist
     const res = await supabase
       .from("gbp_profiles")
       .select("total_reviews, last_fetched_at, created_at")
@@ -273,7 +272,6 @@ export default function CompetitorsPage() {
       return;
     }
 
-    // Fallback: created_at
     const res2 = await supabase
       .from("gbp_profiles")
       .select("total_reviews, last_fetched_at, created_at")
@@ -307,8 +305,6 @@ export default function CompetitorsPage() {
 
     try {
       const proj = await loadProject();
-
-      // ✅ If project is null, it’s almost always RLS/auth. Give a clear message.
       if (!proj) {
         setProject(null);
         setCompetitors([]);
@@ -340,7 +336,6 @@ export default function CompetitorsPage() {
     }
   }
 
-  // ✅ Auth gate
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -373,6 +368,17 @@ export default function CompetitorsPage() {
 
   const finalTarget90d =
     yourCurrentReviews == null ? null : Math.min(reviewModel.realistic90dGain, marketBasedTarget90d);
+
+  // ✅ Progress: You vs Top 3 median
+  const progress = useMemo(() => {
+    if (yourCurrentReviews == null) return null;
+    if (thresholdReviews <= 0) return null;
+
+    const pctDone = pct((yourCurrentReviews / thresholdReviews) * 100);
+    const remaining = Math.max(0, thresholdReviews - yourCurrentReviews);
+
+    return { pctDone, remaining };
+  }, [yourCurrentReviews, thresholdReviews]);
 
   async function runDiscovery() {
     setRunning(true);
@@ -499,6 +505,36 @@ export default function CompetitorsPage() {
           </div>
         )}
 
+        {/* Progress bar */}
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold">You vs Top 3 (median)</div>
+            <div className="text-xs text-gray-600">
+              {yourCurrentReviews ?? "—"} / {thresholdReviews}
+            </div>
+          </div>
+
+          {progress ? (
+            <>
+              <div className="mt-2 h-3 w-full rounded-full bg-white border border-gray-200 overflow-hidden">
+                <div
+                  className="h-full bg-black"
+                  style={{ width: `${progress.pctDone}%` }}
+                  aria-label="progress"
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+                <div>{Math.round(progress.pctDone)}% of benchmark</div>
+                <div>{progress.remaining} reviews to reach median</div>
+              </div>
+            </>
+          ) : (
+            <div className="mt-2 text-xs text-gray-600">
+              Progress will appear once your reviews and competitors are loaded.
+            </div>
+          )}
+        </div>
+
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Your current reviews</div>
@@ -524,6 +560,39 @@ export default function CompetitorsPage() {
             <div className="text-xs text-gray-500">Realistic target (90d)</div>
             <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
             <div className="text-xs text-gray-500">Market + capacity constrained</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Rule target (90d)</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.ruleTargetGain}
+            </div>
+            <div className="text-xs text-gray-500">Your baseline rule</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Capacity (90d)</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.capacity90d}
+            </div>
+            <div className="text-xs text-gray-500">
+              {(project?.monthly_customer_events ?? "—")} / month × 3 ×{" "}
+              {(project?.review_conversion_rate ?? "—")}
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Weekly requirement</div>
+            <div className="text-lg font-semibold">
+              {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
+            </div>
+            <div className="text-xs text-gray-500">~13 weeks in 90 days</div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-3">
+            <div className="text-xs text-gray-500">Market-based target (90d)</div>
+            <div className="text-lg font-semibold">{marketBasedTarget90d}</div>
+            <div className="text-xs text-gray-500">From market velocity</div>
           </div>
         </div>
       </div>
