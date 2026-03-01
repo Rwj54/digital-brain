@@ -161,6 +161,11 @@ function pct(n: number) {
   return Math.max(0, Math.min(100, n));
 }
 
+function shortName(s: string | null) {
+  if (!s) return "—";
+  return s.length > 42 ? s.slice(0, 41) + "…" : s;
+}
+
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -369,7 +374,6 @@ export default function CompetitorsPage() {
   const finalTarget90d =
     yourCurrentReviews == null ? null : Math.min(reviewModel.realistic90dGain, marketBasedTarget90d);
 
-  // ✅ Progress: You vs Top 3 median
   const progress = useMemo(() => {
     if (yourCurrentReviews == null) return null;
     if (thresholdReviews <= 0) return null;
@@ -505,11 +509,17 @@ export default function CompetitorsPage() {
           </div>
         )}
 
-        {/* Progress bar */}
+        {/* Progress bar with clearer context */}
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold">You vs Top 3 (median)</div>
-            <div className="text-xs text-gray-600">
+            <div>
+              <div className="text-sm font-semibold">You vs Top 3 competitors</div>
+              <div className="text-xs text-gray-600">
+                Benchmark = <span className="font-medium">median</span> review count of the{" "}
+                <span className="font-medium">top 3 competitors</span> by reviews (more stable than using the #1 outlier).
+              </div>
+            </div>
+            <div className="text-xs text-gray-700">
               {yourCurrentReviews ?? "—"} / {thresholdReviews}
             </div>
           </div>
@@ -517,15 +527,11 @@ export default function CompetitorsPage() {
           {progress ? (
             <>
               <div className="mt-2 h-3 w-full rounded-full bg-white border border-gray-200 overflow-hidden">
-                <div
-                  className="h-full bg-black"
-                  style={{ width: `${progress.pctDone}%` }}
-                  aria-label="progress"
-                />
+                <div className="h-full bg-black" style={{ width: `${progress.pctDone}%` }} />
               </div>
               <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
                 <div>{Math.round(progress.pctDone)}% of benchmark</div>
-                <div>{progress.remaining} reviews to reach median</div>
+                <div>{progress.remaining} reviews to reach the median</div>
               </div>
             </>
           ) : (
@@ -533,6 +539,33 @@ export default function CompetitorsPage() {
               Progress will appear once your reviews and competitors are loaded.
             </div>
           )}
+
+          {/* Show the actual top 3 used */}
+          <div className="mt-3">
+            <div className="text-xs font-medium text-gray-700">Top 3 competitors (by reviews)</div>
+            {top3.length === 0 ? (
+              <div className="text-xs text-gray-600 mt-1">—</div>
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {top3.map((c, idx) => (
+                  <li
+                    key={c.competitor_domain}
+                    className="flex items-center justify-between text-xs text-gray-700"
+                  >
+                    <span className="truncate pr-3">
+                      {idx + 1}. {shortName(c.name)}
+                      {top3.length === 3 && idx === 1 ? (
+                        <span className="ml-2 rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600">
+                          median benchmark
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="tabular-nums font-medium">{c.total_reviews ?? 0}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -545,7 +578,7 @@ export default function CompetitorsPage() {
           <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Top 3 median reviews</div>
             <div className="text-lg font-semibold">{thresholdReviews}</div>
-            <div className="text-xs text-gray-500">Stable benchmark</div>
+            <div className="text-xs text-gray-500">Benchmark (median of top 3)</div>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
@@ -553,46 +586,13 @@ export default function CompetitorsPage() {
             <div className="text-lg font-semibold">
               {yourCurrentReviews == null ? "—" : reviewModel.gap}
             </div>
-            <div className="text-xs text-gray-500">Top 3 median − you</div>
+            <div className="text-xs text-gray-500">Benchmark − you</div>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Realistic target (90d)</div>
             <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
             <div className="text-xs text-gray-500">Market + capacity constrained</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Rule target (90d)</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.ruleTargetGain}
-            </div>
-            <div className="text-xs text-gray-500">Your baseline rule</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Capacity (90d)</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.capacity90d}
-            </div>
-            <div className="text-xs text-gray-500">
-              {(project?.monthly_customer_events ?? "—")} / month × 3 ×{" "}
-              {(project?.review_conversion_rate ?? "—")}
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Weekly requirement</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
-            </div>
-            <div className="text-xs text-gray-500">~13 weeks in 90 days</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Market-based target (90d)</div>
-            <div className="text-lg font-semibold">{marketBasedTarget90d}</div>
-            <div className="text-xs text-gray-500">From market velocity</div>
           </div>
         </div>
       </div>
