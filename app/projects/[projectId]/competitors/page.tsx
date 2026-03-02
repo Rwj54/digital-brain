@@ -198,6 +198,11 @@ export default function CompetitorsPage() {
     return medianInt(vals);
   }, [top3]);
 
+  const benchmarkUpdatedAt = useMemo(() => {
+    const latest = snapshotsForThreshold?.[0]?.captured_at ?? null;
+    return latest;
+  }, [snapshotsForThreshold]);
+
   async function requireAuth() {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
@@ -509,17 +514,25 @@ export default function CompetitorsPage() {
           </div>
         )}
 
-        {/* Progress bar with clearer context */}
+        {/* Review position (clarified) */}
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold">You vs Top 3 competitors</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-sm font-semibold">Your review position (vs local competitors)</div>
+              <div className="text-xs text-gray-600 mt-0.5">
                 Benchmark = <span className="font-medium">median</span> review count of the{" "}
-                <span className="font-medium">top 3 competitors</span> by reviews (more stable than using the #1 outlier).
+                <span className="font-medium">top 3 discovered competitors</span> (more stable than using the #1 outlier).
               </div>
+              {benchmarkUpdatedAt ? (
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Updated nightly • Benchmark snapshot: {new Date(benchmarkUpdatedAt).toLocaleString()}
+                </div>
+              ) : (
+                <div className="text-[11px] text-gray-500 mt-1">Updated nightly</div>
+              )}
             </div>
-            <div className="text-xs text-gray-700">
+
+            <div className="text-xs text-gray-700 tabular-nums shrink-0 pt-0.5">
               {yourCurrentReviews ?? "—"} / {thresholdReviews}
             </div>
           </div>
@@ -542,7 +555,7 @@ export default function CompetitorsPage() {
 
           {/* Show the actual top 3 used */}
           <div className="mt-3">
-            <div className="text-xs font-medium text-gray-700">Top 3 competitors (by reviews)</div>
+            <div className="text-xs font-medium text-gray-700">Top 3 competitors used</div>
             {top3.length === 0 ? (
               <div className="text-xs text-gray-600 mt-1">—</div>
             ) : (
