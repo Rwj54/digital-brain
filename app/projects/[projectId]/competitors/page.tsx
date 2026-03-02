@@ -48,6 +48,14 @@ type VelocityResult =
       note: string;
     };
 
+type ActionItem = {
+  title: string;
+  priority: "High" | "Medium" | "Low";
+  why: string;
+  nextStep: string;
+  metric?: string;
+};
+
 function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(n)));
 }
@@ -171,6 +179,134 @@ function formatHorizonFromDays(days: number) {
   const weeks = Math.max(1, Math.ceil(safeDays / 7));
   const months = Math.max(1, Math.ceil(safeDays / 30));
   return { days: safeDays, weeks, months };
+}
+
+function buildActionPlan(args: {
+  authed: boolean;
+  yourCurrentReviews: number | null;
+  thresholdReviews: number;
+  finalTarget90d: number | null;
+  reviewModel: {
+    gap: number;
+    ruleTargetGain: number;
+    capacity90d: number;
+    realistic90dGain: number;
+    weeklyNeeded: number;
+  };
+  velocity: VelocityResult;
+  project: Project | null;
+}) {
+  const items: ActionItem[] = [];
+
+  const monthlyCustomerEvents = args.project?.monthly_customer_events ?? 0;
+  const reviewConversionRate = args.project?.review_conversion_rate ?? 0;
+
+  const market90d = Math.max(0, args.velocity.marketGrowth90d);
+  const your90d = args.finalTarget90d ?? 0;
+  const net90d = your90d - market90d;
+
+  const missingInputs =
+    !args.authed ||
+    args.yourCurrentReviews == null ||
+    args.thresholdReviews <= 0 ||
+    args.project == null;
+
+  if (missingInputs) {
+    items.push({
+      title: "Fix inputs so the plan is accurate",
+      priority: "High",
+      why: "Action Plan needs your review count, competitors, and capacity inputs. Right now something is missing.",
+      nextStep:
+        "Click “Refresh inputs”, then run discovery if competitors are empty. Also confirm projects.monthly_customer_events and projects.review_conversion_rate are set.",
+    });
+    return items;
+  }
+
+  // 1) Reviews: the main lever (data-driven)
+  const weekly = Math.max(0, args.reviewModel.weeklyNeeded);
+  const cap90 = args.reviewModel.capacity90d;
+
+  items.push({
+    title: "Build a review capture system (90-day sprint)",
+    priority: "High",
+    why: `Your realistic 90-day target is ${args.finalTarget90d ?? 0} reviews. That requires about ${weekly}/week.`,
+    nextStep:
+      "Add a simple process: every completed job triggers 1 text/email asking for a Google review within 24 hours. Follow up once after 48–72 hours if no response.",
+    metric: `Target: ~${weekly}/week`,
+  });
+
+  // 2) If market is faster, call it out explicitly
+  if (net90d <= 0) {
+    items.push({
+      title: "Increase review conversion rate (market is moving faster)",
+      priority: "High",
+      why: `At current pace, the market is adding ~${market90d} reviews per 90 days, and you’re adding ~${your90d}. Net = ${net90d}.`,
+      nextStep:
+        "Improve conversion: ask in-person + send link by text, train staff, use a short script, and make the ask part of checkout/closeout. If possible, increase monthly customer volume.",
+      metric: `Capacity (90d): ${cap90}`,
+    });
+  } else {
+    items.push({
+      title: "Stay consistent (you’re outpacing the market)",
+      priority: "Medium",
+      why: `You’re projected to gain ~${your90d} reviews per 90 days while the market gains ~${market90d}. Net = +${net90d}.`,
+      nextStep:
+        "Keep the review ask consistent every week. Consistency beats bursts.",
+      metric: `Net gain (90d): +${net90d}`,
+    });
+  }
+
+  // 3) GBP Category alignment (highest leverage non-review)
+  items.push({
+    title: "Verify Google Business Profile category alignment",
+    priority: "High",
+    why: "Category match is a major Maps ranking factor. A mismatch can block you from the right competitors and searches.",
+    nextStep:
+      "Confirm your primary category is the best match for your main service. Add secondary categories that truly apply (no spam).",
+  });
+
+  // 4) Review responses & sentiment (trust + conversion)
+  items.push({
+    title: "Respond to reviews (trust + conversion)",
+    priority: "Medium",
+    why: "Owner responses improve customer confidence and can improve conversion from views → calls/visits.",
+    nextStep:
+      "Respond to every review weekly. Thank positives. For negatives: apologize, offer fix, keep it calm and short.",
+  });
+
+  // 5) Photos & posts cadence (engagement signal)
+  items.push({
+    title: "Increase photo + post cadence",
+    priority: "Medium",
+    why: "Fresh photos and posts increase engagement signals (which correlate with Maps performance).",
+    nextStep:
+      "Add 5–10 new photos per month and post once per week (offer, update, or featured product/service).",
+  });
+
+  // 6) Website & AI discoverability basics (supporting layer)
+  items.push({
+    title: "Website: strengthen local signals + AI discoverability",
+    priority: "Low",
+    why: "Your website supports Maps and organic. Clear entity + geo signals help both Google and AI search.",
+    nextStep:
+      "Add/confirm: NAP consistency, service area text, internal links to key pages, FAQ section, and LocalBusiness schema (with address/service area).",
+  });
+
+  // Small sanity note using their capacity inputs
+  if (monthlyCustomerEvents > 0) {
+    const expectedPerMonth = monthlyCustomerEvents * reviewConversionRate;
+    items.push({
+      title: "Sanity check your capacity inputs",
+      priority: "Low",
+      why: `Based on your inputs: ${monthlyCustomerEvents}/mo × ${Math.round(reviewConversionRate * 100)}% ≈ ${Math.round(
+        expectedPerMonth
+      )} reviews/mo potential.`,
+      nextStep:
+        "If that feels wrong, update monthly_customer_events and review_conversion_rate so targets match reality.",
+    });
+  }
+
+  return items;
 }
 
 export default function CompetitorsPage() {
@@ -482,6 +618,18 @@ export default function CompetitorsPage() {
       parityReachableInYear: netAnnual >= gapToday,
     };
   }, [yourCurrentReviews, thresholdReviews, finalTarget90d, velocity.marketGrowth90d]);
+
+  const actionPlan = useMemo(() => {
+    return buildActionPlan({
+      authed,
+      yourCurrentReviews,
+      thresholdReviews,
+      finalTarget90d,
+      reviewModel,
+      velocity,
+      project,
+    });
+  }, [authed, yourCurrentReviews, thresholdReviews, finalTarget90d, reviewModel, velocity, project]);
 
   async function runDiscovery() {
     setRunning(true);
@@ -844,6 +992,56 @@ export default function CompetitorsPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Action Plan block */}
+        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Action Plan (next 90 days)</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Prioritized tasks based on your gap, your realistic capacity, and market velocity.
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-700 tabular-nums">
+              Target (90d): {finalTarget90d ?? "—"}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            {actionPlan.map((a, i) => (
+              <div key={`${a.title}-${i}`} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-gray-900">{a.title}</div>
+                    <div className="text-xs text-gray-600 mt-1">{a.why}</div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                      a.priority === "High"
+                        ? "bg-white border-gray-300 text-gray-900"
+                        : a.priority === "Medium"
+                        ? "bg-white border-gray-200 text-gray-700"
+                        : "bg-white border-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {a.priority}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-700">
+                  <span className="font-medium">Next step:</span> {a.nextStep}
+                </div>
+
+                {a.metric ? (
+                  <div className="mt-2 text-[11px] text-gray-600">
+                    <span className="font-medium">Metric:</span> {a.metric}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
