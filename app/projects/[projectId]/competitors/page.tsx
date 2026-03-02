@@ -523,13 +523,16 @@ export default function CompetitorsPage() {
                 Benchmark = <span className="font-medium">median</span> review count of the{" "}
                 <span className="font-medium">top 3 discovered competitors</span> (more stable than using the #1 outlier).
               </div>
-              {benchmarkUpdatedAt ? (
-                <div className="text-[11px] text-gray-500 mt-1">
-                  Updated nightly • Benchmark snapshot: {new Date(benchmarkUpdatedAt).toLocaleString()}
-                </div>
-              ) : (
-                <div className="text-[11px] text-gray-500 mt-1">Updated nightly</div>
-              )}
+
+              <div className="mt-2 inline-flex items-center gap-2 rounded-md bg-white border border-gray-200 px-2 py-1">
+                <span className="text-xs font-semibold text-gray-900">Updated nightly</span>
+                <span className="text-xs text-gray-600">•</span>
+                <span className="text-xs font-semibold text-gray-800">
+                  {benchmarkUpdatedAt
+                    ? `Benchmark snapshot: ${new Date(benchmarkUpdatedAt).toLocaleString()}`
+                    : "Benchmark snapshot: —"}
+                </span>
+              </div>
             </div>
 
             <div className="text-xs text-gray-700 tabular-nums shrink-0 pt-0.5">
