@@ -166,6 +166,13 @@ function shortName(s: string | null) {
   return s.length > 42 ? s.slice(0, 41) + "…" : s;
 }
 
+function formatHorizonFromDays(days: number) {
+  const safeDays = Math.max(0, Math.round(days));
+  const weeks = Math.max(1, Math.ceil(safeDays / 7));
+  const months = Math.max(1, Math.ceil(safeDays / 30));
+  return { days: safeDays, weeks, months };
+}
+
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -389,6 +396,66 @@ export default function CompetitorsPage() {
     return { pctDone, remaining };
   }, [yourCurrentReviews, thresholdReviews]);
 
+  const parity = useMemo(() => {
+    if (yourCurrentReviews == null) return null;
+    if (thresholdReviews <= 0) return null;
+
+    const gapToToday = Math.max(0, thresholdReviews - yourCurrentReviews);
+
+    // already at/above median
+    if (gapToToday === 0) {
+      return {
+        gapToToday,
+        status: "at_or_above" as const,
+        static: null as null | { days: number; weeks: number; months: number },
+        moving: null as null | { days: number; weeks: number; months: number },
+        net90d: null as null | number,
+      };
+    }
+
+    const your90d = finalTarget90d ?? 0;
+    if (your90d <= 0) {
+      return {
+        gapToToday,
+        status: "no_pace" as const,
+        static: null,
+        moving: null,
+        net90d: null,
+      };
+    }
+
+    // Static: reach today's benchmark (median doesn't move)
+    const yourPerDay = your90d / 90;
+    const staticDays = Math.ceil(gapToToday / yourPerDay);
+    const staticH = formatHorizonFromDays(staticDays);
+
+    // Moving: benchmark grows by observed market growth
+    const market90d = Math.max(0, velocity.marketGrowth90d);
+    const net90d = your90d - market90d;
+
+    if (net90d <= 0) {
+      return {
+        gapToToday,
+        status: "market_faster" as const,
+        static: staticH,
+        moving: null,
+        net90d,
+      };
+    }
+
+    const netPerDay = net90d / 90;
+    const movingDays = Math.ceil(gapToToday / netPerDay);
+    const movingH = formatHorizonFromDays(movingDays);
+
+    return {
+      gapToToday,
+      status: "ok" as const,
+      static: staticH,
+      moving: movingH,
+      net90d,
+    };
+  }, [yourCurrentReviews, thresholdReviews, finalTarget90d, velocity.marketGrowth90d]);
+
   async function runDiscovery() {
     setRunning(true);
     setStatus("Running discovery…");
@@ -610,6 +677,77 @@ export default function CompetitorsPage() {
             <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
             <div className="text-xs text-gray-500">Market + capacity constrained</div>
           </div>
+        </div>
+
+        {/* Time-to-parity projection */}
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Time-to-parity projection</div>
+              <div className="text-xs text-gray-600 mt-0.5">
+                Based on your <span className="font-medium">realistic 90-day target pace</span>. “Moving market” assumes
+                competitors keep gaining reviews at the current market velocity.
+              </div>
+            </div>
+            <div className="text-xs text-gray-700 tabular-nums">
+              Gap: {parity?.gapToToday ?? "—"}
+            </div>
+          </div>
+
+          {!parity ? (
+            <div className="mt-2 text-xs text-gray-600">
+              Projection will appear once your reviews and competitors are loaded.
+            </div>
+          ) : parity.status === "at_or_above" ? (
+            <div className="mt-2 text-sm text-gray-800">
+              ✅ You’re already at or above the median benchmark.
+            </div>
+          ) : parity.status === "no_pace" ? (
+            <div className="mt-2 text-sm text-gray-800">
+              ⚠️ Time-to-parity can’t be calculated because your 90-day target is 0 (capacity or inputs may be too low).
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-lg bg-white border border-gray-200 p-3">
+                <div className="text-xs text-gray-500">To reach today’s median (benchmark stays still)</div>
+                {parity.static ? (
+                  <div className="mt-1">
+                    <div className="text-lg font-semibold">~{parity.static.weeks} weeks</div>
+                    <div className="text-xs text-gray-500">
+                      (~{parity.static.months} months • {parity.static.days} days)
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-sm text-gray-700">—</div>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-white border border-gray-200 p-3">
+                <div className="text-xs text-gray-500">To catch up in a moving market</div>
+                {parity.status === "market_faster" ? (
+                  <div className="mt-1">
+                    <div className="text-lg font-semibold">Not reachable (at current pace)</div>
+                    <div className="text-xs text-gray-500">
+                      Your 90d pace: {finalTarget90d ?? 0} • Market 90d growth: {velocity.marketGrowth90d} • Net:{" "}
+                      {parity.net90d ?? 0}
+                    </div>
+                  </div>
+                ) : parity.moving ? (
+                  <div className="mt-1">
+                    <div className="text-lg font-semibold">~{parity.moving.weeks} weeks</div>
+                    <div className="text-xs text-gray-500">
+                      (~{parity.moving.months} months • {parity.moving.days} days)
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">
+                      Net gain (you − market) per 90d: {parity.net90d}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-sm text-gray-700">—</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
