@@ -402,7 +402,6 @@ export default function CompetitorsPage() {
 
     const gapToToday = Math.max(0, thresholdReviews - yourCurrentReviews);
 
-    // already at/above median
     if (gapToToday === 0) {
       return {
         gapToToday,
@@ -424,12 +423,10 @@ export default function CompetitorsPage() {
       };
     }
 
-    // Static: reach today's benchmark (median doesn't move)
     const yourPerDay = your90d / 90;
     const staticDays = Math.ceil(gapToToday / yourPerDay);
     const staticH = formatHorizonFromDays(staticDays);
 
-    // Moving: benchmark grows by observed market growth
     const market90d = Math.max(0, velocity.marketGrowth90d);
     const net90d = your90d - market90d;
 
@@ -453,6 +450,36 @@ export default function CompetitorsPage() {
       static: staticH,
       moving: movingH,
       net90d,
+    };
+  }, [yourCurrentReviews, thresholdReviews, finalTarget90d, velocity.marketGrowth90d]);
+
+  const annual = useMemo(() => {
+    if (yourCurrentReviews == null) return null;
+    if (thresholdReviews <= 0) return null;
+
+    const gapToday = Math.max(0, thresholdReviews - yourCurrentReviews);
+
+    const your90d = finalTarget90d ?? 0;
+    const market90d = Math.max(0, velocity.marketGrowth90d);
+
+    const yourAnnual = your90d * 4;
+    const marketAnnual = market90d * 4;
+    const netAnnual = yourAnnual - marketAnnual;
+
+    const projectedYou = yourCurrentReviews + yourAnnual;
+    const projectedBenchmark = thresholdReviews + marketAnnual;
+
+    const projectedGap = Math.max(0, projectedBenchmark - projectedYou);
+
+    return {
+      gapToday,
+      yourAnnual,
+      marketAnnual,
+      netAnnual,
+      projectedYou,
+      projectedBenchmark,
+      projectedGap,
+      parityReachableInYear: netAnnual >= gapToday,
     };
   }, [yourCurrentReviews, thresholdReviews, finalTarget90d, velocity.marketGrowth90d]);
 
@@ -699,9 +726,7 @@ export default function CompetitorsPage() {
               Projection will appear once your reviews and competitors are loaded.
             </div>
           ) : parity.status === "at_or_above" ? (
-            <div className="mt-2 text-sm text-gray-800">
-              ✅ You’re already at or above the median benchmark.
-            </div>
+            <div className="mt-2 text-sm text-gray-800">✅ You’re already at or above the median benchmark.</div>
           ) : parity.status === "no_pace" ? (
             <div className="mt-2 text-sm text-gray-800">
               ⚠️ Time-to-parity can’t be calculated because your 90-day target is 0 (capacity or inputs may be too low).
@@ -738,13 +763,84 @@ export default function CompetitorsPage() {
                     <div className="text-xs text-gray-500">
                       (~{parity.moving.months} months • {parity.moving.days} days)
                     </div>
-                    <div className="text-[11px] text-gray-500 mt-1">
-                      Net gain (you − market) per 90d: {parity.net90d}
-                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1">Net gain (you − market) per 90d: {parity.net90d}</div>
                   </div>
                 ) : (
                   <div className="mt-1 text-sm text-gray-700">—</div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Annual projection engine */}
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Annual projection (12 months)</div>
+              <div className="text-xs text-gray-600 mt-0.5">
+                Uses your 90-day realistic pace × 4. Market assumes current velocity continues.
+              </div>
+            </div>
+            <div className="text-xs text-gray-700 tabular-nums">
+              Starting gap: {annual?.gapToday ?? "—"}
+            </div>
+          </div>
+
+          {!annual ? (
+            <div className="mt-2 text-xs text-gray-600">
+              Projection will appear once your reviews and competitors are loaded.
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-lg bg-white border border-gray-200 p-3">
+                <div className="text-xs text-gray-500">Projected review gains (12 months)</div>
+                <div className="mt-1 text-sm text-gray-800">
+                  <div className="flex items-center justify-between">
+                    <span>Your gain</span>
+                    <span className="font-semibold tabular-nums">{annual.yourAnnual}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span>Market gain</span>
+                    <span className="font-semibold tabular-nums">{annual.marketAnnual}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span>Net (you − market)</span>
+                    <span className="font-semibold tabular-nums">{annual.netAnnual}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-white border border-gray-200 p-3">
+                <div className="text-xs text-gray-500">Projected position (12 months)</div>
+                <div className="mt-1 text-sm text-gray-800">
+                  <div className="flex items-center justify-between">
+                    <span>You</span>
+                    <span className="font-semibold tabular-nums">{annual.projectedYou}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span>Benchmark</span>
+                    <span className="font-semibold tabular-nums">{annual.projectedBenchmark}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span>Gap after 12 months</span>
+                    <span className="font-semibold tabular-nums">{annual.projectedGap}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-white border border-gray-200 p-3">
+                <div className="text-xs text-gray-500">Parity outlook</div>
+                <div className="mt-1">
+                  {annual.parityReachableInYear ? (
+                    <div className="text-sm font-semibold text-gray-900">✅ Reachable in ~12 months</div>
+                  ) : (
+                    <div className="text-sm font-semibold text-gray-900">⚠️ Not reachable at current pace</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-1">
+                    This is a projection (not a promise). It will self-correct as velocity upgrades from snapshots.
+                  </div>
+                </div>
               </div>
             </div>
           )}
