@@ -56,6 +56,8 @@ type ActionItem = {
   metric?: string;
 };
 
+type TabKey = "overview" | "market" | "strategy" | "actions" | "data";
+
 function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.round(n)));
 }
@@ -181,6 +183,13 @@ function formatHorizonFromDays(days: number) {
   return { days: safeDays, weeks, months };
 }
 
+function formatWhen(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
 function buildActionPlan(args: {
   authed: boolean;
   yourCurrentReviews: number | null;
@@ -217,102 +226,101 @@ function buildActionPlan(args: {
       priority: "High",
       why: "Action Plan needs your review count, competitors, and capacity inputs. Right now something is missing.",
       nextStep:
-        "Click “Refresh inputs”, then run discovery if competitors are empty. Also confirm projects.monthly_customer_events and projects.review_conversion_rate are set.",
+        "Click “Refresh inputs”, then run discovery if competitors are empty. Also confirm monthly customer events and review conversion rate are set.",
     });
     return items;
   }
 
-  // 1) Reviews: the main lever (data-driven)
   const weekly = Math.max(0, args.reviewModel.weeklyNeeded);
   const cap90 = args.reviewModel.capacity90d;
 
   items.push({
-    title: "Build a review capture system (90-day sprint)",
+    title: "Build a simple review capture system (90-day sprint)",
     priority: "High",
     why: `Your realistic 90-day target is ${args.finalTarget90d ?? 0} reviews. That requires about ${weekly}/week.`,
     nextStep:
-      "Add a simple process: every completed job triggers 1 text/email asking for a Google review within 24 hours. Follow up once after 48–72 hours if no response.",
+      "After every completed job, send a text/email asking for a Google review within 24 hours. Follow up once after 48–72 hours if no response.",
     metric: `Target: ~${weekly}/week`,
   });
 
-  // 2) If market is faster, call it out explicitly
   if (net90d <= 0) {
     items.push({
       title: "Increase review conversion rate (market is moving faster)",
       priority: "High",
-      why: `At current pace, the market is adding ~${market90d} reviews per 90 days, and you’re adding ~${your90d}. Net = ${net90d}.`,
+      why: `Market adds ~${market90d} reviews per 90 days. You add ~${your90d}. Net = ${net90d}.`,
       nextStep:
-        "Improve conversion: ask in-person + send link by text, train staff, use a short script, and make the ask part of checkout/closeout. If possible, increase monthly customer volume.",
+        "Improve conversion: ask in-person + send link by text, use a short script, train staff, and make the ask part of checkout/closeout. If possible, increase monthly customer volume.",
       metric: `Capacity (90d): ${cap90}`,
     });
   } else {
     items.push({
       title: "Stay consistent (you’re outpacing the market)",
       priority: "Medium",
-      why: `You’re projected to gain ~${your90d} reviews per 90 days while the market gains ~${market90d}. Net = +${net90d}.`,
-      nextStep:
-        "Keep the review ask consistent every week. Consistency beats bursts.",
+      why: `You gain ~${your90d} per 90 days while the market gains ~${market90d}. Net = +${net90d}.`,
+      nextStep: "Keep the review ask consistent every week. Consistency beats bursts.",
       metric: `Net gain (90d): +${net90d}`,
     });
   }
 
-  // 3) GBP Category alignment (highest leverage non-review)
   items.push({
     title: "Verify Google Business Profile category alignment",
     priority: "High",
-    why: "Category match is a major Maps ranking factor. A mismatch can block you from the right competitors and searches.",
+    why: "Category match is a major Maps ranking factor. A mismatch can block you from the right searches.",
     nextStep:
-      "Confirm your primary category is the best match for your main service. Add secondary categories that truly apply (no spam).",
+      "Confirm your primary category is the best match for your main service. Add only true secondary categories.",
   });
 
-  // 4) Review responses & sentiment (trust + conversion)
   items.push({
-    title: "Respond to reviews (trust + conversion)",
+    title: "Respond to reviews weekly (trust + conversion)",
     priority: "Medium",
-    why: "Owner responses improve customer confidence and can improve conversion from views → calls/visits.",
+    why: "Owner responses increase trust and can improve conversions from views → calls/visits.",
     nextStep:
-      "Respond to every review weekly. Thank positives. For negatives: apologize, offer fix, keep it calm and short.",
+      "Respond to every review weekly. Thank positives. For negatives: apologize, offer a fix, keep it short and calm.",
   });
 
-  // 5) Photos & posts cadence (engagement signal)
   items.push({
-    title: "Increase photo + post cadence",
+    title: "Increase photo + post cadence (engagement signals)",
     priority: "Medium",
-    why: "Fresh photos and posts increase engagement signals (which correlate with Maps performance).",
-    nextStep:
-      "Add 5–10 new photos per month and post once per week (offer, update, or featured product/service).",
+    why: "Fresh activity increases engagement signals that correlate with Maps performance.",
+    nextStep: "Add 5–10 new photos per month and post once per week (offer, update, or featured service).",
   });
 
-  // 6) Website & AI discoverability basics (supporting layer)
   items.push({
     title: "Website: strengthen local signals + AI discoverability",
     priority: "Low",
-    why: "Your website supports Maps and organic. Clear entity + geo signals help both Google and AI search.",
+    why: "Your website supports Maps + organic. Clear business + geo signals help both Google and AI search.",
     nextStep:
-      "Add/confirm: NAP consistency, service area text, internal links to key pages, FAQ section, and LocalBusiness schema (with address/service area).",
+      "Confirm NAP consistency, clear service area text, internal links to key pages, an FAQ section, and LocalBusiness structured data (schema).",
   });
 
-  // Small sanity note using their capacity inputs
   if (monthlyCustomerEvents > 0) {
     const expectedPerMonth = monthlyCustomerEvents * reviewConversionRate;
     items.push({
       title: "Sanity check your capacity inputs",
       priority: "Low",
-      why: `Based on your inputs: ${monthlyCustomerEvents}/mo × ${Math.round(reviewConversionRate * 100)}% ≈ ${Math.round(
-        expectedPerMonth
-      )} reviews/mo potential.`,
+      why: `Based on your inputs: ${monthlyCustomerEvents}/mo × ${Math.round(
+        reviewConversionRate * 100
+      )}% ≈ ${Math.round(expectedPerMonth)} reviews/mo potential.`,
       nextStep:
-        "If that feels wrong, update monthly_customer_events and review_conversion_rate so targets match reality.",
+        "If that feels wrong, update monthly customer events and review conversion rate so targets match reality.",
     });
   }
 
   return items;
 }
 
-export default function CompetitorsPage() {
+function prioritySort(p: ActionItem["priority"]) {
+  if (p === "High") return 0;
+  if (p === "Medium") return 1;
+  return 2;
+}
+
+export default function ProjectPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
   const router = useRouter();
+
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   const [authed, setAuthed] = useState(false);
 
@@ -631,6 +639,19 @@ export default function CompetitorsPage() {
     });
   }, [authed, yourCurrentReviews, thresholdReviews, finalTarget90d, reviewModel, velocity, project]);
 
+  const topPriorities = useMemo(() => {
+    const sorted = actionPlan.slice().sort((a, b) => prioritySort(a.priority) - prioritySort(b.priority));
+    return sorted.slice(0, 5);
+  }, [actionPlan]);
+
+  const navTabs: Array<{ key: TabKey; label: string; desc: string }> = [
+    { key: "overview", label: "Overview", desc: "What matters most right now" },
+    { key: "market", label: "Market", desc: "Competitors + velocity" },
+    { key: "strategy", label: "Strategy", desc: "Plain-English findings" },
+    { key: "actions", label: "Action Plan", desc: "Numbered steps" },
+    { key: "data", label: "Data", desc: "Inputs + calculations" },
+  ];
+
   async function runDiscovery() {
     setRunning(true);
     setStatus("Running discovery…");
@@ -656,441 +677,773 @@ export default function CompetitorsPage() {
   if (loading) return <div className="p-4 text-sm text-gray-500">Loading…</div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Competitors</h1>
-          <div className="text-sm text-gray-500">
-            Google Maps competitor discovery (DataForSEO). Sorted by total reviews.
-          </div>
-          {project && (
-            <div className="text-xs text-gray-500 mt-1">
-              {project.primary_category ?? "Category"} • {project.target_metro ?? "Metro"} •{" "}
-              {project.target_radius_miles ?? "—"} mi
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={runDiscovery}
-          disabled={running || !authed || !project}
-          className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium bg-black text-white disabled:opacity-60"
-        >
-          {running ? "Running…" : "Run discovery"}
-        </button>
-      </div>
-
-      {status && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          {status}
-        </div>
-      )}
-
-      {/* Market velocity */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Market velocity</div>
-          <div className="text-xs text-gray-500">
-            {velocity.confidenceLabel} • Automatically improves as nightly snapshots accumulate.
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Market growth (90d)</div>
-            <div className="text-lg font-semibold">{velocity.marketGrowth90d}</div>
-            {velocity.kind === "observed" ? (
-              <div className="text-xs text-gray-500">
-                +{velocity.observedDeltaReviews} over {velocity.observedDays}d
+    <div className="min-h-screen bg-white">
+      {/* Top header */}
+      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-gray-500">Digital Brain</div>
+            <h1 className="text-lg md:text-xl font-semibold truncate">Project Dashboard</h1>
+            {project ? (
+              <div className="text-xs text-gray-500 mt-0.5">
+                {project.primary_category ?? "Category"} • {project.target_metro ?? "Metro"} •{" "}
+                {project.target_radius_miles ?? "—"} mi
               </div>
-            ) : (
-              <div className="text-xs text-gray-500">{velocity.note}</div>
-            )}
+            ) : null}
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Market-based target (90d)</div>
-            <div className="text-lg font-semibold">{marketBasedTarget90d}</div>
-            <div className="text-xs text-gray-500">Catch-up factor applied</div>
-          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              onClick={loadInputs}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:text-black"
+              type="button"
+              disabled={!authed || !project}
+            >
+              Refresh inputs
+            </button>
 
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Confidence</div>
-            <div className="text-lg font-semibold">{velocity.confidenceLabel}</div>
-            <div className="text-xs text-gray-500">Will upgrade over time</div>
-          </div>
-        </div>
-
-        <div className="mt-3 text-xs text-gray-500">
-          Using <span className="font-medium">Top 3 median</span> competitor for stability.
-        </div>
-      </div>
-
-      {/* Review gap & 90-day target */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Review gap & 90-day target</div>
-            <div className="text-xs text-gray-500">
-              Final target = min(rule target, market target, capacity).
-            </div>
-          </div>
-
-          <button
-            onClick={loadInputs}
-            className="text-sm underline text-gray-700 hover:text-black"
-            type="button"
-            disabled={!authed || !project}
-          >
-            Refresh inputs
-          </button>
-        </div>
-
-        {inputsMessage && (
-          <div
-            className={`mt-3 text-sm ${
-              inputsMessage.startsWith("Error:") ? "text-red-600" : "text-orange-600"
-            }`}
-          >
-            {inputsMessage}
-          </div>
-        )}
-
-        {/* Review position (clarified) */}
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Your review position (vs local competitors)</div>
-              <div className="text-xs text-gray-600 mt-0.5">
-                Benchmark = <span className="font-medium">median</span> review count of the{" "}
-                <span className="font-medium">top 3 discovered competitors</span> (more stable than using the #1 outlier).
-              </div>
-
-              <div className="mt-2 inline-flex items-center gap-2 rounded-md bg-white border border-gray-200 px-2 py-1">
-                <span className="text-xs font-semibold text-gray-900">Updated nightly</span>
-                <span className="text-xs text-gray-600">•</span>
-                <span className="text-xs font-semibold text-gray-800">
-                  {benchmarkUpdatedAt
-                    ? `Benchmark snapshot: ${new Date(benchmarkUpdatedAt).toLocaleString()}`
-                    : "Benchmark snapshot: —"}
-                </span>
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-700 tabular-nums shrink-0 pt-0.5">
-              {yourCurrentReviews ?? "—"} / {thresholdReviews}
-            </div>
-          </div>
-
-          {progress ? (
-            <>
-              <div className="mt-2 h-3 w-full rounded-full bg-white border border-gray-200 overflow-hidden">
-                <div className="h-full bg-black" style={{ width: `${progress.pctDone}%` }} />
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
-                <div>{Math.round(progress.pctDone)}% of benchmark</div>
-                <div>{progress.remaining} reviews to reach the median</div>
-              </div>
-            </>
-          ) : (
-            <div className="mt-2 text-xs text-gray-600">
-              Progress will appear once your reviews and competitors are loaded.
-            </div>
-          )}
-
-          {/* Show the actual top 3 used */}
-          <div className="mt-3">
-            <div className="text-xs font-medium text-gray-700">Top 3 competitors used</div>
-            {top3.length === 0 ? (
-              <div className="text-xs text-gray-600 mt-1">—</div>
-            ) : (
-              <ul className="mt-1 space-y-1">
-                {top3.map((c, idx) => (
-                  <li
-                    key={c.competitor_domain}
-                    className="flex items-center justify-between text-xs text-gray-700"
-                  >
-                    <span className="truncate pr-3">
-                      {idx + 1}. {shortName(c.name)}
-                      {top3.length === 3 && idx === 1 ? (
-                        <span className="ml-2 rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600">
-                          median benchmark
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="tabular-nums font-medium">{c.total_reviews ?? 0}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Your current reviews</div>
-            <div className="text-lg font-semibold">{yourCurrentReviews ?? "—"}</div>
-            <div className="text-xs text-gray-500">From latest GBP snapshot</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Top 3 median reviews</div>
-            <div className="text-lg font-semibold">{thresholdReviews}</div>
-            <div className="text-xs text-gray-500">Benchmark (median of top 3)</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Review gap</div>
-            <div className="text-lg font-semibold">
-              {yourCurrentReviews == null ? "—" : reviewModel.gap}
-            </div>
-            <div className="text-xs text-gray-500">Benchmark − you</div>
-          </div>
-
-          <div className="rounded-lg bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Realistic target (90d)</div>
-            <div className="text-lg font-semibold">{finalTarget90d ?? "—"}</div>
-            <div className="text-xs text-gray-500">Market + capacity constrained</div>
-          </div>
-        </div>
-
-        {/* Time-to-parity projection */}
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Time-to-parity projection</div>
-              <div className="text-xs text-gray-600 mt-0.5">
-                Based on your <span className="font-medium">realistic 90-day target pace</span>. “Moving market” assumes
-                competitors keep gaining reviews at the current market velocity.
-              </div>
-            </div>
-            <div className="text-xs text-gray-700 tabular-nums">
-              Gap: {parity?.gapToToday ?? "—"}
-            </div>
-          </div>
-
-          {!parity ? (
-            <div className="mt-2 text-xs text-gray-600">
-              Projection will appear once your reviews and competitors are loaded.
-            </div>
-          ) : parity.status === "at_or_above" ? (
-            <div className="mt-2 text-sm text-gray-800">✅ You’re already at or above the median benchmark.</div>
-          ) : parity.status === "no_pace" ? (
-            <div className="mt-2 text-sm text-gray-800">
-              ⚠️ Time-to-parity can’t be calculated because your 90-day target is 0 (capacity or inputs may be too low).
-            </div>
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-lg bg-white border border-gray-200 p-3">
-                <div className="text-xs text-gray-500">To reach today’s median (benchmark stays still)</div>
-                {parity.static ? (
-                  <div className="mt-1">
-                    <div className="text-lg font-semibold">~{parity.static.weeks} weeks</div>
-                    <div className="text-xs text-gray-500">
-                      (~{parity.static.months} months • {parity.static.days} days)
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-1 text-sm text-gray-700">—</div>
-                )}
-              </div>
-
-              <div className="rounded-lg bg-white border border-gray-200 p-3">
-                <div className="text-xs text-gray-500">To catch up in a moving market</div>
-                {parity.status === "market_faster" ? (
-                  <div className="mt-1">
-                    <div className="text-lg font-semibold">Not reachable (at current pace)</div>
-                    <div className="text-xs text-gray-500">
-                      Your 90d pace: {finalTarget90d ?? 0} • Market 90d growth: {velocity.marketGrowth90d} • Net:{" "}
-                      {parity.net90d ?? 0}
-                    </div>
-                  </div>
-                ) : parity.moving ? (
-                  <div className="mt-1">
-                    <div className="text-lg font-semibold">~{parity.moving.weeks} weeks</div>
-                    <div className="text-xs text-gray-500">
-                      (~{parity.moving.months} months • {parity.moving.days} days)
-                    </div>
-                    <div className="text-[11px] text-gray-500 mt-1">Net gain (you − market) per 90d: {parity.net90d}</div>
-                  </div>
-                ) : (
-                  <div className="mt-1 text-sm text-gray-700">—</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Annual projection engine */}
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Annual projection (12 months)</div>
-              <div className="text-xs text-gray-600 mt-0.5">
-                Uses your 90-day realistic pace × 4. Market assumes current velocity continues.
-              </div>
-            </div>
-            <div className="text-xs text-gray-700 tabular-nums">
-              Starting gap: {annual?.gapToday ?? "—"}
-            </div>
-          </div>
-
-          {!annual ? (
-            <div className="mt-2 text-xs text-gray-600">
-              Projection will appear once your reviews and competitors are loaded.
-            </div>
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-lg bg-white border border-gray-200 p-3">
-                <div className="text-xs text-gray-500">Projected review gains (12 months)</div>
-                <div className="mt-1 text-sm text-gray-800">
-                  <div className="flex items-center justify-between">
-                    <span>Your gain</span>
-                    <span className="font-semibold tabular-nums">{annual.yourAnnual}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Market gain</span>
-                    <span className="font-semibold tabular-nums">{annual.marketAnnual}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Net (you − market)</span>
-                    <span className="font-semibold tabular-nums">{annual.netAnnual}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-white border border-gray-200 p-3">
-                <div className="text-xs text-gray-500">Projected position (12 months)</div>
-                <div className="mt-1 text-sm text-gray-800">
-                  <div className="flex items-center justify-between">
-                    <span>You</span>
-                    <span className="font-semibold tabular-nums">{annual.projectedYou}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Benchmark</span>
-                    <span className="font-semibold tabular-nums">{annual.projectedBenchmark}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Gap after 12 months</span>
-                    <span className="font-semibold tabular-nums">{annual.projectedGap}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg bg-white border border-gray-200 p-3">
-                <div className="text-xs text-gray-500">Parity outlook</div>
-                <div className="mt-1">
-                  {annual.parityReachableInYear ? (
-                    <div className="text-sm font-semibold text-gray-900">✅ Reachable in ~12 months</div>
-                  ) : (
-                    <div className="text-sm font-semibold text-gray-900">⚠️ Not reachable at current pace</div>
-                  )}
-                  <div className="text-xs text-gray-500 mt-1">
-                    This is a projection (not a promise). It will self-correct as velocity upgrades from snapshots.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Action Plan block */}
-        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold">Action Plan (next 90 days)</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Prioritized tasks based on your gap, your realistic capacity, and market velocity.
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-700 tabular-nums">
-              Target (90d): {finalTarget90d ?? "—"}
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3">
-            {actionPlan.map((a, i) => (
-              <div key={`${a.title}-${i}`} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-gray-900">{a.title}</div>
-                    <div className="text-xs text-gray-600 mt-1">{a.why}</div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                      a.priority === "High"
-                        ? "bg-white border-gray-300 text-gray-900"
-                        : a.priority === "Medium"
-                        ? "bg-white border-gray-200 text-gray-700"
-                        : "bg-white border-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {a.priority}
-                  </span>
-                </div>
-
-                <div className="mt-2 text-xs text-gray-700">
-                  <span className="font-medium">Next step:</span> {a.nextStep}
-                </div>
-
-                {a.metric ? (
-                  <div className="mt-2 text-[11px] text-gray-600">
-                    <span className="font-medium">Metric:</span> {a.metric}
-                  </div>
-                ) : null}
-              </div>
-            ))}
+            <button
+              onClick={runDiscovery}
+              disabled={running || !authed || !project}
+              className="rounded-lg px-4 py-2 text-sm font-medium bg-black text-white disabled:opacity-60"
+            >
+              {running ? "Running…" : "Run discovery"}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Discovered competitors */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold">Discovered competitors</div>
-
-        {competitors.length === 0 ? (
-          <div className="mt-3 text-sm text-gray-500">
-            No competitors found yet. Click <span className="font-medium">Run discovery</span>.
+      {/* Status banner */}
+      {status ? (
+        <div className="mx-auto max-w-7xl px-4 md:px-6 mt-3">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            {status}
           </div>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-gray-500">
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Reviews</th>
-                  <th className="py-2 pr-4">Rating</th>
-                  <th className="py-2 pr-4">Domain</th>
-                  <th className="py-2 pr-4">Last seen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {competitors.map((c) => (
-                  <tr key={c.competitor_domain} className="border-t border-gray-100">
-                    <td className="py-2 pr-4">
-                      <div className="font-medium">{c.name ?? "—"}</div>
-                      <div className="text-xs text-gray-500 truncate max-w-[420px]">
-                        {c.place_id ?? c.competitor_domain}
+        </div>
+      ) : null}
+
+      {/* Layout: sidebar (desktop) + content */}
+      <div className="mx-auto max-w-7xl px-4 md:px-6 mt-4 pb-24 md:pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
+          {/* Sidebar (desktop) */}
+          <div className="hidden md:block">
+            <div className="sticky top-[76px] space-y-2">
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="text-xs text-gray-500">Navigation</div>
+                <div className="mt-2 space-y-1">
+                  {navTabs.map((t) => (
+                    <button
+                      key={t.key}
+                      onClick={() => setActiveTab(t.key)}
+                      className={`w-full text-left rounded-lg px-3 py-2 border ${
+                        activeTab === t.key
+                          ? "border-gray-300 bg-gray-50"
+                          : "border-transparent hover:border-gray-200 hover:bg-gray-50"
+                      }`}
+                      type="button"
+                    >
+                      <div className="text-sm font-semibold">{t.label}</div>
+                      <div className="text-xs text-gray-500">{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="text-xs text-gray-500">Updated nightly</div>
+                <div className="text-sm font-semibold mt-1">
+                  {benchmarkUpdatedAt ? formatWhen(benchmarkUpdatedAt) : "—"}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Benchmark snapshot (Top 3 median competitor)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main content */}
+          <div className="space-y-4">
+            {/* Inputs message */}
+            {inputsMessage ? (
+              <div
+                className={`rounded-lg border px-3 py-2 text-sm ${
+                  inputsMessage.startsWith("Error:")
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-orange-200 bg-orange-50 text-orange-700"
+                }`}
+              >
+                {inputsMessage}
+              </div>
+            ) : null}
+
+            {/* OVERVIEW */}
+            {activeTab === "overview" ? (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Overview</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        A simple summary based on your market data and realistic capacity.
                       </div>
-                    </td>
-                    <td className="py-2 pr-4 font-medium">{c.total_reviews ?? 0}</td>
-                    <td className="py-2 pr-4">{c.rating ?? "—"}</td>
-                    <td className="py-2 pr-4 text-xs text-gray-700">
-                      {c.competitor_domain?.startsWith("place_id:") ? "—" : c.competitor_domain ?? "—"}
-                    </td>
-                    <td className="py-2 pr-4 text-xs text-gray-700">
-                      {c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="text-xs text-gray-700 tabular-nums">
+                      Target (90d): {finalTarget90d ?? "—"}
+                    </div>
+                  </div>
+
+                  {/* Review position */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">Your review position</div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          Benchmark = <span className="font-medium">median</span> review count of the{" "}
+                          <span className="font-medium">top 3 discovered competitors</span>.
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-700 tabular-nums">
+                        {yourCurrentReviews ?? "—"} / {thresholdReviews}
+                      </div>
+                    </div>
+
+                    {progress ? (
+                      <>
+                        <div className="mt-2 h-3 w-full rounded-full bg-white border border-gray-200 overflow-hidden">
+                          <div className="h-full bg-black" style={{ width: `${progress.pctDone}%` }} />
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
+                          <div>{Math.round(progress.pctDone)}% of benchmark</div>
+                          <div>{progress.remaining} reviews to reach the median</div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Progress will appear once your reviews and competitors are loaded.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Key stats */}
+                  <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Review gap</div>
+                      <div className="text-lg font-semibold">
+                        {yourCurrentReviews == null ? "—" : reviewModel.gap}
+                      </div>
+                      <div className="text-xs text-gray-500">Benchmark − you</div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Weekly requirement</div>
+                      <div className="text-lg font-semibold">
+                        {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
+                      </div>
+                      <div className="text-xs text-gray-500">To hit 90-day target</div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Market growth (90d)</div>
+                      <div className="text-lg font-semibold">{velocity.marketGrowth90d}</div>
+                      <div className="text-xs text-gray-500">{velocity.confidenceLabel}</div>
+                    </div>
+
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Capacity (90d)</div>
+                      <div className="text-lg font-semibold">{reviewModel.capacity90d}</div>
+                      <div className="text-xs text-gray-500">From your inputs</div>
+                    </div>
+                  </div>
+
+                  {/* Time-to-parity */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">Time-to-parity</div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          “Moving market” assumes competitors keep gaining reviews at the current market velocity.
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-700 tabular-nums">
+                        Gap: {parity?.gapToToday ?? "—"}
+                      </div>
+                    </div>
+
+                    {!parity ? (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Projection will appear once your reviews and competitors are loaded.
+                      </div>
+                    ) : parity.status === "at_or_above" ? (
+                      <div className="mt-2 text-sm text-gray-800">✅ You’re already at or above the benchmark.</div>
+                    ) : parity.status === "no_pace" ? (
+                      <div className="mt-2 text-sm text-gray-800">
+                        ⚠️ Can’t calculate because your 90-day target is 0 (capacity or inputs may be too low).
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="text-xs text-gray-500">To reach today’s median (static)</div>
+                          {parity.static ? (
+                            <div className="mt-1">
+                              <div className="text-lg font-semibold">~{parity.static.weeks} weeks</div>
+                              <div className="text-xs text-gray-500">
+                                (~{parity.static.months} months • {parity.static.days} days)
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-sm text-gray-700">—</div>
+                          )}
+                        </div>
+
+                        <div className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="text-xs text-gray-500">To catch up in a moving market</div>
+                          {parity.status === "market_faster" ? (
+                            <div className="mt-1">
+                              <div className="text-lg font-semibold">Not reachable (at current pace)</div>
+                              <div className="text-xs text-gray-500">
+                                Your 90d: {finalTarget90d ?? 0} • Market 90d: {velocity.marketGrowth90d} • Net:{" "}
+                                {parity.net90d ?? 0}
+                              </div>
+                            </div>
+                          ) : parity.moving ? (
+                            <div className="mt-1">
+                              <div className="text-lg font-semibold">~{parity.moving.weeks} weeks</div>
+                              <div className="text-xs text-gray-500">
+                                (~{parity.moving.months} months • {parity.moving.days} days)
+                              </div>
+                              <div className="text-[11px] text-gray-500 mt-1">
+                                Net gain (you − market) per 90d: {parity.net90d}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-sm text-gray-700">—</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Annual */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">Annual outlook</div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          Uses your 90-day realistic pace × 4. Market assumes current velocity continues.
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-700 tabular-nums">Starting gap: {annual?.gapToday ?? "—"}</div>
+                    </div>
+
+                    {!annual ? (
+                      <div className="mt-2 text-xs text-gray-600">
+                        Projection will appear once your reviews and competitors are loaded.
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="text-xs text-gray-500">Projected gains (12 months)</div>
+                          <div className="mt-1 text-sm text-gray-800">
+                            <div className="flex items-center justify-between">
+                              <span>Your gain</span>
+                              <span className="font-semibold tabular-nums">{annual.yourAnnual}</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span>Market gain</span>
+                              <span className="font-semibold tabular-nums">{annual.marketAnnual}</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span>Net (you − market)</span>
+                              <span className="font-semibold tabular-nums">{annual.netAnnual}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="text-xs text-gray-500">Projected position (12 months)</div>
+                          <div className="mt-1 text-sm text-gray-800">
+                            <div className="flex items-center justify-between">
+                              <span>You</span>
+                              <span className="font-semibold tabular-nums">{annual.projectedYou}</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span>Benchmark</span>
+                              <span className="font-semibold tabular-nums">{annual.projectedBenchmark}</span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1">
+                              <span>Gap after 12 months</span>
+                              <span className="font-semibold tabular-nums">{annual.projectedGap}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="text-xs text-gray-500">Parity outlook</div>
+                          <div className="mt-1">
+                            {annual.parityReachableInYear ? (
+                              <div className="text-sm font-semibold text-gray-900">✅ Reachable in ~12 months</div>
+                            ) : (
+                              <div className="text-sm font-semibold text-gray-900">⚠️ Not reachable at current pace</div>
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
+                              This will self-correct as velocity upgrades from snapshots.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Top priorities */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">Top priorities (next 90 days)</div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          Generated from your gap, your realistic capacity, and your market velocity.
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab("actions")}
+                        className="text-sm underline text-gray-700 hover:text-black"
+                        type="button"
+                      >
+                        View full Action Plan
+                      </button>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      {topPriorities.map((a, idx) => (
+                        <div key={`${a.title}-${idx}`} className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900">
+                                {idx + 1}. {a.title}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-1">{a.why}</div>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-700">
+                              {a.priority}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 text-xs text-gray-500">
+                      This plan follows widely accepted Google Business Profile + local SEO best practices (not a Google
+                      guarantee), combined with your market data and realistic capacity.
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {/* MARKET */}
+            {activeTab === "market" ? (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Market & competitors</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Competitor discovery is based on Google Maps results (DataForSEO). Sorted by total reviews.
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-700 tabular-nums">
+                      Updated nightly: {benchmarkUpdatedAt ? formatWhen(benchmarkUpdatedAt) : "—"}
+                    </div>
+                  </div>
+
+                  {/* Market velocity */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold">Market velocity</div>
+                      <div className="text-xs text-gray-500">
+                        {velocity.confidenceLabel} • Improves automatically as snapshots accumulate.
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="rounded-lg bg-white border border-gray-200 p-3">
+                        <div className="text-xs text-gray-500">Market growth (90d)</div>
+                        <div className="text-lg font-semibold">{velocity.marketGrowth90d}</div>
+                        {velocity.kind === "observed" ? (
+                          <div className="text-xs text-gray-500">
+                            +{velocity.observedDeltaReviews} over {velocity.observedDays}d
+                          </div>
+                        ) : (
+                          <div className="text-xs text-gray-500">{velocity.note}</div>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg bg-white border border-gray-200 p-3">
+                        <div className="text-xs text-gray-500">Market-based target (90d)</div>
+                        <div className="text-lg font-semibold">{marketBasedTarget90d}</div>
+                        <div className="text-xs text-gray-500">Catch-up factor applied</div>
+                      </div>
+
+                      <div className="rounded-lg bg-white border border-gray-200 p-3">
+                        <div className="text-xs text-gray-500">Benchmark</div>
+                        <div className="text-lg font-semibold">{thresholdReviews}</div>
+                        <div className="text-xs text-gray-500">Top 3 median reviews</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-xs text-gray-500">
+                      Benchmark uses <span className="font-medium">Top 3 median</span> to avoid #1 outlier distortion.
+                    </div>
+                  </div>
+
+                  {/* Competitors */}
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-sm font-semibold">Discovered competitors</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      These are competitors Google surfaces in your target area for your category.
+                    </div>
+
+                    {competitors.length === 0 ? (
+                      <div className="mt-3 text-sm text-gray-500">
+                        No competitors found yet. Click <span className="font-medium">Run discovery</span>.
+                      </div>
+                    ) : (
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-xs text-gray-500">
+                              <th className="py-2 pr-4">Name</th>
+                              <th className="py-2 pr-4">Reviews</th>
+                              <th className="py-2 pr-4">Rating</th>
+                              <th className="py-2 pr-4">Domain</th>
+                              <th className="py-2 pr-4">Last seen</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {competitors.map((c) => (
+                              <tr key={c.competitor_domain} className="border-t border-gray-100">
+                                <td className="py-2 pr-4">
+                                  <div className="font-medium">{c.name ?? "—"}</div>
+                                  <div className="text-xs text-gray-500 truncate max-w-[420px]">
+                                    {c.place_id ?? c.competitor_domain}
+                                  </div>
+                                </td>
+                                <td className="py-2 pr-4 font-medium">{c.total_reviews ?? 0}</td>
+                                <td className="py-2 pr-4">{c.rating ?? "—"}</td>
+                                <td className="py-2 pr-4 text-xs text-gray-700">
+                                  {c.competitor_domain?.startsWith("place_id:")
+                                    ? "—"
+                                    : c.competitor_domain ?? "—"}
+                                </td>
+                                <td className="py-2 pr-4 text-xs text-gray-700">
+                                  {c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="mt-3">
+                      <div className="text-xs font-medium text-gray-700">Top 3 used for benchmark</div>
+                      {top3.length === 0 ? (
+                        <div className="text-xs text-gray-600 mt-1">—</div>
+                      ) : (
+                        <ul className="mt-1 space-y-1">
+                          {top3.map((c, idx) => (
+                            <li
+                              key={c.competitor_domain}
+                              className="flex items-center justify-between text-xs text-gray-700"
+                            >
+                              <span className="truncate pr-3">
+                                {idx + 1}. {shortName(c.name)}
+                                {top3.length === 3 && idx === 1 ? (
+                                  <span className="ml-2 rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600">
+                                    median benchmark
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="tabular-nums font-medium">{c.total_reviews ?? 0}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {/* STRATEGY */}
+            {activeTab === "strategy" ? (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="text-sm font-semibold">Strategy summary</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    A concise explanation of what we found and what it means.
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">What Google sees</div>
+                      <div className="text-sm font-semibold mt-1">Local competitors + review position</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Your benchmark is the <span className="font-medium">median of the top 3 competitors</span> in your
+                        target area. This avoids a single outlier skewing your target.
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Your biggest constraint</div>
+                      <div className="text-sm font-semibold mt-1">Capacity (realistic reviews you can earn)</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Targets are constrained by your monthly customers and your review conversion rate.
+                        {project ? (
+                          <>
+                            {" "}
+                            Your inputs:{" "}
+                            <span className="font-medium tabular-nums">
+                              {project.monthly_customer_events ?? 0}/mo
+                            </span>{" "}
+                            at{" "}
+                            <span className="font-medium tabular-nums">
+                              {Math.round((project.review_conversion_rate ?? 0) * 100)}%
+                            </span>
+                            .
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">What this means</div>
+                    <div className="mt-2 space-y-2 text-sm text-gray-800">
+                      <div>
+                        • Your review gap is{" "}
+                        <span className="font-semibold tabular-nums">
+                          {yourCurrentReviews == null ? "—" : reviewModel.gap}
+                        </span>{" "}
+                        versus the benchmark.
+                      </div>
+                      <div>
+                        • Your realistic 90-day target is{" "}
+                        <span className="font-semibold tabular-nums">{finalTarget90d ?? "—"}</span>, which is about{" "}
+                        <span className="font-semibold tabular-nums">
+                          {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
+                        </span>{" "}
+                        per week.
+                      </div>
+                      <div>
+                        • The market is currently gaining{" "}
+                        <span className="font-semibold tabular-nums">{velocity.marketGrowth90d}</span> reviews per 90 days (
+                        <span className="font-medium">{velocity.confidenceLabel}</span>).
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-xs text-gray-500">
+                      This summary is based on widely accepted GBP + local SEO best practices plus your market data. It is
+                      not a Google guarantee.
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setActiveTab("actions")}
+                      className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white"
+                      type="button"
+                    >
+                      Go to Action Plan
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {/* ACTION PLAN */}
+            {activeTab === "actions" ? (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Action Plan (next 90 days)</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Numbered steps generated from your gap, capacity, and market velocity.
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-700 tabular-nums">
+                      Target (90d): {finalTarget90d ?? "—"}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-xs text-gray-500">
+                    This plan follows widely accepted Google Business Profile + local SEO best practices (not a Google
+                    guarantee), combined with your market data and realistic capacity.
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {actionPlan.map((a, idx) => (
+                      <div key={`${a.title}-${idx}`} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {idx + 1}. {a.title}
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">{a.why}</div>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-white border border-gray-200 px-2 py-0.5 text-[11px] text-gray-700">
+                            {a.priority}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 text-xs text-gray-800">
+                          <span className="font-medium">Next step:</span> {a.nextStep}
+                        </div>
+
+                        {a.metric ? (
+                          <div className="mt-2 text-[11px] text-gray-600">
+                            <span className="font-medium">Metric:</span> {a.metric}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {/* DATA */}
+            {activeTab === "data" ? (
+              <>
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="text-sm font-semibold">Data & inputs</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    This section shows the numbers used to generate targets and projections.
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Project inputs</div>
+                      <div className="mt-2 space-y-1 text-sm text-gray-800">
+                        <div className="flex items-center justify-between">
+                          <span>Monthly customer events</span>
+                          <span className="font-semibold tabular-nums">{project?.monthly_customer_events ?? "—"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Review conversion rate</span>
+                          <span className="font-semibold tabular-nums">
+                            {project ? `${Math.round((project.review_conversion_rate ?? 0) * 100)}%` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        These two fields drive capacity and realistic targets.
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <div className="text-xs text-gray-500">Benchmark + snapshot</div>
+                      <div className="mt-2 space-y-1 text-sm text-gray-800">
+                        <div className="flex items-center justify-between">
+                          <span>Top 3 median benchmark</span>
+                          <span className="font-semibold tabular-nums">{thresholdReviews}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Benchmark updated</span>
+                          <span className="font-semibold tabular-nums">{benchmarkUpdatedAt ? "Yes" : "No"}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Latest snapshot time</span>
+                          <span className="font-semibold tabular-nums">
+                            {benchmarkUpdatedAt ? formatWhen(benchmarkUpdatedAt) : "—"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        Snapshots accumulate nightly and upgrade velocity accuracy.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Target math (90 days)</div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 text-sm text-gray-800">
+                      <div className="flex items-center justify-between">
+                        <span>Gap</span>
+                        <span className="font-semibold tabular-nums">{yourCurrentReviews == null ? "—" : reviewModel.gap}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Rule target gain</span>
+                        <span className="font-semibold tabular-nums">
+                          {yourCurrentReviews == null ? "—" : reviewModel.ruleTargetGain}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Capacity (90d)</span>
+                        <span className="font-semibold tabular-nums">{reviewModel.capacity90d}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Market-based target (90d)</span>
+                        <span className="font-semibold tabular-nums">{marketBasedTarget90d}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Final target (90d)</span>
+                        <span className="font-semibold tabular-nums">{finalTarget90d ?? "—"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Weekly needed</span>
+                        <span className="font-semibold tabular-nums">
+                          {yourCurrentReviews == null ? "—" : reviewModel.weeklyNeeded}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Velocity details</div>
+                    <div className="mt-2 text-sm text-gray-800 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span>Confidence</span>
+                        <span className="font-semibold">{velocity.confidenceLabel}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Market growth (90d)</span>
+                        <span className="font-semibold tabular-nums">{velocity.marketGrowth90d}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Source</span>
+                        <span className="font-semibold">{velocity.kind === "observed" ? "Observed from snapshots" : "Estimated fallback"}</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      Observed velocity auto-upgrades from 90d → 30d → 14d once enough snapshots exist.
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
-        )}
+        </div>
       </div>
 
-      <div className="h-10" />
+      {/* Bottom nav (mobile) */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white md:hidden">
+        <div className="mx-auto max-w-7xl px-2 py-2 grid grid-cols-5 gap-1">
+          {navTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`rounded-lg px-2 py-2 text-center ${
+                activeTab === t.key ? "bg-gray-50 border border-gray-200" : "border border-transparent"
+              }`}
+              type="button"
+            >
+              <div className="text-[11px] font-semibold text-gray-900">{t.label}</div>
+              <div className="text-[10px] text-gray-500 truncate">{t.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
