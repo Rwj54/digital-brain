@@ -106,6 +106,22 @@ export default function ProjectAuthorityPage() {
 
           <div className="shrink-0 flex items-center gap-2">
             <button
+              onClick={() => router.push(`/projects/${projectId}/authority`)}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:text-black"
+              type="button"
+            >
+              Authority
+            </button>
+
+            <button
+              onClick={() => router.push(`/projects/${projectId}/momentum`)}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:text-black"
+              type="button"
+            >
+              Momentum
+            </button>
+
+            <button
               onClick={() => router.push(`/projects/${projectId}/competitors`)}
               className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:text-black"
               type="button"
