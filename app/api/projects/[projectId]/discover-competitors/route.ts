@@ -18,16 +18,28 @@ function getProjectIdFromUrl(req: Request): string {
   return "";
 }
 
-export async function POST(
-  req: NextRequest,
-  context: { params: Promise<{ projectId: string }> }
-) {
-  try {
-    const { projectId: paramProjectId } = await context.params;
+async function readProjectIdFromContext(context: any): Promise<string> {
+  // Next.js can provide params as an object or as a Promise (depending on version/runtime)
+  const paramsMaybe = context?.params;
 
-    const projectId =
-      (typeof paramProjectId === "string" && paramProjectId.trim()) ||
-      getProjectIdFromUrl(req);
+  if (!paramsMaybe) return "";
+
+  try {
+    const params =
+      typeof (paramsMaybe as any)?.then === "function" ? await paramsMaybe : paramsMaybe;
+
+    const projectId = params?.projectId;
+    return typeof projectId === "string" ? projectId.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+export async function POST(req: NextRequest, context: any) {
+  try {
+    const paramProjectId = await readProjectIdFromContext(context);
+
+    const projectId = paramProjectId || getProjectIdFromUrl(req);
 
     if (!projectId) {
       return NextResponse.json(
