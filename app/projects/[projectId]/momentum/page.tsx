@@ -21,6 +21,12 @@ type AuthorityRow = {
   created_at: string;
 };
 
+type AuthorityChartPoint = {
+  date: string; // YYYY-MM-DD
+  authority: number;
+  momentum: number;
+};
+
 function formatJson(value: any) {
   try {
     return JSON.stringify(value, null, 2);
@@ -35,6 +41,16 @@ function asNumber(v: any): number | null {
   return null;
 }
 
+function clamp01(n: number) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function fmt1(n: number | null | undefined) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  return n.toFixed(1);
+}
+
 export default function ProjectMomentumPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -43,6 +59,10 @@ export default function ProjectMomentumPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [row, setRow] = useState<AuthorityRow | null>(null);
+
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendStatus, setTrendStatus] = useState<string | null>(null);
+  const [trendSeries, setTrendSeries] = useState<AuthorityChartPoint[]>([]);
 
   async function requireAuth() {
     const { data } = await supabase.auth.getSession();
@@ -69,6 +89,48 @@ export default function ProjectMomentumPage() {
     setRow(first);
   }
 
+  async function loadAuthorityTrend() {
+    setTrendLoading(true);
+    setTrendStatus(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/authority-chart`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg = json?.error ? String(json.error) : `Trend request failed (${res.status})`;
+        throw new Error(msg);
+      }
+
+      if (!json?.ok || !Array.isArray(json.series)) {
+        throw new Error("Trend response was not in the expected format.");
+      }
+
+      const raw = json.series as any[];
+
+      // Normalize + validate
+      const normalized: AuthorityChartPoint[] = raw
+        .map((p) => ({
+          date: typeof p?.date === "string" ? p.date : "",
+          authority: typeof p?.authority === "number" ? p.authority : Number(p?.authority),
+          momentum: typeof p?.momentum === "number" ? p.momentum : Number(p?.momentum),
+        }))
+        .filter((p) => p.date && Number.isFinite(p.authority) && Number.isFinite(p.momentum));
+
+      setTrendSeries(normalized);
+    } catch (e: any) {
+      setTrendStatus(e?.message ?? "Failed to load authority trend");
+      setTrendSeries([]);
+    } finally {
+      setTrendLoading(false);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -82,6 +144,7 @@ export default function ProjectMomentumPage() {
 
       try {
         await loadLatestAuthority();
+        await loadAuthorityTrend();
       } catch (e: any) {
         setStatus(e?.message ?? "Failed to load momentum");
       } finally {
@@ -104,6 +167,46 @@ export default function ProjectMomentumPage() {
   const gapShrinkRatio = asNumber(row?.inputs?.momentum?.components?.gapShrinkRatio);
   const marketPressure = asNumber(row?.inputs?.momentum?.components?.marketPressure);
 
+  // Deduplicate same-day entries (e.g., v1.0 and v1.1 both on the same captured_at)
+  // Keep the "best/most-informative" point for that date.
+  const trendDeduped = useMemo(() => {
+    const byDate = new Map<string, AuthorityChartPoint>();
+
+    for (const p of trendSeries) {
+      const existing = byDate.get(p.date);
+      if (!existing) {
+        byDate.set(p.date, p);
+        continue;
+      }
+
+      // Prefer higher momentum (v1.1 vs v1.0 usually), then higher authority as tie-breaker
+      if (p.momentum > existing.momentum) byDate.set(p.date, p);
+      else if (p.momentum === existing.momentum && p.authority > existing.authority) byDate.set(p.date, p);
+    }
+
+    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [trendSeries]);
+
+  const trendStats = useMemo(() => {
+    if (!trendDeduped.length) return null;
+
+    const authorityVals = trendDeduped.map((p) => p.authority);
+    const momentumVals = trendDeduped.map((p) => p.momentum);
+
+    const minA = Math.min(...authorityVals);
+    const maxA = Math.max(...authorityVals);
+    const minM = Math.min(...momentumVals);
+    const maxM = Math.max(...momentumVals);
+
+    const latest = trendDeduped[trendDeduped.length - 1];
+    const prev = trendDeduped.length >= 2 ? trendDeduped[trendDeduped.length - 2] : null;
+
+    const deltaA = prev ? latest.authority - prev.authority : null;
+    const deltaM = prev ? latest.momentum - prev.momentum : null;
+
+    return { minA, maxA, minM, maxM, latest, prev, deltaA, deltaM };
+  }, [trendDeduped]);
+
   if (loading) return <div className="p-4 text-sm text-gray-500">Loading…</div>;
 
   return (
@@ -122,8 +225,11 @@ export default function ProjectMomentumPage() {
             <button
               onClick={async () => {
                 setStatus("Refreshing…");
+                setTrendStatus(null);
+
                 try {
                   await loadLatestAuthority();
+                  await loadAuthorityTrend();
                   setStatus(null);
                 } catch (e: any) {
                   setStatus(e?.message ?? "Refresh failed");
@@ -140,20 +246,150 @@ export default function ProjectMomentumPage() {
 
       {status ? (
         <div className="mx-auto max-w-7xl px-4 md:px-6 mt-3">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            {status}
-          </div>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">{status}</div>
         </div>
       ) : null}
 
       <div className="mx-auto max-w-7xl px-4 md:px-6 mt-4 pb-10 space-y-4">
         <AuthoritySummaryCard projectId={projectId} />
 
+        {/* NEW: Authority Trend (History) */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Authority Trend (history)</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Uses the nightly score history. Same-day duplicates are automatically deduped.
+              </div>
+            </div>
+
+            <button
+              onClick={loadAuthorityTrend}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:text-black disabled:opacity-60"
+              type="button"
+              disabled={trendLoading}
+            >
+              {trendLoading ? "Refreshing…" : "Refresh trend"}
+            </button>
+          </div>
+
+          {trendStatus ? (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {trendStatus}
+            </div>
+          ) : null}
+
+          {!trendDeduped.length ? (
+            <div className="mt-3 text-sm text-gray-500">
+              No history yet. This will grow nightly as the scorer runs.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {/* Summary row */}
+              {trendStats ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Latest authority</div>
+                    <div className="text-lg font-semibold">{fmt1(trendStats.latest.authority)}</div>
+                    <div className="text-xs text-gray-500">
+                      Δ vs prior: {trendStats.deltaA == null ? "—" : (trendStats.deltaA >= 0 ? "+" : "") + trendStats.deltaA.toFixed(1)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Latest momentum</div>
+                    <div className="text-lg font-semibold">{fmt1(trendStats.latest.momentum)}</div>
+                    <div className="text-xs text-gray-500">
+                      Δ vs prior: {trendStats.deltaM == null ? "—" : (trendStats.deltaM >= 0 ? "+" : "") + trendStats.deltaM.toFixed(1)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Authority range</div>
+                    <div className="text-lg font-semibold">
+                      {trendStats.minA.toFixed(1)}–{trendStats.maxA.toFixed(1)}
+                    </div>
+                    <div className="text-xs text-gray-500">{trendDeduped.length} days</div>
+                  </div>
+
+                  <div className="rounded-lg bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">Momentum range</div>
+                    <div className="text-lg font-semibold">
+                      {trendStats.minM.toFixed(1)}–{trendStats.maxM.toFixed(1)}
+                    </div>
+                    <div className="text-xs text-gray-500">updates weekly (behavior)</div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Simple visual bar list (no chart libs) */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="text-xs text-gray-500">Daily points</div>
+
+                <div className="mt-3 space-y-2">
+                  {trendDeduped
+                    .slice()
+                    .reverse()
+                    .slice(0, 30)
+                    .map((p) => {
+                      const minA = trendStats?.minA ?? p.authority;
+                      const maxA = trendStats?.maxA ?? p.authority;
+                      const rangeA = Math.max(0.0001, maxA - minA);
+                      const wA = clamp01((p.authority - minA) / rangeA);
+
+                      const minM = trendStats?.minM ?? p.momentum;
+                      const maxM = trendStats?.maxM ?? p.momentum;
+                      const rangeM = Math.max(0.0001, maxM - minM);
+                      const wM = clamp01((p.momentum - minM) / rangeM);
+
+                      return (
+                        <div key={p.date} className="rounded-lg bg-white border border-gray-200 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-xs text-gray-700 font-medium">{p.date}</div>
+                            <div className="text-xs text-gray-700 tabular-nums">
+                              Authority <span className="font-semibold">{p.authority.toFixed(1)}</span> • Momentum{" "}
+                              <span className="font-semibold">{p.momentum.toFixed(1)}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                                <span>Authority</span>
+                                <span>{(wA * 100).toFixed(0)}%</span>
+                              </div>
+                              <div className="mt-1 h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
+                                <div className="h-full bg-black" style={{ width: `${wA * 100}%` }} />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                                <span>Momentum</span>
+                                <span>{(wM * 100).toFixed(0)}%</span>
+                              </div>
+                              <div className="mt-1 h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
+                                <div className="h-full bg-black" style={{ width: `${wM * 100}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <div className="mt-3 text-[11px] text-gray-500">
+                  Note: Bars are normalized to the min/max in your available history (not a fixed 0–100 scale).
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Existing: Momentum inspector */}
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="text-sm font-semibold">Momentum details</div>
-          <div className="text-xs text-gray-500 mt-1">
-            Leading indicator. Moves weekly and reflects market-relative acceleration.
-          </div>
+          <div className="text-xs text-gray-500 mt-1">Leading indicator. Moves weekly and reflects market-relative acceleration.</div>
 
           {!row ? (
             <div className="mt-3 text-sm text-gray-500">No momentum row found yet.</div>
@@ -185,16 +421,12 @@ export default function ProjectMomentumPage() {
 
                 <div className="rounded-lg bg-gray-50 p-3">
                   <div className="text-xs text-gray-500">Gap shrink</div>
-                  <div className="text-lg font-semibold">
-                    {gapShrinkRatio == null ? "—" : gapShrinkRatio.toFixed(3)}
-                  </div>
+                  <div className="text-lg font-semibold">{gapShrinkRatio == null ? "—" : gapShrinkRatio.toFixed(3)}</div>
                 </div>
 
                 <div className="rounded-lg bg-gray-50 p-3">
                   <div className="text-xs text-gray-500">Market pressure</div>
-                  <div className="text-lg font-semibold">
-                    {marketPressure == null ? "—" : marketPressure.toFixed(3)}
-                  </div>
+                  <div className="text-lg font-semibold">{marketPressure == null ? "—" : marketPressure.toFixed(3)}</div>
                 </div>
               </div>
 
