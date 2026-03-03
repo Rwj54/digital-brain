@@ -21,8 +21,7 @@ type AuthorityRow = {
 };
 
 function formatDate(d: string) {
-  // captured_at is YYYY-MM-DD
-  return d;
+  return d; // captured_at is YYYY-MM-DD
 }
 
 export default function AuthoritySummaryCard({ projectId }: { projectId: string }) {
@@ -47,6 +46,7 @@ export default function AuthoritySummaryCard({ projectId }: { projectId: string 
         )
         .eq("project_id", projectId)
         .order("captured_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (cancelled) return;
@@ -74,7 +74,7 @@ export default function AuthoritySummaryCard({ projectId }: { projectId: string 
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-gray-900">Local Authority</div>
-          <div className="text-xs text-gray-500">Nightly score (v1.0)</div>
+          <div className="text-xs text-gray-500">Nightly score ({row?.version ?? "—"})</div>
         </div>
 
         {row ? (
