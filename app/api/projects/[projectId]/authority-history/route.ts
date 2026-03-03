@@ -38,7 +38,10 @@ export async function GET(req: NextRequest, context: any) {
     const projectId = paramProjectId || getProjectIdFromUrl(req);
 
     if (!projectId) {
-      return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing projectId" },
+        { status: 400 }
+      );
     }
 
     const url = new URL(req.url);
@@ -46,7 +49,10 @@ export async function GET(req: NextRequest, context: any) {
     const limitRaw = limitParam ? Number(limitParam) : 30;
     const limit = clampInt(Number.isFinite(limitRaw) ? limitRaw : 30, 1, 365);
 
-    const { data, error } = await supabaseAdmin
+    // NOTE: In this codebase, supabaseAdmin is a factory function.
+    const admin = supabaseAdmin();
+
+    const { data, error } = await admin
       .from("project_authority_scores")
       .select(
         "project_id,captured_at,version,authority_score,authority_tier,competitive_strength,structural_optimization,momentum_score,momentum_label,created_at"
