@@ -1,17 +1,27 @@
 -- supabase/schema.sql
 -- Digital Brain (Phase 2E)
 -- Database schema + policies that must be tracked in source control.
--- NOTE: This file is an operational "source of truth" log.
--- Apply changes in Supabase SQL editor, then mirror them here.
+-- NOTE: Apply in Supabase SQL editor, then mirror changes here.
 
 begin;
 
 -- ============================================================
--- RLS: project_authority_scores
+-- TABLE: project_authority_scores
 -- ============================================================
 
--- Ensure RLS is enabled
+-- RLS enabled
 alter table public.project_authority_scores enable row level security;
+
+-- Unique key: allow multiple versions per day
+alter table public.project_authority_scores
+drop constraint if exists project_authority_scores_project_id_captured_at_key;
+
+create unique index if not exists project_authority_scores_project_id_captured_at_version_key
+on public.project_authority_scores (project_id, captured_at, version);
+
+-- ============================================================
+-- RLS: project_authority_scores
+-- ============================================================
 
 -- Read policy:
 -- Allow authenticated users to read authority scores for projects they can access.
