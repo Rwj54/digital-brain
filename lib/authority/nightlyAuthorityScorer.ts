@@ -48,7 +48,6 @@ function percentileRank(values: number[], yourValue: number): number {
 }
 
 function normalize01(x: number, softCap: number): number {
-  // stable 0..1 mapping without hard cliffs
   const v = Math.max(0, x);
   return v / (v + Math.max(1, softCap));
 }
@@ -80,11 +79,11 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
     errors: [],
   };
 
-  // 1) Load projects (minimal columns)
+  // 1) Load projects (ONLY columns guaranteed: id, client_id)
   const { data: projects, error: projectsError } = await supabase
     .from("projects")
-    .select("id, client_id, name")
-    .order("created_at", { ascending: false });
+    .select("id, client_id")
+    .order("id", { ascending: true });
 
   if (projectsError) {
     throw new Error(`Failed to load projects: ${projectsError.message}`);
@@ -111,7 +110,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         continue;
       }
 
-      // If no profile, skip (no "you" to score)
       if (!profile) {
         result.projects_skipped++;
         continue;
@@ -133,7 +131,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
 
       const metricsRows = (metrics ?? []) as AnyRow[];
 
-      // If no competitors, still compute (market is empty-ish) but normalize safely
       const competitorReviews = metricsRows.map((r) =>
         num(r, ["review_count", "reviews", "reviews_count", "total_reviews"], 0)
       );
@@ -155,7 +152,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         top3.map((r) => num(r, ["review_count", "reviews", "reviews_count", "total_reviews"], 0))
       );
 
-      const yourVelocity90_est = 0; // we may not have your own history yet
       const top3MedianVelocity90 = median(
         top3.map((r) =>
           num(r, ["velocity_90", "v90", "reviews_90", "reviews_90d", "reviews_delta_90", "delta_90"], 0)
@@ -164,9 +160,9 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
 
       // Market distribution includes you + competitors
       const dist = [...competitorReviews, yourReviews];
-      const pRank = percentileRank(dist, yourReviews); // 0..1
+      const pRank = percentileRank(dist, yourReviews);
 
-      // Market competitiveness normalized (heuristic, stable)
+      // Market competitiveness (heuristic)
       const competitorCount = metricsRows.length;
       const densityScore = Math.min(1, competitorCount / 50);
 
@@ -181,11 +177,11 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const velP90Index = Math.max(0, Math.floor(0.9 * Math.max(0, velSorted.length - 1)));
       const velocityCeiling = velSorted.length ? velSorted[velP90Index] : 0;
 
-      const marketReviewCeilingScore = normalize01(reviewCeiling, 200); // softcap 200 reviews
-      const marketVelocityCeilingScore = normalize01(velocityCeiling, 20); // softcap 20 reviews / 90d
-      const marketDensityScore = normalize01(densityScore, 0.7); // keep it smooth
+      const marketReviewCeilingScore = normalize01(reviewCeiling, 200);
+      const marketVelocityCeilingScore = normalize01(velocityCeiling, 20);
+      const marketDensityScore = normalize01(densityScore, 0.7);
 
-      // Structural fields (best-effort now; expands later)
+      // Structural fields (best-effort)
       const hasPrimaryCategory = bool(profile, ["has_primary_category"], true) || !!profile["primary_category"];
       const additionalCategoryCount = num(profile, ["additional_category_count", "additional_categories_count"], 0);
 
@@ -198,14 +194,13 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const reviewResponseRateFinal =
         Number.isFinite(reviewResponseRate) ? Math.max(0, Math.min(1, reviewResponseRate)) : undefined;
 
-      // Momentum v1: we don’t yet have your own review time-series; keep stable defaults
-      // We will upgrade this once we store your review deltas.
-      const yourVelocity90 = num(profile, ["velocity_90", "v90", "reviews_90d", "reviews_delta_90"], yourVelocity90_est);
+      // Momentum placeholders (upgraded in next step)
+      const yourVelocity90 = num(profile, ["velocity_90", "v90", "reviews_90d", "reviews_delta_90"], 0);
       const yourVelocity30 = num(profile, ["velocity_30", "v30", "reviews_30d", "reviews_delta_30"], Math.round(yourVelocity90 / 3));
       const yourVelocity14 = num(profile, ["velocity_14", "v14", "reviews_14d", "reviews_delta_14"], Math.round(yourVelocity90 / 6));
 
-      const gapChange90 = 0; // placeholder until we store yesterday’s authority inputs (next step)
-      const marketAcceleration = 0; // placeholder until we compute 14/30/90 accel across market
+      const gapChange90 = 0;
+      const marketAcceleration = 0;
 
       const computed = computeAuthority({
         yourReviews,
@@ -235,7 +230,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         marketAcceleration,
       });
 
-      // Store explainability inputs (small + stable)
       const inputs = {
         your_reviews: yourReviews,
         top3_median_reviews: top3MedianReviews,
@@ -272,7 +266,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         },
       };
 
-      // Upsert into project_authority_scores
       const { error: upsertError } = await supabase
         .from("project_authority_scores")
         .upsert(
