@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getAuthorityHistory } from "@/lib/domain/authority/getAuthorityHistory";
 
 export const runtime = "nodejs";
 
@@ -11,10 +11,6 @@ function getProjectIdFromUrl(req: Request): string {
   const idx = parts.indexOf("projects");
   if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
   return "";
-}
-
-function clampInt(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
 async function readProjectIdFromContext(context: any): Promise<string> {
@@ -33,52 +29,27 @@ async function readProjectIdFromContext(context: any): Promise<string> {
 }
 
 export async function GET(req: NextRequest, context: any) {
-  try {
-    const paramProjectId = await readProjectIdFromContext(context);
-    const projectId = paramProjectId || getProjectIdFromUrl(req);
+  const paramProjectId = await readProjectIdFromContext(context);
+  const projectId = paramProjectId || getProjectIdFromUrl(req);
 
-    if (!projectId) {
-      return NextResponse.json(
-        { ok: false, error: "Missing projectId" },
-        { status: 400 }
-      );
-    }
+  const url = new URL(req.url);
+  const limitParam = url.searchParams.get("limit");
+  const limitRaw = limitParam ? Number(limitParam) : 30;
+  const limit = Number.isFinite(limitRaw) ? limitRaw : 30;
 
-    const url = new URL(req.url);
-    const limitParam = url.searchParams.get("limit");
-    const limitRaw = limitParam ? Number(limitParam) : 30;
-    const limit = clampInt(Number.isFinite(limitRaw) ? limitRaw : 30, 1, 365);
+  const result = await getAuthorityHistory({ projectId, limit });
 
-    // NOTE: In this codebase, supabaseAdmin is a factory function.
-    const admin = supabaseAdmin();
-
-    const { data, error } = await admin
-      .from("project_authority_scores")
-      .select(
-        "project_id,captured_at,version,authority_score,authority_tier,competitive_strength,structural_optimization,momentum_score,momentum_label,created_at"
-      )
-      .eq("project_id", projectId)
-      .order("captured_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: `Failed to load authority history: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      projectId,
-      limit,
-      rows: data ?? [],
-    });
-  } catch (e: any) {
+  if (!result.ok) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
-      { status: 500 }
+      { ok: false, error: result.error },
+      { status: result.status }
     );
   }
+
+  return NextResponse.json({
+    ok: true,
+    projectId: result.projectId,
+    limit: result.limit,
+    rows: result.rows,
+  });
 }

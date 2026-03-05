@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getAuthorityChart } from "@/lib/domain/authority/getAuthorityChart";
 
 export const runtime = "nodejs";
 
@@ -18,7 +18,7 @@ async function readProjectIdFromContext(context: any): Promise<string> {
 
   try {
     const params =
-      typeof paramsMaybe?.then === "function"
+      typeof (paramsMaybe as any)?.then === "function"
         ? await paramsMaybe
         : paramsMaybe;
 
@@ -30,48 +30,21 @@ async function readProjectIdFromContext(context: any): Promise<string> {
 }
 
 export async function GET(req: NextRequest, context: any) {
-  try {
-    const paramProjectId = await readProjectIdFromContext(context);
-    const projectId = paramProjectId || getProjectIdFromUrl(req);
+  const paramProjectId = await readProjectIdFromContext(context);
+  const projectId = paramProjectId || getProjectIdFromUrl(req);
 
-    if (!projectId) {
-      return NextResponse.json(
-        { ok: false, error: "Missing projectId" },
-        { status: 400 }
-      );
-    }
+  const result = await getAuthorityChart({ projectId });
 
-    const admin = supabaseAdmin();
-
-    const { data, error } = await admin
-      .from("project_authority_scores")
-      .select("captured_at,authority_score,momentum_score")
-      .eq("project_id", projectId)
-      .order("captured_at", { ascending: true });
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    const series =
-      data?.map((row: any) => ({
-        date: row.captured_at,
-        authority: row.authority_score,
-        momentum: row.momentum_score,
-      })) ?? [];
-
-    return NextResponse.json({
-      ok: true,
-      projectId,
-      series,
-    });
-  } catch (e: any) {
+  if (!result.ok) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
-      { status: 500 }
+      { ok: false, error: result.error },
+      { status: result.status }
     );
   }
+
+  return NextResponse.json({
+    ok: true,
+    projectId: result.projectId,
+    series: result.series,
+  });
 }
