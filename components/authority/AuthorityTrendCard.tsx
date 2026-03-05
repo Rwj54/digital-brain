@@ -8,16 +8,18 @@ type TrendPoint = {
   momentum: number;
 };
 
-type ApiResponse =
-  | {
-      ok: true;
-      projectId: string;
-      series: TrendPoint[];
-    }
-  | {
-      ok: false;
-      error: string;
-    };
+type ApiOk = {
+  ok: true;
+  projectId: string;
+  series: TrendPoint[];
+};
+
+type ApiErr = {
+  ok: false;
+  error: string;
+};
+
+type ApiResponse = ApiOk | ApiErr;
 
 function asNumber(v: any, fallback = 0) {
   const n = typeof v === "number" ? v : Number(v);
@@ -55,6 +57,16 @@ function normalizeToPct(v: number, min: number, max: number) {
   return Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
 }
 
+function isApiOk(json: any): json is ApiOk {
+  return (
+    !!json &&
+    typeof json === "object" &&
+    json.ok === true &&
+    typeof json.projectId === "string" &&
+    Array.isArray(json.series)
+  );
+}
+
 export default function AuthorityTrendCard(props: { projectId: string }) {
   const { projectId } = props;
 
@@ -73,9 +85,9 @@ export default function AuthorityTrendCard(props: { projectId: string }) {
         cache: "no-store",
       });
 
-      const json = (await res.json()) as ApiResponse;
+      const json = (await res.json()) as unknown;
 
-      if (!res.ok || !json || (json as any).ok !== true) {
+      if (!res.ok) {
         const msg =
           (json as any)?.error ||
           `Failed to load trend (${res.status}). Make sure authority-chart route exists.`;
@@ -84,12 +96,21 @@ export default function AuthorityTrendCard(props: { projectId: string }) {
         return;
       }
 
-      const raw = Array.isArray(json.series) ? json.series : [];
+      if (!isApiOk(json)) {
+        const msg =
+          (json as any)?.error ||
+          "Trend response malformed. Make sure authority-chart returns { ok:true, projectId, series }.";
+        setStatus(msg);
+        setSeries([]);
+        return;
+      }
+
+      const raw = json.series;
       const cleaned = raw
-        .map((p) => ({
-          date: String(p.date ?? ""),
-          authority: asNumber((p as any).authority, 0),
-          momentum: asNumber((p as any).momentum, 0),
+        .map((p: any) => ({
+          date: String(p?.date ?? ""),
+          authority: asNumber(p?.authority, 0),
+          momentum: asNumber(p?.momentum, 0),
         }))
         .filter((p) => p.date);
 
@@ -175,7 +196,9 @@ export default function AuthorityTrendCard(props: { projectId: string }) {
           </div>
           <div className="text-xs text-gray-500">
             Δ vs prior:{" "}
-            {derived.authorityDelta == null ? "—" : (derived.authorityDelta >= 0 ? "+" : "") + safeFixed(derived.authorityDelta, 1)}
+            {derived.authorityDelta == null
+              ? "—"
+              : (derived.authorityDelta >= 0 ? "+" : "") + safeFixed(derived.authorityDelta, 1)}
           </div>
         </div>
 
@@ -186,7 +209,9 @@ export default function AuthorityTrendCard(props: { projectId: string }) {
           </div>
           <div className="text-xs text-gray-500">
             Δ vs prior:{" "}
-            {derived.momentumDelta == null ? "—" : (derived.momentumDelta >= 0 ? "+" : "") + safeFixed(derived.momentumDelta, 1)}
+            {derived.momentumDelta == null
+              ? "—"
+              : (derived.momentumDelta >= 0 ? "+" : "") + safeFixed(derived.momentumDelta, 1)}
           </div>
         </div>
 
@@ -205,53 +230,68 @@ export default function AuthorityTrendCard(props: { projectId: string }) {
 
       <div className="mt-4">
         {!derived.points.length ? (
-          <div className="text-sm text-gray-500">No history yet. It will populate after nightly runs.</div>
+          <div className="text-sm text-gray-500">
+            No history yet. It will populate after nightly runs.
+          </div>
         ) : (
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="text-xs text-gray-500">Daily points</div>
 
             <div className="mt-3 space-y-3">
-              {derived.points.slice().reverse().map((p) => {
-                const aPct = normalizeToPct(p.authority, derived.aMinMax.min, derived.aMinMax.max);
-                const mPct = normalizeToPct(p.momentum, derived.mMinMax.min, derived.mMinMax.max);
+              {derived.points
+                .slice()
+                .reverse()
+                .map((p) => {
+                  const aPct = normalizeToPct(
+                    p.authority,
+                    derived.aMinMax.min,
+                    derived.aMinMax.max
+                  );
+                  const mPct = normalizeToPct(
+                    p.momentum,
+                    derived.mMinMax.min,
+                    derived.mMinMax.max
+                  );
 
-                return (
-                  <div key={p.date} className="rounded-lg bg-white border border-gray-200 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold">{p.date}</div>
-                      <div className="text-xs text-gray-600 tabular-nums">
-                        Authority {safeFixed(p.authority, 1)} • Momentum {safeFixed(p.momentum, 1)}
+                  return (
+                    <div key={p.date} className="rounded-lg bg-white border border-gray-200 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold">{p.date}</div>
+                        <div className="text-xs text-gray-600 tabular-nums">
+                          Authority {safeFixed(p.authority, 1)} • Momentum{" "}
+                          {safeFixed(p.momentum, 1)}
+                        </div>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-1 gap-2">
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-gray-500">
+                            <span>Authority</span>
+                            <span className="tabular-nums">{Math.round(aPct)}%</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
+                            <div className="h-full bg-black" style={{ width: `${aPct}%` }} />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-gray-500">
+                            <span>Momentum</span>
+                            <span className="tabular-nums">{Math.round(mPct)}%</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
+                            <div className="h-full bg-black" style={{ width: `${mPct}%` }} />
+                          </div>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mt-2 grid grid-cols-1 gap-2">
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] text-gray-500">
-                          <span>Authority</span>
-                          <span className="tabular-nums">{Math.round(aPct)}%</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
-                          <div className="h-full bg-black" style={{ width: `${aPct}%` }} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] text-gray-500">
-                          <span>Momentum</span>
-                          <span className="tabular-nums">{Math.round(mPct)}%</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-gray-100 border border-gray-200 overflow-hidden">
-                          <div className="h-full bg-black" style={{ width: `${mPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
 
             <div className="mt-3 text-xs text-gray-500">
-              Note: Bars are normalized to the min/max in your available history (not a fixed 0–100 scale).
+              Note: Bars are normalized to the min/max in your available history (not a fixed 0–100
+              scale).
             </div>
           </div>
         )}
