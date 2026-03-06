@@ -9,12 +9,12 @@ type RouteContext = {
 
 export async function POST(_request: Request, context: RouteContext) {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl) {
       return NextResponse.json(
-        { ok: false, error: "Missing SUPABASE_URL." },
+        { ok: false, error: "Missing NEXT_PUBLIC_SUPABASE_URL." },
         { status: 500 }
       );
     }
