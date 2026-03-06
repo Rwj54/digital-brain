@@ -39,7 +39,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, name, rank_keyword, rank_metro")
+      .select("id, rank_keyword, rank_metro")
       .eq("id", projectId)
       .maybeSingle();
 
@@ -73,7 +73,6 @@ export async function POST(_request: Request, context: RouteContext) {
       message: "Rank discovery endpoint scaffold is live.",
       project: {
         id: project.id,
-        name: project.name,
         rankKeyword: project.rank_keyword,
         rankMetro: project.rank_metro,
       },
