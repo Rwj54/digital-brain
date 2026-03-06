@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 type RouteContext = {
   params: Promise<{
     projectId: string;
@@ -14,6 +9,25 @@ type RouteContext = {
 
 export async function POST(_request: Request, context: RouteContext) {
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl) {
+      return NextResponse.json(
+        { ok: false, error: "Missing SUPABASE_URL." },
+        { status: 500 }
+      );
+    }
+
+    if (!supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { ok: false, error: "Missing SUPABASE_SERVICE_ROLE_KEY." },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
     const { projectId } = await context.params;
 
     if (!projectId) {
@@ -68,9 +82,6 @@ export async function POST(_request: Request, context: RouteContext) {
     const message =
       error instanceof Error ? error.message : "Unknown server error.";
 
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
