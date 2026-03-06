@@ -115,7 +115,8 @@ export async function GET(req: NextRequest, context: any) {
     if (categoryGap > 0) {
       actions.push({
         title: "Improve category relevance",
-        detail: "Review primary and secondary GBP categories to better match the leaders in your market.",
+        detail:
+          "Review primary and secondary GBP categories to better match the leaders in your market.",
         priority: "high",
         category: "categories",
       });
@@ -133,18 +134,30 @@ export async function GET(req: NextRequest, context: any) {
     if (actions.length === 0) {
       actions.push({
         title: "Maintain current momentum",
-        detail: "No obvious structural action gaps were detected from the current authority inputs.",
+        detail:
+          "No obvious structural action gaps were detected from the current authority inputs.",
         priority: "low",
         category: "general",
       });
     }
 
-    await admin.from("project_actions").insert({
-      project_id: projectId,
-      captured_at: latest.captured_at,
-      version: "v0",
-      actions_json: actions,
-    });
+    const { error: upsertError } = await admin
+      .from("project_actions")
+      .upsert(
+        {
+          project_id: projectId,
+          captured_at: latest.captured_at,
+          version: "v0",
+          actions_json: actions,
+        },
+        {
+          onConflict: "project_id,captured_at,version",
+        }
+      );
+
+    if (upsertError) {
+      return NextResponse.json({ ok: false, error: upsertError.message }, { status: 500 });
+    }
 
     return NextResponse.json({
       ok: true,
