@@ -5,24 +5,47 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AuthoritySummaryCard from "@/components/authority/AuthoritySummaryCard";
 import ProjectInsightsNav from "@/components/projects/ProjectInsightsNav";
+import AuthorityTrendCard from "@/components/authority/AuthorityTrendCard";
 
 type AuthorityRow = {
   project_id: string;
   captured_at: string; // date
   version: string;
-
   authority_score: number;
   authority_tier: string;
-
   competitive_strength: number;
   structural_optimization: number;
-
   momentum_score: number;
   momentum_label: string;
-
   inputs: any;
   created_at: string;
 };
+
+type ActionItem = {
+  title: string;
+  detail: string;
+  priority: "high" | "medium" | "low";
+  category: "reviews" | "photos" | "posts" | "categories" | "citations" | "general";
+};
+
+type ActionsResponse =
+  | {
+      ok: true;
+      projectId: string;
+      capturedAt: string | null;
+      version: string;
+      actions: ActionItem[];
+      authorityScore?: number | null;
+      authorityTier?: string | null;
+      momentumScore?: number | null;
+      momentumLabel?: string | null;
+      profile?: any;
+      market?: any;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
 
 function formatJson(value: any) {
   try {
@@ -30,6 +53,16 @@ function formatJson(value: any) {
   } catch {
     return String(value);
   }
+}
+
+function priorityClasses(priority: ActionItem["priority"]) {
+  if (priority === "high") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (priority === "medium") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  return "border-gray-200 bg-gray-50 text-gray-700";
 }
 
 export default function ProjectAuthorityPage() {
@@ -42,6 +75,9 @@ export default function ProjectAuthorityPage() {
   const [status, setStatus] = useState<string | null>(null);
 
   const [row, setRow] = useState<AuthorityRow | null>(null);
+  const [actions, setActions] = useState<ActionItem[]>([]);
+  const [actionsVersion, setActionsVersion] = useState<string | null>(null);
+  const [actionsCapturedAt, setActionsCapturedAt] = useState<string | null>(null);
 
   async function requireAuth() {
     const { data } = await supabase.auth.getSession();
@@ -68,6 +104,24 @@ export default function ProjectAuthorityPage() {
     setRow(first);
   }
 
+  async function loadActions() {
+    const res = await fetch(`/api/projects/${projectId}/actions`, {
+      method: "GET",
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+    });
+
+    const json = (await res.json()) as ActionsResponse;
+
+    if (!res.ok || !json || json.ok !== true) {
+      throw new Error((json as any)?.error ?? "Failed to load actions");
+    }
+
+    setActions(Array.isArray(json.actions) ? json.actions : []);
+    setActionsVersion(json.version ?? null);
+    setActionsCapturedAt(json.capturedAt ?? null);
+  }
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -83,6 +137,7 @@ export default function ProjectAuthorityPage() {
 
       try {
         await loadLatestAuthority();
+        await loadActions();
       } catch (e: any) {
         setStatus(e?.message ?? "Failed to load authority");
       } finally {
@@ -96,7 +151,6 @@ export default function ProjectAuthorityPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -113,6 +167,7 @@ export default function ProjectAuthorityPage() {
                 setStatus("Refreshing…");
                 try {
                   await loadLatestAuthority();
+                  await loadActions();
                   setStatus(null);
                 } catch (e: any) {
                   setStatus(e?.message ?? "Refresh failed");
@@ -128,7 +183,6 @@ export default function ProjectAuthorityPage() {
         </div>
       </div>
 
-      {/* Status */}
       {status ? (
         <div className="mx-auto max-w-7xl px-4 md:px-6 mt-3">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -138,10 +192,58 @@ export default function ProjectAuthorityPage() {
       ) : null}
 
       <div className="mx-auto max-w-7xl px-4 md:px-6 mt-4 pb-10 space-y-4">
-        {/* North star card */}
         <AuthoritySummaryCard projectId={projectId} />
 
-        {/* Read-only inspection */}
+        <AuthorityTrendCard projectId={projectId} />
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Recommended next actions</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Action Engine v0 recommendations based on the latest authority inputs.
+              </div>
+            </div>
+
+            <div className="text-right text-xs text-gray-500">
+              <div>Version: {actionsVersion ?? "v0"}</div>
+              <div className="mt-1">Captured: {actionsCapturedAt ?? "—"}</div>
+            </div>
+          </div>
+
+          {!actions.length ? (
+            <div className="mt-3 text-sm text-gray-500">No actions available yet.</div>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {actions.map((action, index) => (
+                <div
+                  key={`${action.category}-${action.title}-${index}`}
+                  className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{action.title}</div>
+                      <div className="mt-1 text-sm text-gray-600">{action.detail}</div>
+                    </div>
+
+                    <div
+                      className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium uppercase ${priorityClasses(
+                        action.priority
+                      )}`}
+                    >
+                      {action.priority}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-[11px] uppercase tracking-wide text-gray-500">
+                    Category: {action.category}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="text-sm font-semibold">Authority details</div>
           <div className="text-xs text-gray-500 mt-1">
@@ -161,17 +263,23 @@ export default function ProjectAuthorityPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Tier</div>
                 <div className="text-sm font-semibold mt-1">{row.authority_tier}</div>
-                <div className="text-xs text-gray-500 mt-1">Score: {Number(row.authority_score).toFixed(1)}</div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Score: {Number(row.authority_score).toFixed(1)}
+                </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Competitive Strength</div>
-                <div className="text-sm font-semibold mt-1">{Number(row.competitive_strength).toFixed(1)}</div>
+                <div className="text-sm font-semibold mt-1">
+                  {Number(row.competitive_strength).toFixed(1)}
+                </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Structural Optimization</div>
-                <div className="text-sm font-semibold mt-1">{Number(row.structural_optimization).toFixed(1)}</div>
+                <div className="text-sm font-semibold mt-1">
+                  {Number(row.structural_optimization).toFixed(1)}
+                </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:col-span-2">
