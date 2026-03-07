@@ -44,6 +44,16 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
+function resolveLocationCode(metro: string): number {
+  const normalized = metro.trim().toLowerCase();
+
+  if (normalized === "omaha, nebraska") {
+    return 2840;
+  }
+
+  throw new Error(`Unsupported metro for rank discovery: ${metro}`);
+}
+
 function normalizeMapsItems(payload: any): RankCandidate[] {
   const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
   const normalized: RankCandidate[] = [];
@@ -111,6 +121,7 @@ export async function discoverRankCandidates(
     throw new Error("Missing metro.");
   }
 
+  const locationCode = resolveLocationCode(metro);
   const auth = Buffer.from(`${login}:${password}`).toString("base64");
 
   const response = await fetch(
@@ -124,7 +135,7 @@ export async function discoverRankCandidates(
       body: JSON.stringify([
         {
           keyword,
-          location_name: metro,
+          location_code: locationCode,
           language_code: "en",
           device: "desktop",
           os: "windows",
