@@ -1,167 +1,136 @@
-type DiscoverRankCandidatesInput = {
-  keyword: string;
-  metro: string;
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { discoverRankCandidates } from "@/lib/domain/rank/discoverRankCandidates";
+
+type RouteContext = {
+  params: Promise<{
+    projectId: string;
+  }>;
 };
 
-type DataForSeoMapsItem = {
-  rank_absolute?: number;
-  title?: string;
-  data_id?: string;
-  category?: string;
-  address?: string;
-  rating?:
-    | {
-        value?: number;
-        votes_count?: number;
-        rating_max?: number;
-      }
-    | number;
-  reviews?: number;
-  latitude?: number;
-  longitude?: number;
-};
+export async function POST(_request: Request, context: RouteContext) {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-type RankCandidate = {
-  rankPosition: number;
-  title: string | null;
-  dataId: string | null;
-  category: string | null;
-  address: string | null;
-  rating: number | null;
-  reviewsCount: number | null;
-  latitude: number | null;
-  longitude: number | null;
-  rawResult: unknown;
-};
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing ${name}.`);
-  }
-
-  return value;
-}
-
-function resolveLocationCode(metro: string): number {
-  const normalized = metro.trim().toLowerCase();
-
-  if (normalized === "omaha, nebraska") {
-    return 2840;
-  }
-
-  throw new Error(`Unsupported metro for rank discovery: ${metro}`);
-}
-
-function normalizeMapsItems(payload: any): RankCandidate[] {
-  const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
-  const normalized: RankCandidate[] = [];
-
-  for (const task of tasks) {
-    const results = Array.isArray(task?.result) ? task.result : [];
-
-    for (const result of results) {
-      const items = Array.isArray(result?.items) ? result.items : [];
-
-      items.forEach((item: DataForSeoMapsItem, index: number) => {
-        const ratingValue =
-          typeof item?.rating === "number"
-            ? item.rating
-            : typeof item?.rating?.value === "number"
-              ? item.rating.value
-              : null;
-
-        const reviewsCount =
-          typeof item?.rating === "object" &&
-          item?.rating !== null &&
-          typeof item.rating.votes_count === "number"
-            ? item.rating.votes_count
-            : typeof item?.reviews === "number"
-              ? item.reviews
-              : null;
-
-        normalized.push({
-          rankPosition:
-            typeof item?.rank_absolute === "number"
-              ? item.rank_absolute
-              : index + 1,
-          title: item?.title ?? null,
-          dataId: item?.data_id ?? null,
-          category: item?.category ?? null,
-          address: item?.address ?? null,
-          rating: ratingValue,
-          reviewsCount,
-          latitude: typeof item?.latitude === "number" ? item.latitude : null,
-          longitude:
-            typeof item?.longitude === "number" ? item.longitude : null,
-          rawResult: item,
-        });
-      });
+    if (!supabaseUrl) {
+      return NextResponse.json(
+        { ok: false, error: "Missing NEXT_PUBLIC_SUPABASE_URL." },
+        { status: 500 }
+      );
     }
-  }
 
-  return normalized.sort((a, b) => a.rankPosition - b.rankPosition);
-}
+    if (!supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { ok: false, error: "Missing SUPABASE_SERVICE_ROLE_KEY." },
+        { status: 500 }
+      );
+    }
 
-export async function discoverRankCandidates(
-  input: DiscoverRankCandidatesInput
-) {
-  const login = getRequiredEnv("DATAFORSEO_LOGIN");
-  const password = getRequiredEnv("DATAFORSEO_PASSWORD");
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-  const keyword = input.keyword.trim();
-  const metro = input.metro.trim();
+    const { projectId } = await context.params;
 
-  if (!keyword) {
-    throw new Error("Missing keyword.");
-  }
+    if (!projectId) {
+      return NextResponse.json(
+        { ok: false, error: "Missing projectId." },
+        { status: 400 }
+      );
+    }
 
-  if (!metro) {
-    throw new Error("Missing metro.");
-  }
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id, rank_keyword, rank_metro, rank_lat, rank_lng")
+      .eq("id", projectId)
+      .maybeSingle();
 
-  const locationCode = resolveLocationCode(metro);
-  const auth = Buffer.from(`${login}:${password}`).toString("base64");
+    if (projectError) {
+      return NextResponse.json(
+        { ok: false, error: `Failed to load project: ${projectError.message}` },
+        { status: 500 }
+      );
+    }
 
-  const response = await fetch(
-    "https://api.dataforseo.com/v3/serp/google/maps/live/advanced",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${auth}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify([
+    if (!project) {
+      return NextResponse.json(
+        { ok: false, error: "Project not found." },
+        { status: 404 }
+      );
+    }
+
+    if (!project.rank_keyword || !project.rank_metro) {
+      return NextResponse.json(
         {
-          keyword,
-          location_code: locationCode,
-          language_code: "en",
-          device: "desktop",
-          os: "windows",
-          depth: 20,
+          ok: false,
+          error: "Project is missing rank_keyword or rank_metro.",
         },
-      ]),
-      cache: "no-store",
+        { status: 400 }
+      );
     }
-  );
 
-  if (!response.ok) {
-    const responseText = await response.text();
+    if (
+      typeof project.rank_lat !== "number" ||
+      typeof project.rank_lng !== "number"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Project is missing rank_lat or rank_lng.",
+        },
+        { status: 400 }
+      );
+    }
 
-    throw new Error(
-      `DataForSEO request failed with status ${response.status}: ${responseText}`
-    );
+    const rankDiscovery = await discoverRankCandidates({
+      keyword: project.rank_keyword,
+      metro: project.rank_metro,
+      latitude: project.rank_lat,
+      longitude: project.rank_lng,
+    });
+
+    const tasks = Array.isArray(rankDiscovery.rawResponse?.tasks)
+      ? rankDiscovery.rawResponse.tasks
+      : [];
+
+    const taskSummaries = tasks.map((task: any) => {
+      const results = Array.isArray(task?.result) ? task.result : [];
+
+      return {
+        id: task?.id ?? null,
+        statusCode: task?.status_code ?? null,
+        statusMessage: task?.status_message ?? null,
+        cost: task?.cost ?? null,
+        resultCount: results.length,
+        itemCounts: results.map((result: any) =>
+          Array.isArray(result?.items) ? result.items.length : 0
+        ),
+        resultTypes: results.map((result: any) => result?.type ?? null),
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      phase: "phase_3_rank_intelligence",
+      message: "Live rank discovery completed.",
+      project: {
+        id: project.id,
+        rankKeyword: project.rank_keyword,
+        rankMetro: project.rank_metro,
+        rankLat: project.rank_lat,
+        rankLng: project.rank_lng,
+      },
+      candidateCount: rankDiscovery.candidates.length,
+      candidates: rankDiscovery.candidates,
+      debug: {
+        taskCount: tasks.length,
+        taskSummaries,
+        rawResponsePreview: rankDiscovery.rawResponse,
+      },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown server error.";
+
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
-
-  const payload = await response.json();
-  const candidates = normalizeMapsItems(payload);
-
-  return {
-    ok: true,
-    keyword,
-    metro,
-    candidates,
-    rawResponse: payload,
-  };
 }
