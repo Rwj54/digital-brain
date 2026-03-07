@@ -73,6 +73,26 @@ export async function POST(_request: Request, context: RouteContext) {
       metro: project.rank_metro,
     });
 
+    const tasks = Array.isArray(rankDiscovery.rawResponse?.tasks)
+      ? rankDiscovery.rawResponse.tasks
+      : [];
+
+    const taskSummaries = tasks.map((task: any) => {
+      const results = Array.isArray(task?.result) ? task.result : [];
+
+      return {
+        id: task?.id ?? null,
+        statusCode: task?.status_code ?? null,
+        statusMessage: task?.status_message ?? null,
+        cost: task?.cost ?? null,
+        resultCount: results.length,
+        itemCounts: results.map((result: any) =>
+          Array.isArray(result?.items) ? result.items.length : 0
+        ),
+        resultTypes: results.map((result: any) => result?.type ?? null),
+      };
+    });
+
     return NextResponse.json({
       ok: true,
       phase: "phase_3_rank_intelligence",
@@ -84,6 +104,11 @@ export async function POST(_request: Request, context: RouteContext) {
       },
       candidateCount: rankDiscovery.candidates.length,
       candidates: rankDiscovery.candidates,
+      debug: {
+        taskCount: tasks.length,
+        taskSummaries,
+        rawResponsePreview: rankDiscovery.rawResponse,
+      },
     });
   } catch (error) {
     const message =
