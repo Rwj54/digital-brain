@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { discoverRankCandidates } from "@/lib/domain/rank/discoverRankCandidates";
 
 type RouteContext = {
   params: Promise<{
@@ -67,15 +68,22 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
+    const rankDiscovery = await discoverRankCandidates({
+      keyword: project.rank_keyword,
+      metro: project.rank_metro,
+    });
+
     return NextResponse.json({
       ok: true,
       phase: "phase_3_rank_intelligence",
-      message: "Rank discovery endpoint scaffold is live.",
+      message: "Live rank discovery completed.",
       project: {
         id: project.id,
         rankKeyword: project.rank_keyword,
         rankMetro: project.rank_metro,
       },
+      candidateCount: rankDiscovery.candidates.length,
+      candidates: rankDiscovery.candidates,
     });
   } catch (error) {
     const message =
