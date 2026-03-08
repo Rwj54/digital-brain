@@ -40,7 +40,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, rank_keyword, rank_metro")
+      .select("id, rank_keyword, rank_metro, rank_lat, rank_lng")
       .eq("id", projectId)
       .maybeSingle();
 
@@ -68,9 +68,26 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
+    if (
+      typeof project.rank_lat !== "number" ||
+      Number.isNaN(project.rank_lat) ||
+      typeof project.rank_lng !== "number" ||
+      Number.isNaN(project.rank_lng)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Project is missing rank_lat or rank_lng.",
+        },
+        { status: 400 }
+      );
+    }
+
     const rankDiscovery = await discoverRankCandidates({
       keyword: project.rank_keyword,
       metro: project.rank_metro,
+      latitude: project.rank_lat,
+      longitude: project.rank_lng,
     });
 
     const tasks = Array.isArray(rankDiscovery.rawResponse?.tasks)
@@ -101,6 +118,8 @@ export async function POST(_request: Request, context: RouteContext) {
         id: project.id,
         rankKeyword: project.rank_keyword,
         rankMetro: project.rank_metro,
+        rankLat: project.rank_lat,
+        rankLng: project.rank_lng,
       },
       candidateCount: rankDiscovery.candidates.length,
       candidates: rankDiscovery.candidates,
