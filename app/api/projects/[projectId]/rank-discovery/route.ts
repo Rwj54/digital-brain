@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { discoverRankCandidates } from "@/lib/domain/rank/discoverRankCandidates";
+import { storeRankSnapshot } from "@/lib/domain/rank/storeRankSnapshot";
 
 type RouteContext = {
   params: Promise<{
@@ -90,30 +91,43 @@ export async function POST(_request: Request, context: RouteContext) {
       longitude: project.rank_lng,
     });
 
-    const tasks = Array.isArray(rankDiscovery.rawResponse?.tasks)
-      ? rankDiscovery.rawResponse.tasks
-      : [];
+    const capturedAt = new Date().toISOString().slice(0, 10);
 
-    const taskSummaries = tasks.map((task: any) => {
-      const results = Array.isArray(task?.result) ? task.result : [];
+    for (const candidate of rankDiscovery.candidates) {
+      await storeRankSnapshot({
+        projectId: project.id,
+        competitorId: null,
+        keyword: project.rank_keyword,
+        metro: project.rank_metro,
+        rankPosition: candidate.rankPosition,
+        rawResult: candidate.rawResult,
+        capturedAt,
+      });
+    }
 
-      return {
-        id: task?.id ?? null,
-        statusCode: task?.status_code ?? null,
-        statusMessage: task?.status_message ?? null,
-        cost: task?.cost ?? null,
-        resultCount: results.length,
-        itemCounts: results.map((result: any) =>
-          Array.isArray(result?.items) ? result.items.length : 0
-        ),
-        resultTypes: results.map((result: any) => result?.type ?? null),
-      };
-    });
+    const { data: storedRows, error: storedRowsError } = await supabase
+      .from("gbp_rank_snapshots")
+      .select("id, rank_position, captured_at")
+      .eq("project_id", project.id)
+      .eq("keyword", project.rank_keyword)
+      .eq("metro", project.rank_metro)
+      .eq("captured_at", capturedAt)
+      .order("rank_position", { ascending: true });
+
+    if (storedRowsError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Rank discovery succeeded but verification query failed: ${storedRowsError.message}`,
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
       phase: "phase_3_rank_intelligence",
-      message: "Live rank discovery completed.",
+      message: "Live rank discovery completed and snapshots stored.",
       project: {
         id: project.id,
         rankKeyword: project.rank_keyword,
@@ -122,12 +136,15 @@ export async function POST(_request: Request, context: RouteContext) {
         rankLng: project.rank_lng,
       },
       candidateCount: rankDiscovery.candidates.length,
-      candidates: rankDiscovery.candidates,
-      debug: {
-        taskCount: tasks.length,
-        taskSummaries,
-        rawResponsePreview: rankDiscovery.rawResponse,
-      },
+      storedCount: storedRows.length,
+      topResults: rankDiscovery.candidates.slice(0, 5).map((candidate) => ({
+        rankPosition: candidate.rankPosition,
+        title: candidate.title,
+        category: candidate.category,
+        address: candidate.address,
+        rating: candidate.rating,
+        reviewsCount: candidate.reviewsCount,
+      })),
     });
   } catch (error) {
     const message =
