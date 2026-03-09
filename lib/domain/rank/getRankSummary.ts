@@ -31,6 +31,7 @@ type RankSummary = {
   worstRank: number | null;
   snapshotCount: number;
   latestDayCount: number;
+  targetFoundInLatestSnapshot: boolean;
 };
 
 function getSupabaseAdminClient() {
@@ -155,12 +156,13 @@ export async function getRankSummary(
 
   return {
     latestCapturedAt,
-    latestRank: latestTargetRow ? latestTargetRow.rank_position : null,
+    latestRank: latestTargetRow ? latestTargetRow.rank_position : 21,
     bestRank:
-      targetRanksByDay.length > 0 ? Math.min(...targetRanksByDay) : null,
+      targetRanksByDay.length > 0 ? Math.min(...targetRanksByDay) : 21,
     worstRank:
-      targetRanksByDay.length > 0 ? Math.max(...targetRanksByDay) : null,
+      targetRanksByDay.length > 0 ? Math.max(...targetRanksByDay) : 21,
     snapshotCount: snapshots.length,
     latestDayCount: latestDayRows.length,
+    targetFoundInLatestSnapshot: Boolean(latestTargetRow),
   };
 }

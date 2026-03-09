@@ -18,10 +18,11 @@ type RankSummaryResponse = {
   summary: {
     latestCapturedAt: string;
     latestRank: number | null;
-    bestRank: number;
-    worstRank: number;
+    bestRank: number | null;
+    worstRank: number | null;
     snapshotCount: number;
     latestDayCount: number;
+    targetFoundInLatestSnapshot: boolean;
   } | null;
 };
 
@@ -121,6 +122,18 @@ function formatReviews(
   }
 
   return "—";
+}
+
+function formatRankValue(value: number | null | undefined) {
+  if (value == null) {
+    return "—";
+  }
+
+  if (value >= 21) {
+    return ">20";
+  }
+
+  return String(value);
 }
 
 function buildSparklinePoints(series: RankSeriesPoint[]) {
@@ -406,13 +419,20 @@ export default function RankPage({ params }: PageProps) {
           </div>
         ) : null}
 
+        {!summary?.targetFoundInLatestSnapshot ? (
+          <div className="rounded-2xl border border-amber-900 bg-amber-950/40 p-4 text-sm text-amber-200">
+            Tracked business not found in the latest top-20 snapshot for this keyword
+            and search origin.
+          </div>
+        ) : null}
+
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
             <p className="text-xs uppercase tracking-wide text-neutral-500">
               Latest Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {summary?.latestRank ?? "—"}
+              {formatRankValue(summary?.latestRank)}
             </p>
           </div>
 
@@ -421,7 +441,7 @@ export default function RankPage({ params }: PageProps) {
               Best Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {summary?.bestRank ?? "—"}
+              {formatRankValue(summary?.bestRank)}
             </p>
           </div>
 
@@ -430,7 +450,7 @@ export default function RankPage({ params }: PageProps) {
               Worst Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {summary?.worstRank ?? "—"}
+              {formatRankValue(summary?.worstRank)}
             </p>
           </div>
 
