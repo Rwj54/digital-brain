@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getRankHistory } from "@/lib/domain/rank/getRankHistory";
 
 type RouteContext = {
   params: Promise<{
@@ -9,25 +9,6 @@ type RouteContext = {
 
 export async function GET(request: Request, context: RouteContext) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl) {
-      return NextResponse.json(
-        { ok: false, error: "Missing NEXT_PUBLIC_SUPABASE_URL." },
-        { status: 500 }
-      );
-    }
-
-    if (!supabaseServiceRoleKey) {
-      return NextResponse.json(
-        { ok: false, error: "Missing SUPABASE_SERVICE_ROLE_KEY." },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
     const { projectId } = await context.params;
 
     if (!projectId) {
@@ -64,30 +45,20 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("gbp_rank_snapshots")
-      .select("id, keyword, metro, rank_position, captured_at, raw_result")
-      .eq("project_id", projectId)
-      .eq("keyword", keyword)
-      .eq("metro", metro)
-      .order("captured_at", { ascending: false })
-      .order("rank_position", { ascending: true })
-      .limit(limit);
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: `Failed to load rank history: ${error.message}` },
-        { status: 500 }
-      );
-    }
+    const snapshots = await getRankHistory({
+      projectId,
+      keyword,
+      metro,
+      limit,
+    });
 
     return NextResponse.json({
       ok: true,
       projectId,
       keyword,
       metro,
-      count: data.length,
-      snapshots: data,
+      count: snapshots.length,
+      snapshots,
     });
   } catch (error) {
     const message =
