@@ -18,12 +18,18 @@ function getSupabaseAdminClient() {
   return createClient(supabaseUrl, supabaseServiceRoleKey);
 }
 
-type ProjectRow = {
+type ProjectKeywordRow = {
   id: string;
-  rank_keyword: string | null;
-  rank_metro: string | null;
-  rank_lat: number | null;
-  rank_lng: number | null;
+  project_id: string;
+  keyword: string;
+  metro: string;
+  is_active: boolean;
+  priority: number;
+  project: {
+    id: string;
+    rank_lat: number | null;
+    rank_lng: number | null;
+  } | null;
 };
 
 export async function POST(request: Request) {
@@ -48,68 +54,78 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdminClient();
 
     const { data, error } = await supabase
-      .from("projects")
-      .select("id, rank_keyword, rank_metro, rank_lat, rank_lng")
-      .not("rank_keyword", "is", null)
-      .not("rank_metro", "is", null)
-      .not("rank_lat", "is", null)
-      .not("rank_lng", "is", null);
+      .from("project_rank_keywords")
+      .select(`
+        id,
+        project_id,
+        keyword,
+        metro,
+        is_active,
+        priority,
+        project:projects (
+          id,
+          rank_lat,
+          rank_lng
+        )
+      `)
+      .eq("is_active", true)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true });
 
     if (error) {
       return NextResponse.json(
-        { ok: false, error: `Failed to load projects: ${error.message}` },
+        { ok: false, error: `Failed to load project rank keywords: ${error.message}` },
         { status: 500 }
       );
     }
 
-    const projects = (data ?? []) as ProjectRow[];
+    const projectKeywords = (data ?? []) as ProjectKeywordRow[];
     const capturedAt = new Date().toISOString().slice(0, 10);
 
     const results: Array<{
       projectId: string;
-      keyword: string | null;
-      metro: string | null;
+      keyword: string;
+      metro: string;
       candidateCount: number;
       storedCount: number;
       ok: boolean;
       error?: string;
     }> = [];
 
-    for (const project of projects) {
+    for (const item of projectKeywords) {
       try {
         if (
-          !project.rank_keyword ||
-          !project.rank_metro ||
-          typeof project.rank_lat !== "number" ||
-          Number.isNaN(project.rank_lat) ||
-          typeof project.rank_lng !== "number" ||
-          Number.isNaN(project.rank_lng)
+          !item.project ||
+          typeof item.project.rank_lat !== "number" ||
+          Number.isNaN(item.project.rank_lat) ||
+          typeof item.project.rank_lng !== "number" ||
+          Number.isNaN(item.project.rank_lng)
         ) {
           results.push({
-            projectId: project.id,
-            keyword: project.rank_keyword,
-            metro: project.rank_metro,
+            projectId: item.project_id,
+            keyword: item.keyword,
+            metro: item.metro,
             candidateCount: 0,
             storedCount: 0,
             ok: false,
-            error: "Project rank configuration is incomplete.",
+            error: "Project rank origin is incomplete.",
           });
           continue;
         }
 
         const rankDiscovery = await discoverRankCandidates({
-          keyword: project.rank_keyword,
-          metro: project.rank_metro,
-          latitude: project.rank_lat,
-          longitude: project.rank_lng,
+          keyword: item.keyword,
+          metro: item.metro,
+          latitude: item.project.rank_lat,
+          longitude: item.project.rank_lng,
         });
 
         for (const candidate of rankDiscovery.candidates) {
           await storeRankSnapshot({
-            projectId: project.id,
+            projectId: item.project_id,
             competitorId: null,
-            keyword: project.rank_keyword,
-            metro: project.rank_metro,
+            keyword: item.keyword,
+            metro: item.metro,
             rankPosition: candidate.rankPosition,
             rawResult: candidate.rawResult,
             capturedAt,
@@ -117,18 +133,18 @@ export async function POST(request: Request) {
         }
 
         results.push({
-          projectId: project.id,
-          keyword: project.rank_keyword,
-          metro: project.rank_metro,
+          projectId: item.project_id,
+          keyword: item.keyword,
+          metro: item.metro,
           candidateCount: rankDiscovery.candidates.length,
           storedCount: rankDiscovery.candidates.length,
           ok: true,
         });
       } catch (error) {
         results.push({
-          projectId: project.id,
-          keyword: project.rank_keyword,
-          metro: project.rank_metro,
+          projectId: item.project_id,
+          keyword: item.keyword,
+          metro: item.metro,
           candidateCount: 0,
           storedCount: 0,
           ok: false,
@@ -143,7 +159,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       capturedAt,
-      projectCount: projects.length,
+      keywordRunCount: projectKeywords.length,
       successCount,
       failureCount,
       results,
