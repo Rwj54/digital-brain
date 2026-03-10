@@ -36,29 +36,57 @@ export async function GET(_request: Request, context: RouteContext) {
       );
     }
 
-    const { data, error } = await supabase
+    const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, rank_keyword, rank_metro, rank_lat, rank_lng")
+      .select("id, rank_lat, rank_lng")
       .eq("id", projectId)
       .maybeSingle();
 
-    if (error) {
+    if (projectError) {
       return NextResponse.json(
-        { ok: false, error: `Failed to load rank config: ${error.message}` },
+        { ok: false, error: `Failed to load project: ${projectError.message}` },
         { status: 500 }
       );
     }
 
-    if (!data) {
+    if (!project) {
       return NextResponse.json(
         { ok: false, error: "Project not found." },
         { status: 404 }
       );
     }
 
+    const { data: keywordRows, error: keywordError } = await supabase
+      .from("project_rank_keywords")
+      .select("id, keyword, metro, is_active, priority")
+      .eq("project_id", projectId)
+      .eq("is_active", true)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (keywordError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Failed to load project rank keywords: ${keywordError.message}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    const activeKeyword = (keywordRows ?? [])[0] ?? null;
+
     return NextResponse.json({
       ok: true,
-      project: data,
+      project: {
+        id: project.id,
+        rank_keyword: activeKeyword?.keyword ?? null,
+        rank_metro: activeKeyword?.metro ?? null,
+        rank_lat: project.rank_lat,
+        rank_lng: project.rank_lng,
+        keyword_id: activeKeyword?.id ?? null,
+      },
     });
   } catch (error) {
     const message =
