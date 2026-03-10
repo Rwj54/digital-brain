@@ -9,6 +9,24 @@ type PageProps = {
   }>;
 };
 
+type RankKeywordRow = {
+  id: string;
+  project_id: string;
+  keyword: string;
+  metro: string;
+  is_active: boolean;
+  priority: number;
+  created_at: string;
+};
+
+type RankKeywordsResponse = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  count: number;
+  keywords: RankKeywordRow[];
+};
+
 type RankSummaryResponse = {
   ok: boolean;
   error?: string;
@@ -83,6 +101,7 @@ type RankConfigResponse = {
     rank_metro: string | null;
     rank_lat: number | null;
     rank_lng: number | null;
+    keyword_id?: string | null;
   } | null;
 };
 
@@ -169,6 +188,7 @@ export default function RankPage({ params }: PageProps) {
   const [projectId, setProjectId] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
   const [metro, setMetro] = useState<string>("");
+  const [keywords, setKeywords] = useState<RankKeywordRow[]>([]);
 
   const [summary, setSummary] = useState<RankSummaryResponse["summary"]>(null);
   const [series, setSeries] = useState<RankSeriesPoint[]>([]);
@@ -200,15 +220,24 @@ export default function RankPage({ params }: PageProps) {
 
         setProjectId(resolvedProjectId);
 
-        const configResponse = await fetch(
-          `/api/projects/${resolvedProjectId}/rank-config`,
-          { cache: "no-store" }
-        );
+        const [configResponse, keywordsResponse] = await Promise.all([
+          fetch(`/api/projects/${resolvedProjectId}/rank-config`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${resolvedProjectId}/rank-keywords`, {
+            cache: "no-store",
+          }),
+        ]);
 
         const configJson = (await configResponse.json()) as RankConfigResponse;
+        const keywordsJson = (await keywordsResponse.json()) as RankKeywordsResponse;
 
         if (!configResponse.ok || !configJson.ok || !configJson.project) {
           throw new Error(configJson.error ?? "Failed to load rank config.");
+        }
+
+        if (!keywordsResponse.ok || !keywordsJson.ok) {
+          throw new Error(keywordsJson.error ?? "Failed to load rank keywords.");
         }
 
         const rankKeyword = configJson.project.rank_keyword ?? "";
@@ -224,6 +253,7 @@ export default function RankPage({ params }: PageProps) {
 
         setKeyword(rankKeyword);
         setMetro(rankMetro);
+        setKeywords(keywordsJson.keywords);
 
         const encodedKeyword = encodeURIComponent(rankKeyword);
         const encodedMetro = encodeURIComponent(rankMetro);
@@ -425,6 +455,33 @@ export default function RankPage({ params }: PageProps) {
             and search origin.
           </div>
         ) : null}
+
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-6">
+          <div>
+            <h2 className="text-lg font-semibold">Tracked Keywords</h2>
+            <p className="mt-1 text-sm text-neutral-400">
+              Active keywords currently configured for this project.
+            </p>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            {keywords.length === 0 ? (
+              <div className="text-sm text-neutral-500">No active rank keywords found.</div>
+            ) : (
+              keywords.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3"
+                >
+                  <p className="text-sm font-medium text-neutral-200">{item.keyword}</p>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {item.metro} • Priority {item.priority}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
