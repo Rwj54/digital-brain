@@ -186,18 +186,67 @@ function buildSparklinePoints(series: RankSeriesPoint[]) {
 
 export default function RankPage({ params }: PageProps) {
   const [projectId, setProjectId] = useState<string>("");
+  const [projectLat, setProjectLat] = useState<number | null>(null);
+  const [projectLng, setProjectLng] = useState<number | null>(null);
+
+  const [keywords, setKeywords] = useState<RankKeywordRow[]>([]);
+  const [selectedKeywordId, setSelectedKeywordId] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
   const [metro, setMetro] = useState<string>("");
-  const [keywords, setKeywords] = useState<RankKeywordRow[]>([]);
 
   const [summary, setSummary] = useState<RankSummaryResponse["summary"]>(null);
   const [series, setSeries] = useState<RankSeriesPoint[]>([]);
   const [history, setHistory] = useState<RankHistoryRow[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadingKeywordData, setLoadingKeywordData] = useState(false);
   const [runningDiscovery, setRunningDiscovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [runMessage, setRunMessage] = useState<string | null>(null);
+
+  async function loadKeywordData(
+    resolvedProjectId: string,
+    nextKeyword: string,
+    nextMetro: string
+  ) {
+    const encodedKeyword = encodeURIComponent(nextKeyword);
+    const encodedMetro = encodeURIComponent(nextMetro);
+
+    const [summaryResponse, seriesResponse, historyResponse] = await Promise.all([
+      fetch(
+        `/api/projects/${resolvedProjectId}/rank-summary?keyword=${encodedKeyword}&metro=${encodedMetro}`,
+        { cache: "no-store" }
+      ),
+      fetch(
+        `/api/projects/${resolvedProjectId}/rank-series?keyword=${encodedKeyword}&metro=${encodedMetro}`,
+        { cache: "no-store" }
+      ),
+      fetch(
+        `/api/projects/${resolvedProjectId}/rank-history?keyword=${encodedKeyword}&metro=${encodedMetro}&limit=25`,
+        { cache: "no-store" }
+      ),
+    ]);
+
+    const summaryJson = (await summaryResponse.json()) as RankSummaryResponse;
+    const seriesJson = (await seriesResponse.json()) as RankSeriesResponse;
+    const historyJson = (await historyResponse.json()) as RankHistoryResponse;
+
+    if (!summaryResponse.ok || !summaryJson.ok) {
+      throw new Error(summaryJson.error ?? "Failed to load rank summary.");
+    }
+
+    if (!seriesResponse.ok || !seriesJson.ok) {
+      throw new Error(seriesJson.error ?? "Failed to load rank series.");
+    }
+
+    if (!historyResponse.ok || !historyJson.ok) {
+      throw new Error(historyJson.error ?? "Failed to load rank history.");
+    }
+
+    setSummary(summaryJson.summary);
+    setSeries(seriesJson.series);
+    setHistory(historyJson.snapshots);
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -240,62 +289,34 @@ export default function RankPage({ params }: PageProps) {
           throw new Error(keywordsJson.error ?? "Failed to load rank keywords.");
         }
 
-        const rankKeyword = configJson.project.rank_keyword ?? "";
-        const rankMetro = configJson.project.rank_metro ?? "";
-
-        if (!rankKeyword || !rankMetro) {
-          throw new Error("Project rank config is incomplete.");
-        }
-
         if (!isMounted) {
           return;
         }
 
-        setKeyword(rankKeyword);
-        setMetro(rankMetro);
+        setProjectLat(configJson.project.rank_lat);
+        setProjectLng(configJson.project.rank_lng);
         setKeywords(keywordsJson.keywords);
 
-        const encodedKeyword = encodeURIComponent(rankKeyword);
-        const encodedMetro = encodeURIComponent(rankMetro);
+        const initialKeywordRow =
+          keywordsJson.keywords.find(
+            (item) => item.id === configJson.project?.keyword_id
+          ) ??
+          keywordsJson.keywords[0] ??
+          null;
 
-        const [summaryResponse, seriesResponse, historyResponse] = await Promise.all([
-          fetch(
-            `/api/projects/${resolvedProjectId}/rank-summary?keyword=${encodedKeyword}&metro=${encodedMetro}`,
-            { cache: "no-store" }
-          ),
-          fetch(
-            `/api/projects/${resolvedProjectId}/rank-series?keyword=${encodedKeyword}&metro=${encodedMetro}`,
-            { cache: "no-store" }
-          ),
-          fetch(
-            `/api/projects/${resolvedProjectId}/rank-history?keyword=${encodedKeyword}&metro=${encodedMetro}&limit=25`,
-            { cache: "no-store" }
-          ),
-        ]);
-
-        const summaryJson = (await summaryResponse.json()) as RankSummaryResponse;
-        const seriesJson = (await seriesResponse.json()) as RankSeriesResponse;
-        const historyJson = (await historyResponse.json()) as RankHistoryResponse;
-
-        if (!summaryResponse.ok || !summaryJson.ok) {
-          throw new Error(summaryJson.error ?? "Failed to load rank summary.");
+        if (!initialKeywordRow) {
+          throw new Error("No active rank keywords found for this project.");
         }
 
-        if (!seriesResponse.ok || !seriesJson.ok) {
-          throw new Error(seriesJson.error ?? "Failed to load rank series.");
-        }
+        setSelectedKeywordId(initialKeywordRow.id);
+        setKeyword(initialKeywordRow.keyword);
+        setMetro(initialKeywordRow.metro);
 
-        if (!historyResponse.ok || !historyJson.ok) {
-          throw new Error(historyJson.error ?? "Failed to load rank history.");
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setSummary(summaryJson.summary);
-        setSeries(seriesJson.series);
-        setHistory(historyJson.snapshots);
+        await loadKeywordData(
+          resolvedProjectId,
+          initialKeywordRow.keyword,
+          initialKeywordRow.metro
+        );
       } catch (err) {
         if (!isMounted) {
           return;
@@ -315,6 +336,28 @@ export default function RankPage({ params }: PageProps) {
       isMounted = false;
     };
   }, [params]);
+
+  async function handleKeywordSelect(keywordRow: RankKeywordRow) {
+    if (!projectId || selectedKeywordId === keywordRow.id) {
+      return;
+    }
+
+    try {
+      setLoadingKeywordData(true);
+      setError(null);
+      setRunMessage(null);
+
+      setSelectedKeywordId(keywordRow.id);
+      setKeyword(keywordRow.keyword);
+      setMetro(keywordRow.metro);
+
+      await loadKeywordData(projectId, keywordRow.keyword, keywordRow.metro);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load selected keyword.");
+    } finally {
+      setLoadingKeywordData(false);
+    }
+  }
 
   async function runRankDiscovery() {
     if (!projectId) {
@@ -344,38 +387,8 @@ export default function RankPage({ params }: PageProps) {
         `Rank discovery completed. Stored ${json.storedCount ?? 0} snapshots.`
       );
 
-      const encodedKeyword = encodeURIComponent(keyword);
-      const encodedMetro = encodeURIComponent(metro);
-
-      const [summaryResponse, seriesResponse, historyResponse] = await Promise.all([
-        fetch(
-          `/api/projects/${projectId}/rank-summary?keyword=${encodedKeyword}&metro=${encodedMetro}`,
-          { cache: "no-store" }
-        ),
-        fetch(
-          `/api/projects/${projectId}/rank-series?keyword=${encodedKeyword}&metro=${encodedMetro}`,
-          { cache: "no-store" }
-        ),
-        fetch(
-          `/api/projects/${projectId}/rank-history?keyword=${encodedKeyword}&metro=${encodedMetro}&limit=25`,
-          { cache: "no-store" }
-        ),
-      ]);
-
-      const summaryJson = (await summaryResponse.json()) as RankSummaryResponse;
-      const seriesJson = (await seriesResponse.json()) as RankSeriesResponse;
-      const historyJson = (await historyResponse.json()) as RankHistoryResponse;
-
-      if (summaryResponse.ok && summaryJson.ok) {
-        setSummary(summaryJson.summary);
-      }
-
-      if (seriesResponse.ok && seriesJson.ok) {
-        setSeries(seriesJson.series);
-      }
-
-      if (historyResponse.ok && historyJson.ok) {
-        setHistory(historyJson.snapshots);
+      if (keyword && metro) {
+        await loadKeywordData(projectId, keyword, metro);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to run rank discovery.");
@@ -417,6 +430,12 @@ export default function RankPage({ params }: PageProps) {
               Keyword: <span className="text-neutral-200">{keyword || "—"}</span>{" "}
               • Metro: <span className="text-neutral-200">{metro || "—"}</span>
             </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Search origin:{" "}
+              {projectLat != null && projectLng != null
+                ? `${projectLat}, ${projectLng}`
+                : "—"}
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -429,7 +448,7 @@ export default function RankPage({ params }: PageProps) {
             <button
               type="button"
               onClick={runRankDiscovery}
-              disabled={runningDiscovery}
+              disabled={runningDiscovery || loadingKeywordData}
               className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-60"
             >
               {runningDiscovery ? "Running…" : "Run Rank Discovery"}
@@ -460,7 +479,7 @@ export default function RankPage({ params }: PageProps) {
           <div>
             <h2 className="text-lg font-semibold">Tracked Keywords</h2>
             <p className="mt-1 text-sm text-neutral-400">
-              Active keywords currently configured for this project.
+              Select a keyword to view its rank intelligence.
             </p>
           </div>
 
@@ -468,17 +487,32 @@ export default function RankPage({ params }: PageProps) {
             {keywords.length === 0 ? (
               <div className="text-sm text-neutral-500">No active rank keywords found.</div>
             ) : (
-              keywords.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3"
-                >
-                  <p className="text-sm font-medium text-neutral-200">{item.keyword}</p>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    {item.metro} • Priority {item.priority}
-                  </p>
-                </div>
-              ))
+              keywords.map((item) => {
+                const isSelected = item.id === selectedKeywordId;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void handleKeywordSelect(item)}
+                    disabled={loadingKeywordData}
+                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                      isSelected
+                        ? "border-white bg-white text-black"
+                        : "border-neutral-800 bg-neutral-950 text-neutral-200 hover:bg-neutral-900"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <p className="text-sm font-medium">{item.keyword}</p>
+                    <p
+                      className={`mt-1 text-xs ${
+                        isSelected ? "text-neutral-700" : "text-neutral-500"
+                      }`}
+                    >
+                      {item.metro} • Priority {item.priority}
+                    </p>
+                  </button>
+                );
+              })
             )}
           </div>
         </section>
@@ -489,7 +523,7 @@ export default function RankPage({ params }: PageProps) {
               Latest Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {formatRankValue(summary?.latestRank)}
+              {loadingKeywordData ? "…" : formatRankValue(summary?.latestRank)}
             </p>
           </div>
 
@@ -498,7 +532,7 @@ export default function RankPage({ params }: PageProps) {
               Best Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {formatRankValue(summary?.bestRank)}
+              {loadingKeywordData ? "…" : formatRankValue(summary?.bestRank)}
             </p>
           </div>
 
@@ -507,7 +541,7 @@ export default function RankPage({ params }: PageProps) {
               Worst Rank
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {formatRankValue(summary?.worstRank)}
+              {loadingKeywordData ? "…" : formatRankValue(summary?.worstRank)}
             </p>
           </div>
 
@@ -516,7 +550,7 @@ export default function RankPage({ params }: PageProps) {
               Latest Day Results
             </p>
             <p className="mt-3 text-3xl font-semibold">
-              {summary?.latestDayCount ?? "—"}
+              {loadingKeywordData ? "…" : summary?.latestDayCount ?? "—"}
             </p>
           </div>
         </section>
@@ -536,7 +570,11 @@ export default function RankPage({ params }: PageProps) {
           </div>
 
           <div className="mt-6">
-            {series.length === 0 ? (
+            {loadingKeywordData ? (
+              <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-sm text-neutral-500">
+                Loading rank series…
+              </div>
+            ) : series.length === 0 ? (
               <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-sm text-neutral-500">
                 No rank series data yet.
               </div>
@@ -580,7 +618,13 @@ export default function RankPage({ params }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {latestMarketRows.length === 0 ? (
+                {loadingKeywordData ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-neutral-500">
+                      Loading market results…
+                    </td>
+                  </tr>
+                ) : latestMarketRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-8 text-neutral-500">
                       No market results found.
