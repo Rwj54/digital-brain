@@ -9,6 +9,21 @@ type RouteContext = {
   }>;
 };
 
+type ProjectRow = {
+  id: string;
+  rank_lat: number | null;
+  rank_lng: number | null;
+};
+
+type ProjectKeywordRow = {
+  id: string;
+  project_id: string;
+  keyword: string;
+  metro: string;
+  is_active: boolean;
+  priority: number;
+};
+
 export async function POST(_request: Request, context: RouteContext) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,7 +56,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, rank_keyword, rank_metro, rank_lat, rank_lng")
+      .select("id, rank_lat, rank_lng")
       .eq("id", projectId)
       .maybeSingle();
 
@@ -59,21 +74,13 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
-    if (!project.rank_keyword || !project.rank_metro) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Project is missing rank_keyword or rank_metro.",
-        },
-        { status: 400 }
-      );
-    }
+    const typedProject = project as ProjectRow;
 
     if (
-      typeof project.rank_lat !== "number" ||
-      Number.isNaN(project.rank_lat) ||
-      typeof project.rank_lng !== "number" ||
-      Number.isNaN(project.rank_lng)
+      typeof typedProject.rank_lat !== "number" ||
+      Number.isNaN(typedProject.rank_lat) ||
+      typeof typedProject.rank_lng !== "number" ||
+      Number.isNaN(typedProject.rank_lng)
     ) {
       return NextResponse.json(
         {
@@ -84,21 +91,52 @@ export async function POST(_request: Request, context: RouteContext) {
       );
     }
 
+    const { data: keywordRows, error: keywordError } = await supabase
+      .from("project_rank_keywords")
+      .select("id, project_id, keyword, metro, is_active, priority")
+      .eq("project_id", projectId)
+      .eq("is_active", true)
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (keywordError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Failed to load project rank keywords: ${keywordError.message}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    const activeKeyword = ((keywordRows ?? []) as ProjectKeywordRow[])[0];
+
+    if (!activeKeyword) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Project has no active rank keywords.",
+        },
+        { status: 400 }
+      );
+    }
+
     const rankDiscovery = await discoverRankCandidates({
-      keyword: project.rank_keyword,
-      metro: project.rank_metro,
-      latitude: project.rank_lat,
-      longitude: project.rank_lng,
+      keyword: activeKeyword.keyword,
+      metro: activeKeyword.metro,
+      latitude: typedProject.rank_lat,
+      longitude: typedProject.rank_lng,
     });
 
     const capturedAt = new Date().toISOString().slice(0, 10);
 
     for (const candidate of rankDiscovery.candidates) {
       await storeRankSnapshot({
-        projectId: project.id,
+        projectId: typedProject.id,
         competitorId: null,
-        keyword: project.rank_keyword,
-        metro: project.rank_metro,
+        keyword: activeKeyword.keyword,
+        metro: activeKeyword.metro,
         rankPosition: candidate.rankPosition,
         rawResult: candidate.rawResult,
         capturedAt,
@@ -108,9 +146,9 @@ export async function POST(_request: Request, context: RouteContext) {
     const { data: storedRows, error: storedRowsError } = await supabase
       .from("gbp_rank_snapshots")
       .select("id, rank_position, captured_at")
-      .eq("project_id", project.id)
-      .eq("keyword", project.rank_keyword)
-      .eq("metro", project.rank_metro)
+      .eq("project_id", typedProject.id)
+      .eq("keyword", activeKeyword.keyword)
+      .eq("metro", activeKeyword.metro)
       .eq("captured_at", capturedAt)
       .order("rank_position", { ascending: true });
 
@@ -129,11 +167,12 @@ export async function POST(_request: Request, context: RouteContext) {
       phase: "phase_3_rank_intelligence",
       message: "Live rank discovery completed and snapshots stored.",
       project: {
-        id: project.id,
-        rankKeyword: project.rank_keyword,
-        rankMetro: project.rank_metro,
-        rankLat: project.rank_lat,
-        rankLng: project.rank_lng,
+        id: typedProject.id,
+        keywordId: activeKeyword.id,
+        rankKeyword: activeKeyword.keyword,
+        rankMetro: activeKeyword.metro,
+        rankLat: typedProject.rank_lat,
+        rankLng: typedProject.rank_lng,
       },
       candidateCount: rankDiscovery.candidates.length,
       storedCount: storedRows.length,
