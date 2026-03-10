@@ -18,6 +18,12 @@ function getSupabaseAdminClient() {
   return createClient(supabaseUrl, supabaseServiceRoleKey);
 }
 
+type ProjectRelationRow = {
+  id: string;
+  rank_lat: number | null;
+  rank_lng: number | null;
+};
+
 type ProjectKeywordRow = {
   id: string;
   project_id: string;
@@ -25,11 +31,7 @@ type ProjectKeywordRow = {
   metro: string;
   is_active: boolean;
   priority: number;
-  project: {
-    id: string;
-    rank_lat: number | null;
-    rank_lng: number | null;
-  } | null;
+  project: ProjectRelationRow[] | null;
 };
 
 export async function POST(request: Request) {
@@ -55,7 +57,8 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase
       .from("project_rank_keywords")
-      .select(`
+      .select(
+        `
         id,
         project_id,
         keyword,
@@ -67,19 +70,23 @@ export async function POST(request: Request) {
           rank_lat,
           rank_lng
         )
-      `)
+      `
+      )
       .eq("is_active", true)
       .order("priority", { ascending: true })
       .order("created_at", { ascending: true });
 
     if (error) {
       return NextResponse.json(
-        { ok: false, error: `Failed to load project rank keywords: ${error.message}` },
+        {
+          ok: false,
+          error: `Failed to load project rank keywords: ${error.message}`,
+        },
         { status: 500 }
       );
     }
 
-    const projectKeywords = (data ?? []) as ProjectKeywordRow[];
+    const projectKeywords = ((data ?? []) as unknown) as ProjectKeywordRow[];
     const capturedAt = new Date().toISOString().slice(0, 10);
 
     const results: Array<{
@@ -94,12 +101,14 @@ export async function POST(request: Request) {
 
     for (const item of projectKeywords) {
       try {
+        const project = Array.isArray(item.project) ? item.project[0] : null;
+
         if (
-          !item.project ||
-          typeof item.project.rank_lat !== "number" ||
-          Number.isNaN(item.project.rank_lat) ||
-          typeof item.project.rank_lng !== "number" ||
-          Number.isNaN(item.project.rank_lng)
+          !project ||
+          typeof project.rank_lat !== "number" ||
+          Number.isNaN(project.rank_lat) ||
+          typeof project.rank_lng !== "number" ||
+          Number.isNaN(project.rank_lng)
         ) {
           results.push({
             projectId: item.project_id,
@@ -116,8 +125,8 @@ export async function POST(request: Request) {
         const rankDiscovery = await discoverRankCandidates({
           keyword: item.keyword,
           metro: item.metro,
-          latitude: item.project.rank_lat,
-          longitude: item.project.rank_lng,
+          latitude: project.rank_lat,
+          longitude: project.rank_lng,
         });
 
         for (const candidate of rankDiscovery.candidates) {
