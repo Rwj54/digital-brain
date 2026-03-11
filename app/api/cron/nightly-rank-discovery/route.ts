@@ -31,7 +31,7 @@ type ProjectKeywordRow = {
   metro: string;
   is_active: boolean;
   priority: number;
-  project: ProjectRelationRow[] | null;
+  project: ProjectRelationRow | ProjectRelationRow[] | null;
 };
 
 type RankCandidate = {
@@ -98,6 +98,20 @@ function asInteger(value: unknown): number | null {
   return Math.round(numeric);
 }
 
+function getProjectRelation(
+  value: ProjectRelationRow | ProjectRelationRow[] | null
+): ProjectRelationRow | null {
+  if (!value) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value;
+}
+
 function extractResultName(rawResult: Record<string, unknown> | null): string {
   if (!rawResult) {
     return "Unknown result";
@@ -113,7 +127,9 @@ function extractResultName(rawResult: Record<string, unknown> | null): string {
   );
 }
 
-function extractDomain(rawResult: Record<string, unknown> | null): string | null {
+function extractDomain(
+  rawResult: Record<string, unknown> | null
+): string | null {
   if (!rawResult) {
     return null;
   }
@@ -144,7 +160,12 @@ function extractDomain(rawResult: Record<string, unknown> | null): string | null
 
     return new URL(normalizedUrl).hostname.replace(/^www\./i, "").toLowerCase();
   } catch {
-    return candidateUrl.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0] || null;
+    return (
+      candidateUrl
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .split("/")[0] || null
+    );
   }
 }
 
@@ -175,7 +196,9 @@ function extractRating(rawResult: Record<string, unknown> | null): number | null
   );
 }
 
-function extractReviewCount(rawResult: Record<string, unknown> | null): number | null {
+function extractReviewCount(
+  rawResult: Record<string, unknown> | null
+): number | null {
   if (!rawResult) {
     return null;
   }
@@ -189,7 +212,9 @@ function extractReviewCount(rawResult: Record<string, unknown> | null): number |
   );
 }
 
-function extractPhotoCount(rawResult: Record<string, unknown> | null): number | null {
+function extractPhotoCount(
+  rawResult: Record<string, unknown> | null
+): number | null {
   if (!rawResult) {
     return null;
   }
@@ -411,7 +436,7 @@ export async function POST(request: Request) {
 
     for (const item of projectKeywords) {
       try {
-        const project = Array.isArray(item.project) ? item.project[0] : null;
+        const project = getProjectRelation(item.project);
 
         if (
           !project ||
