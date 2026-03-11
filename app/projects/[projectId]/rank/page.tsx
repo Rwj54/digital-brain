@@ -41,6 +41,13 @@ type RankSummaryResponse = {
     snapshotCount: number;
     latestDayCount: number;
     targetFoundInLatestSnapshot: boolean;
+    top3PresenceCount: number;
+    top10PresenceCount: number;
+    top20PresenceCount: number;
+    top3PresenceRate: number;
+    top10PresenceRate: number;
+    top20PresenceRate: number;
+    localMarketVisibilityScore: number;
   } | null;
 };
 
@@ -155,6 +162,22 @@ function formatRankValue(value: number | null | undefined) {
   return String(value);
 }
 
+function formatPercent(value: number | null | undefined) {
+  if (value == null) {
+    return "—";
+  }
+
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatVisibilityScore(value: number | null | undefined) {
+  if (value == null) {
+    return "—";
+  }
+
+  return value.toFixed(1);
+}
+
 function buildSparklinePoints(series: RankSeriesPoint[]) {
   if (series.length === 0) {
     return "";
@@ -182,6 +205,32 @@ function buildSparklinePoints(series: RankSeriesPoint[]) {
       return `${x},${y}`;
     })
     .join(" ");
+}
+
+function StatCard({
+  label,
+  value,
+  helper,
+  loading,
+}: {
+  label: string;
+  value: string | number;
+  helper?: string;
+  loading?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+      <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-semibold text-neutral-950 dark:text-white">
+        {loading ? "…" : value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-400">{helper}</p>
+      ) : null}
+    </div>
+  );
 }
 
 export default function RankPage({ params }: PageProps) {
@@ -409,28 +458,38 @@ export default function RankPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
+      <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
         <div className="mx-auto max-w-6xl">
-          <p className="text-sm text-neutral-400">Loading rank intelligence…</p>
+          <p className="text-sm text-neutral-700 dark:text-neutral-400">
+            Loading rank intelligence…
+          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-6 py-10 text-white">
+    <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
       <div className="mx-auto max-w-6xl space-y-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-500">
               Digital Brain
             </p>
-            <h1 className="mt-2 text-3xl font-semibold">Rank Intelligence</h1>
-            <p className="mt-2 text-sm text-neutral-400">
-              Keyword: <span className="text-neutral-200">{keyword || "—"}</span>{" "}
-              • Metro: <span className="text-neutral-200">{metro || "—"}</span>
+            <h1 className="mt-2 text-3xl font-semibold text-neutral-950 dark:text-white">
+              Rank Intelligence
+            </h1>
+            <p className="mt-2 text-sm text-neutral-800 dark:text-neutral-400">
+              Keyword:{" "}
+              <span className="font-medium text-neutral-950 dark:text-neutral-200">
+                {keyword || "—"}
+              </span>{" "}
+              • Metro:{" "}
+              <span className="font-medium text-neutral-950 dark:text-neutral-200">
+                {metro || "—"}
+              </span>
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
               Search origin:{" "}
               {projectLat != null && projectLng != null
                 ? `${projectLat}, ${projectLng}`
@@ -441,7 +500,7 @@ export default function RankPage({ params }: PageProps) {
           <div className="flex flex-wrap gap-3">
             <Link
               href={`/projects/${projectId}/authority`}
-              className="rounded-xl border border-neutral-800 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
             >
               Back to Authority
             </Link>
@@ -449,7 +508,7 @@ export default function RankPage({ params }: PageProps) {
               type="button"
               onClick={runRankDiscovery}
               disabled={runningDiscovery || loadingKeywordData}
-              className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-neutral-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
             >
               {runningDiscovery ? "Running…" : "Run Rank Discovery"}
             </button>
@@ -457,35 +516,39 @@ export default function RankPage({ params }: PageProps) {
         </div>
 
         {error ? (
-          <div className="rounded-2xl border border-red-900 bg-red-950/40 p-4 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </div>
         ) : null}
 
         {runMessage ? (
-          <div className="rounded-2xl border border-emerald-900 bg-emerald-950/40 p-4 text-sm text-emerald-200">
+          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
             {runMessage}
           </div>
         ) : null}
 
         {!summary?.targetFoundInLatestSnapshot ? (
-          <div className="rounded-2xl border border-amber-900 bg-amber-950/40 p-4 text-sm text-amber-200">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
             Tracked business not found in the latest top-20 snapshot for this keyword
             and search origin.
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-6">
+        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
           <div>
-            <h2 className="text-lg font-semibold">Tracked Keywords</h2>
-            <p className="mt-1 text-sm text-neutral-400">
+            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
+              Tracked Keywords
+            </h2>
+            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
               Select a keyword to view its rank intelligence.
             </p>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
             {keywords.length === 0 ? (
-              <div className="text-sm text-neutral-500">No active rank keywords found.</div>
+              <div className="text-sm text-neutral-700 dark:text-neutral-500">
+                No active rank keywords found.
+              </div>
             ) : (
               keywords.map((item) => {
                 const isSelected = item.id === selectedKeywordId;
@@ -496,16 +559,18 @@ export default function RankPage({ params }: PageProps) {
                     type="button"
                     onClick={() => void handleKeywordSelect(item)}
                     disabled={loadingKeywordData}
-                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                    className={`rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       isSelected
-                        ? "border-white bg-white text-black"
-                        : "border-neutral-800 bg-neutral-950 text-neutral-200 hover:bg-neutral-900"
-                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                        ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-black"
+                        : "border-neutral-300 bg-neutral-50 text-neutral-900 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                    }`}
                   >
                     <p className="text-sm font-medium">{item.keyword}</p>
                     <p
                       className={`mt-1 text-xs ${
-                        isSelected ? "text-neutral-700" : "text-neutral-500"
+                        isSelected
+                          ? "text-neutral-200 dark:text-neutral-700"
+                          : "text-neutral-700 dark:text-neutral-500"
                       }`}
                     >
                       {item.metro} • Priority {item.priority}
@@ -518,52 +583,78 @@ export default function RankPage({ params }: PageProps) {
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500">
-              Latest Rank
-            </p>
-            <p className="mt-3 text-3xl font-semibold">
-              {loadingKeywordData ? "…" : formatRankValue(summary?.latestRank)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500">
-              Best Rank
-            </p>
-            <p className="mt-3 text-3xl font-semibold">
-              {loadingKeywordData ? "…" : formatRankValue(summary?.bestRank)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500">
-              Worst Rank
-            </p>
-            <p className="mt-3 text-3xl font-semibold">
-              {loadingKeywordData ? "…" : formatRankValue(summary?.worstRank)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-5">
-            <p className="text-xs uppercase tracking-wide text-neutral-500">
-              Latest Day Results
-            </p>
-            <p className="mt-3 text-3xl font-semibold">
-              {loadingKeywordData ? "…" : summary?.latestDayCount ?? "—"}
-            </p>
-          </div>
+          <StatCard
+            label="Latest Rank"
+            value={formatRankValue(summary?.latestRank)}
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Best Rank"
+            value={formatRankValue(summary?.bestRank)}
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Worst Rank"
+            value={formatRankValue(summary?.worstRank)}
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Latest Day Results"
+            value={summary?.latestDayCount ?? "—"}
+            loading={loadingKeywordData}
+          />
         </section>
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-6">
+        <section className="grid gap-4 md:grid-cols-4">
+          <StatCard
+            label="Top 3 Presence"
+            value={formatPercent(summary?.top3PresenceRate)}
+            helper={
+              summary
+                ? `${summary.top3PresenceCount} of ${summary.snapshotCount} capture days`
+                : undefined
+            }
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Top 10 Presence"
+            value={formatPercent(summary?.top10PresenceRate)}
+            helper={
+              summary
+                ? `${summary.top10PresenceCount} of ${summary.snapshotCount} capture days`
+                : undefined
+            }
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Top 20 Presence"
+            value={formatPercent(summary?.top20PresenceRate)}
+            helper={
+              summary
+                ? `${summary.top20PresenceCount} of ${summary.snapshotCount} capture days`
+                : undefined
+            }
+            loading={loadingKeywordData}
+          />
+          <StatCard
+            label="Local Market Visibility"
+            value={formatVisibilityScore(summary?.localMarketVisibilityScore)}
+            helper="Weighted visibility score"
+            loading={loadingKeywordData}
+          />
+        </section>
+
+        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">Rank Trend</h2>
-              <p className="mt-1 text-sm text-neutral-400">
+              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
+                Rank Trend
+              </h2>
+              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
                 Daily best-rank series for this keyword and metro.
               </p>
             </div>
-            <div className="text-right text-xs text-neutral-500">
+            <div className="text-right text-xs text-neutral-700 dark:text-neutral-500">
               <p>Points: {series.length}</p>
               <p>Latest capture: {summary?.latestCapturedAt ?? "—"}</p>
             </div>
@@ -571,24 +662,25 @@ export default function RankPage({ params }: PageProps) {
 
           <div className="mt-6">
             {loadingKeywordData ? (
-              <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-sm text-neutral-500">
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-500">
                 Loading rank series…
               </div>
             ) : series.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-800 p-8 text-sm text-neutral-500">
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-500">
                 No rank series data yet.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+              <div className="overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
                 <svg viewBox="0 0 520 180" className="h-56 w-full">
                   <polyline
                     fill="none"
-                    stroke="white"
+                    stroke="currentColor"
                     strokeWidth="3"
+                    className="text-neutral-950 dark:text-white"
                     points={sparklinePoints}
                   />
                 </svg>
-                <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
+                <div className="mt-3 flex items-center justify-between text-xs text-neutral-700 dark:text-neutral-500">
                   <span>{series[0]?.capturedAt ?? "—"}</span>
                   <span>{series[series.length - 1]?.capturedAt ?? "—"}</span>
                 </div>
@@ -597,18 +689,20 @@ export default function RankPage({ params }: PageProps) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-6">
+        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
           <div>
-            <h2 className="text-lg font-semibold">Current Top Market Results</h2>
-            <p className="mt-1 text-sm text-neutral-400">
+            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
+              Current Top Market Results
+            </h2>
+            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
               Latest captured local pack results for this search origin.
             </p>
           </div>
 
           <div className="mt-6 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="text-neutral-500">
-                <tr className="border-b border-neutral-800">
+              <thead className="text-neutral-800 dark:text-neutral-500">
+                <tr className="border-b border-neutral-300 dark:border-neutral-800">
                   <th className="px-3 py-3 font-medium">Rank</th>
                   <th className="px-3 py-3 font-medium">Business</th>
                   <th className="px-3 py-3 font-medium">Category</th>
@@ -620,35 +714,38 @@ export default function RankPage({ params }: PageProps) {
               <tbody>
                 {loadingKeywordData ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-neutral-500">
+                    <td colSpan={6} className="px-3 py-8 text-neutral-700 dark:text-neutral-500">
                       Loading market results…
                     </td>
                   </tr>
                 ) : latestMarketRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-neutral-500">
+                    <td colSpan={6} className="px-3 py-8 text-neutral-700 dark:text-neutral-500">
                       No market results found.
                     </td>
                   </tr>
                 ) : (
                   latestMarketRows.map((row) => (
-                    <tr key={row.id} className="border-b border-neutral-900">
-                      <td className="px-3 py-3 text-neutral-200">
+                    <tr
+                      key={row.id}
+                      className="border-b border-neutral-200 dark:border-neutral-900"
+                    >
+                      <td className="px-3 py-3 text-neutral-950 dark:text-neutral-200">
                         {row.rank_position}
                       </td>
-                      <td className="px-3 py-3 text-neutral-200">
+                      <td className="px-3 py-3 text-neutral-950 dark:text-neutral-200">
                         {row.raw_result?.title ?? "—"}
                       </td>
-                      <td className="px-3 py-3 text-neutral-400">
+                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
                         {row.raw_result?.category ?? "—"}
                       </td>
-                      <td className="px-3 py-3 text-neutral-400">
+                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
                         {formatRating(row.raw_result?.rating)}
                       </td>
-                      <td className="px-3 py-3 text-neutral-400">
+                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
                         {formatReviews(row.raw_result?.rating)}
                       </td>
-                      <td className="px-3 py-3 text-neutral-400">
+                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
                         {row.raw_result?.address ?? "—"}
                       </td>
                     </tr>
