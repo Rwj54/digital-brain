@@ -207,6 +207,22 @@ function buildSparklinePoints(series: RankSeriesPoint[]) {
     .join(" ");
 }
 
+function getUniqueCaptureDayCount(series: RankSeriesPoint[], latestCapturedAt?: string | null) {
+  const uniqueDates = new Set<string>();
+
+  for (const point of series) {
+    if (point.capturedAt) {
+      uniqueDates.add(point.capturedAt);
+    }
+  }
+
+  if (latestCapturedAt) {
+    uniqueDates.add(latestCapturedAt);
+  }
+
+  return uniqueDates.size;
+}
+
 function StatCard({
   label,
   value,
@@ -456,6 +472,14 @@ export default function RankPage({ params }: PageProps) {
 
   const sparklinePoints = useMemo(() => buildSparklinePoints(series), [series]);
 
+  const captureDayCount = useMemo(
+    () => getUniqueCaptureDayCount(series, summary?.latestCapturedAt),
+    [series, summary?.latestCapturedAt]
+  );
+
+  const captureDayHelper =
+    captureDayCount === 1 ? "1 capture day" : `${captureDayCount} capture days`;
+
   if (loading) {
     return (
       <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
@@ -610,9 +634,7 @@ export default function RankPage({ params }: PageProps) {
             label="Top 3 Presence"
             value={formatPercent(summary?.top3PresenceRate)}
             helper={
-              summary
-                ? `${summary.top3PresenceCount} of ${summary.snapshotCount} capture days`
-                : undefined
+              summary ? `${summary.top3PresenceCount} of ${captureDayHelper}` : undefined
             }
             loading={loadingKeywordData}
           />
@@ -620,9 +642,7 @@ export default function RankPage({ params }: PageProps) {
             label="Top 10 Presence"
             value={formatPercent(summary?.top10PresenceRate)}
             helper={
-              summary
-                ? `${summary.top10PresenceCount} of ${summary.snapshotCount} capture days`
-                : undefined
+              summary ? `${summary.top10PresenceCount} of ${captureDayHelper}` : undefined
             }
             loading={loadingKeywordData}
           />
@@ -630,9 +650,7 @@ export default function RankPage({ params }: PageProps) {
             label="Top 20 Presence"
             value={formatPercent(summary?.top20PresenceRate)}
             helper={
-              summary
-                ? `${summary.top20PresenceCount} of ${summary.snapshotCount} capture days`
-                : undefined
+              summary ? `${summary.top20PresenceCount} of ${captureDayHelper}` : undefined
             }
             loading={loadingKeywordData}
           />
@@ -714,13 +732,19 @@ export default function RankPage({ params }: PageProps) {
               <tbody>
                 {loadingKeywordData ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-neutral-700 dark:text-neutral-500">
+                    <td
+                      colSpan={6}
+                      className="px-3 py-8 text-neutral-700 dark:text-neutral-500"
+                    >
                       Loading market results…
                     </td>
                   </tr>
                 ) : latestMarketRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-8 text-neutral-700 dark:text-neutral-500">
+                    <td
+                      colSpan={6}
+                      className="px-3 py-8 text-neutral-700 dark:text-neutral-500"
+                    >
                       No market results found.
                     </td>
                   </tr>
