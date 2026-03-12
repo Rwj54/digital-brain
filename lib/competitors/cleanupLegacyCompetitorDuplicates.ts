@@ -16,7 +16,6 @@ function normalizeDomain(input: string | null | undefined): string {
   if (!input) return "";
 
   let value = input.trim().toLowerCase();
-
   value = value.replace(/^https?:\/\//, "");
   value = value.replace(/^www\./, "");
   value = value.replace(/\/.*$/, "");
@@ -32,6 +31,18 @@ function normalizeName(input: string | null | undefined): string {
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function getEffectiveDomain(row: CompetitorMetricRow): string {
+  const fromDomain = normalizeDomain(row.domain);
+  if (fromDomain) return fromDomain;
+
+  const fromCompetitorDomain = normalizeDomain(row.competitor_domain);
+  if (fromCompetitorDomain && !fromCompetitorDomain.startsWith("place_id:")) {
+    return fromCompetitorDomain;
+  }
+
+  return "";
 }
 
 function chooseKeeper(a: CompetitorMetricRow, b: CompetitorMetricRow): CompetitorMetricRow {
@@ -55,8 +66,8 @@ function chooseKeeper(a: CompetitorMetricRow, b: CompetitorMetricRow): Competito
     return aSeen > bSeen ? a : b;
   }
 
-  const aHasName = Boolean(a.name || a.competitor_name);
-  const bHasName = Boolean(b.name || b.competitor_name);
+  const aHasName = normalizeName(a.name ?? a.competitor_name).length > 0;
+  const bHasName = normalizeName(b.name ?? b.competitor_name).length > 0;
 
   if (aHasName && !bHasName) return a;
   if (bHasName && !aHasName) return b;
@@ -91,21 +102,21 @@ export async function cleanupLegacyCompetitorDuplicates(input: {
   }
 
   const rows = (data ?? []) as CompetitorMetricRow[];
-  const rowsByDomain = new Map<string, CompetitorMetricRow[]>();
+  const rowsByEffectiveDomain = new Map<string, CompetitorMetricRow[]>();
 
   for (const row of rows) {
-    const normalizedDomain = normalizeDomain(row.domain);
+    const effectiveDomain = getEffectiveDomain(row);
 
-    if (!normalizedDomain) {
+    if (!effectiveDomain) {
       continue;
     }
 
-    const existing = rowsByDomain.get(normalizedDomain);
+    const existing = rowsByEffectiveDomain.get(effectiveDomain);
 
     if (existing) {
       existing.push(row);
     } else {
-      rowsByDomain.set(normalizedDomain, [row]);
+      rowsByEffectiveDomain.set(effectiveDomain, [row]);
     }
   }
 
@@ -116,21 +127,14 @@ export async function cleanupLegacyCompetitorDuplicates(input: {
     deletedIds: string[];
   }> = [];
 
-  for (const [domain, domainRows] of rowsByDomain.entries()) {
+  for (const [domain, domainRows] of rowsByEffectiveDomain.entries()) {
     if (domainRows.length < 2) {
       continue;
     }
 
-    const namedRows = domainRows.filter((row) => {
-      const displayName = row.name ?? row.competitor_name ?? "";
-      return normalizeName(displayName).length > 0;
-    });
+    let keeper = domainRows[0];
 
-    const eligibleRows = namedRows.length > 0 ? namedRows : domainRows;
-
-    let keeper = eligibleRows[0];
-
-    for (const row of eligibleRows.slice(1)) {
+    for (const row of domainRows.slice(1)) {
       keeper = chooseKeeper(keeper, row);
     }
 
