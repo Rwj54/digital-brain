@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import RankTrendChart from "@/components/rank/RankTrendChart";
+import RankMarketResultsTable from "@/components/rank/RankMarketResultsTable";
+import RankKeywordPicker from "@/components/rank/RankKeywordPicker";
+import RankSummaryStats from "@/components/rank/RankSummaryStats";
 
 type PageProps = {
   params: Promise<{
@@ -112,101 +116,6 @@ type RankConfigResponse = {
   } | null;
 };
 
-function formatRating(
-  rating:
-    | {
-        value?: number | null;
-        votes_count?: number | null;
-      }
-    | number
-    | null
-    | undefined
-) {
-  if (typeof rating === "number") {
-    return rating.toFixed(1);
-  }
-
-  if (rating && typeof rating.value === "number") {
-    return rating.value.toFixed(1);
-  }
-
-  return "—";
-}
-
-function formatReviews(
-  rating:
-    | {
-        value?: number | null;
-        votes_count?: number | null;
-      }
-    | number
-    | null
-    | undefined
-) {
-  if (rating && typeof rating === "object" && typeof rating.votes_count === "number") {
-    return rating.votes_count;
-  }
-
-  return "—";
-}
-
-function formatRankValue(value: number | null | undefined) {
-  if (value == null) {
-    return "—";
-  }
-
-  if (value >= 21) {
-    return ">20";
-  }
-
-  return String(value);
-}
-
-function formatPercent(value: number | null | undefined) {
-  if (value == null) {
-    return "—";
-  }
-
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatVisibilityScore(value: number | null | undefined) {
-  if (value == null) {
-    return "—";
-  }
-
-  return value.toFixed(1);
-}
-
-function buildSparklinePoints(series: RankSeriesPoint[]) {
-  if (series.length === 0) {
-    return "";
-  }
-
-  const width = 520;
-  const height = 180;
-  const padding = 20;
-
-  const bestRanks = series.map((point) => point.bestRank);
-  const minRank = Math.min(...bestRanks);
-  const maxRank = Math.max(...bestRanks);
-  const rankRange = Math.max(maxRank - minRank, 1);
-
-  return bestRanks
-    .map((rank, index) => {
-      const x =
-        series.length === 1
-          ? width / 2
-          : padding + (index * (width - padding * 2)) / (series.length - 1);
-
-      const normalized = (rank - minRank) / rankRange;
-      const y = padding + normalized * (height - padding * 2);
-
-      return `${x},${y}`;
-    })
-    .join(" ");
-}
-
 function getUniqueCaptureDayCount(series: RankSeriesPoint[], latestCapturedAt?: string | null) {
   const uniqueDates = new Set<string>();
 
@@ -221,32 +130,6 @@ function getUniqueCaptureDayCount(series: RankSeriesPoint[], latestCapturedAt?: 
   }
 
   return uniqueDates.size;
-}
-
-function StatCard({
-  label,
-  value,
-  helper,
-  loading,
-}: {
-  label: string;
-  value: string | number;
-  helper?: string;
-  loading?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-      <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-semibold text-neutral-950 dark:text-white">
-        {loading ? "…" : value}
-      </p>
-      {helper ? (
-        <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-400">{helper}</p>
-      ) : null}
-    </div>
-  );
 }
 
 export default function RankPage({ params }: PageProps) {
@@ -470,8 +353,6 @@ export default function RankPage({ params }: PageProps) {
     return history.filter((row) => row.captured_at === summary.latestCapturedAt);
   }, [history, summary]);
 
-  const sparklinePoints = useMemo(() => buildSparklinePoints(series), [series]);
-
   const captureDayCount = useMemo(
     () => getUniqueCaptureDayCount(series, summary?.latestCapturedAt),
     [series, summary?.latestCapturedAt]
@@ -558,227 +439,31 @@ export default function RankPage({ params }: PageProps) {
           </div>
         ) : null}
 
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-              Tracked Keywords
-            </h2>
-            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-              Select a keyword to view its rank intelligence.
-            </p>
-          </div>
+        <RankKeywordPicker
+          keywords={keywords}
+          selectedKeywordId={selectedKeywordId}
+          loading={loadingKeywordData}
+          onSelect={(keywordRow) => {
+            void handleKeywordSelect(keywordRow);
+          }}
+        />
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            {keywords.length === 0 ? (
-              <div className="text-sm text-neutral-700 dark:text-neutral-500">
-                No active rank keywords found.
-              </div>
-            ) : (
-              keywords.map((item) => {
-                const isSelected = item.id === selectedKeywordId;
+        <RankSummaryStats
+          summary={summary}
+          captureDayHelper={captureDayHelper}
+          loading={loadingKeywordData}
+        />
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => void handleKeywordSelect(item)}
-                    disabled={loadingKeywordData}
-                    className={`rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                      isSelected
-                        ? "border-neutral-950 bg-neutral-950 text-white dark:border-white dark:bg-white dark:text-black"
-                        : "border-neutral-300 bg-neutral-50 text-neutral-900 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200 dark:hover:bg-neutral-900"
-                    }`}
-                  >
-                    <p className="text-sm font-medium">{item.keyword}</p>
-                    <p
-                      className={`mt-1 text-xs ${
-                        isSelected
-                          ? "text-neutral-200 dark:text-neutral-700"
-                          : "text-neutral-700 dark:text-neutral-500"
-                      }`}
-                    >
-                      {item.metro} • Priority {item.priority}
-                    </p>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </section>
+        <RankTrendChart
+          series={series}
+          latestCapturedAt={summary?.latestCapturedAt ?? null}
+          loading={loadingKeywordData}
+        />
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Latest Rank"
-            value={formatRankValue(summary?.latestRank)}
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Best Rank"
-            value={formatRankValue(summary?.bestRank)}
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Worst Rank"
-            value={formatRankValue(summary?.worstRank)}
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Latest Day Results"
-            value={summary?.latestDayCount ?? "—"}
-            loading={loadingKeywordData}
-          />
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Top 3 Presence"
-            value={formatPercent(summary?.top3PresenceRate)}
-            helper={
-              summary ? `${summary.top3PresenceCount} of ${captureDayHelper}` : undefined
-            }
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Top 10 Presence"
-            value={formatPercent(summary?.top10PresenceRate)}
-            helper={
-              summary ? `${summary.top10PresenceCount} of ${captureDayHelper}` : undefined
-            }
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Top 20 Presence"
-            value={formatPercent(summary?.top20PresenceRate)}
-            helper={
-              summary ? `${summary.top20PresenceCount} of ${captureDayHelper}` : undefined
-            }
-            loading={loadingKeywordData}
-          />
-          <StatCard
-            label="Local Market Visibility"
-            value={formatVisibilityScore(summary?.localMarketVisibilityScore)}
-            helper="Weighted visibility score"
-            loading={loadingKeywordData}
-          />
-        </section>
-
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-                Rank Trend
-              </h2>
-              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-                Daily best-rank series for this keyword and metro.
-              </p>
-            </div>
-            <div className="text-right text-xs text-neutral-700 dark:text-neutral-500">
-              <p>Points: {series.length}</p>
-              <p>Latest capture: {summary?.latestCapturedAt ?? "—"}</p>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            {loadingKeywordData ? (
-              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-500">
-                Loading rank series…
-              </div>
-            ) : series.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-sm text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-500">
-                No rank series data yet.
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
-                <svg viewBox="0 0 520 180" className="h-56 w-full">
-                  <polyline
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    className="text-neutral-950 dark:text-white"
-                    points={sparklinePoints}
-                  />
-                </svg>
-                <div className="mt-3 flex items-center justify-between text-xs text-neutral-700 dark:text-neutral-500">
-                  <span>{series[0]?.capturedAt ?? "—"}</span>
-                  <span>{series[series.length - 1]?.capturedAt ?? "—"}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-              Current Top Market Results
-            </h2>
-            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-              Latest captured local pack results for this search origin.
-            </p>
-          </div>
-
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-neutral-800 dark:text-neutral-500">
-                <tr className="border-b border-neutral-300 dark:border-neutral-800">
-                  <th className="px-3 py-3 font-medium">Rank</th>
-                  <th className="px-3 py-3 font-medium">Business</th>
-                  <th className="px-3 py-3 font-medium">Category</th>
-                  <th className="px-3 py-3 font-medium">Rating</th>
-                  <th className="px-3 py-3 font-medium">Reviews</th>
-                  <th className="px-3 py-3 font-medium">Address</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingKeywordData ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-3 py-8 text-neutral-700 dark:text-neutral-500"
-                    >
-                      Loading market results…
-                    </td>
-                  </tr>
-                ) : latestMarketRows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-3 py-8 text-neutral-700 dark:text-neutral-500"
-                    >
-                      No market results found.
-                    </td>
-                  </tr>
-                ) : (
-                  latestMarketRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-neutral-200 dark:border-neutral-900"
-                    >
-                      <td className="px-3 py-3 text-neutral-950 dark:text-neutral-200">
-                        {row.rank_position}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-950 dark:text-neutral-200">
-                        {row.raw_result?.title ?? "—"}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {row.raw_result?.category ?? "—"}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {formatRating(row.raw_result?.rating)}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {formatReviews(row.raw_result?.rating)}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {row.raw_result?.address ?? "—"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <RankMarketResultsTable
+          rows={latestMarketRows}
+          loading={loadingKeywordData}
+        />
       </div>
     </main>
   );
