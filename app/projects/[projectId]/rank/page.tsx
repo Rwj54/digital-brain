@@ -6,6 +6,7 @@ import RankTrendChart from "@/components/rank/RankTrendChart";
 import RankMarketResultsTable from "@/components/rank/RankMarketResultsTable";
 import RankKeywordPicker from "@/components/rank/RankKeywordPicker";
 import RankSummaryStats from "@/components/rank/RankSummaryStats";
+import RankCompetitorPressure from "@/components/rank/RankCompetitorPressure";
 
 type PageProps = {
   params: Promise<{
@@ -116,7 +117,38 @@ type RankConfigResponse = {
   } | null;
 };
 
-function getUniqueCaptureDayCount(series: RankSeriesPoint[], latestCapturedAt?: string | null) {
+type CompetitorPressureItem = {
+  competitorKey: string;
+  competitorName: string;
+  currentRank: number;
+  previousRank: number | null;
+  rankChange: number | null;
+  currentReviewCount: number | null;
+  previousReviewCount: number | null;
+  reviewChange: number | null;
+  pressureScore: number;
+};
+
+type CompetitorPressure = {
+  latestCapturedAt: string | null;
+  previousCapturedAt: string | null;
+  itemCount: number;
+  items: CompetitorPressureItem[];
+};
+
+type CompetitorPressureResponse = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  keyword: string;
+  metro: string;
+  pressure: CompetitorPressure;
+};
+
+function getUniqueCaptureDayCount(
+  series: RankSeriesPoint[],
+  latestCapturedAt?: string | null
+) {
   const uniqueDates = new Set<string>();
 
   for (const point of series) {
@@ -145,6 +177,7 @@ export default function RankPage({ params }: PageProps) {
   const [summary, setSummary] = useState<RankSummaryResponse["summary"]>(null);
   const [series, setSeries] = useState<RankSeriesPoint[]>([]);
   const [history, setHistory] = useState<RankHistoryRow[]>([]);
+  const [pressure, setPressure] = useState<CompetitorPressure | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [loadingKeywordData, setLoadingKeywordData] = useState(false);
@@ -160,7 +193,12 @@ export default function RankPage({ params }: PageProps) {
     const encodedKeyword = encodeURIComponent(nextKeyword);
     const encodedMetro = encodeURIComponent(nextMetro);
 
-    const [summaryResponse, seriesResponse, historyResponse] = await Promise.all([
+    const [
+      summaryResponse,
+      seriesResponse,
+      historyResponse,
+      pressureResponse,
+    ] = await Promise.all([
       fetch(
         `/api/projects/${resolvedProjectId}/rank-summary?keyword=${encodedKeyword}&metro=${encodedMetro}`,
         { cache: "no-store" }
@@ -173,11 +211,17 @@ export default function RankPage({ params }: PageProps) {
         `/api/projects/${resolvedProjectId}/rank-history?keyword=${encodedKeyword}&metro=${encodedMetro}&limit=25`,
         { cache: "no-store" }
       ),
+      fetch(
+        `/api/projects/${resolvedProjectId}/competitor-pressure?keyword=${encodedKeyword}&metro=${encodedMetro}`,
+        { cache: "no-store" }
+      ),
     ]);
 
     const summaryJson = (await summaryResponse.json()) as RankSummaryResponse;
     const seriesJson = (await seriesResponse.json()) as RankSeriesResponse;
     const historyJson = (await historyResponse.json()) as RankHistoryResponse;
+    const pressureJson =
+      (await pressureResponse.json()) as CompetitorPressureResponse;
 
     if (!summaryResponse.ok || !summaryJson.ok) {
       throw new Error(summaryJson.error ?? "Failed to load rank summary.");
@@ -191,9 +235,16 @@ export default function RankPage({ params }: PageProps) {
       throw new Error(historyJson.error ?? "Failed to load rank history.");
     }
 
+    if (!pressureResponse.ok || !pressureJson.ok) {
+      throw new Error(
+        pressureJson.error ?? "Failed to load competitor pressure."
+      );
+    }
+
     setSummary(summaryJson.summary);
     setSeries(seriesJson.series);
     setHistory(historyJson.snapshots);
+    setPressure(pressureJson.pressure ?? null);
   }
 
   useEffect(() => {
@@ -457,6 +508,11 @@ export default function RankPage({ params }: PageProps) {
         <RankTrendChart
           series={series}
           latestCapturedAt={summary?.latestCapturedAt ?? null}
+          loading={loadingKeywordData}
+        />
+
+        <RankCompetitorPressure
+          pressure={pressure}
           loading={loadingKeywordData}
         />
 
