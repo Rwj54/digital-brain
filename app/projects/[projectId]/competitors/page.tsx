@@ -17,6 +17,7 @@ type CompetitorMetric = {
   competitor_domain: string;
   place_id: string | null;
   name: string | null;
+  competitor_name: string | null;
   rating: number | null;
   total_reviews: number | null;
   last_seen_at: string | null;
@@ -151,6 +152,10 @@ function shortName(s: string | null) {
   return s.length > 42 ? s.slice(0, 41) + "…" : s;
 }
 
+function getDisplayName(c: CompetitorMetric) {
+  return c.name?.trim() || c.competitor_name?.trim() || "—";
+}
+
 export default function CompetitorsPage() {
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
@@ -214,7 +219,9 @@ export default function CompetitorsPage() {
   async function loadCompetitors() {
     const { data, error } = await supabase
       .from("gbp_competitor_metrics")
-      .select("project_id, competitor_domain, place_id, name, rating, total_reviews, last_seen_at")
+      .select(
+        "project_id, competitor_domain, place_id, name, competitor_name, rating, total_reviews, last_seen_at"
+      )
       .eq("project_id", projectId);
 
     if (error) throw new Error(`Competitors load failed: ${error.message}`);
@@ -487,7 +494,7 @@ export default function CompetitorsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-neutral-950 dark:text-white">
-                        {idx + 1}. {shortName(c.name)}
+                        {idx + 1}. {shortName(getDisplayName(c))}
                       </p>
                       <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
                         {c.place_id ?? c.competitor_domain}
@@ -556,7 +563,7 @@ export default function CompetitorsPage() {
                       <td className="px-3 py-3">
                         <div>
                           <p className="font-medium text-neutral-950 dark:text-neutral-200">
-                            {c.name ?? "—"}
+                            {getDisplayName(c)}
                           </p>
                           <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
                             {c.place_id ?? c.competitor_domain}
