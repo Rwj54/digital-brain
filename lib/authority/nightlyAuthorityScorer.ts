@@ -2,6 +2,8 @@
 
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { computeAuthority } from "@/lib/authority/authorityEngine";
+import { detectCompetitorPressure } from "@/lib/domain/rank/detectCompetitorPressure";
+import { buildPressureActions } from "@/lib/domain/rank/buildPressureActions";
 
 type AnyRow = Record<string, any>;
 
@@ -47,6 +49,10 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 type MomentumOut = { score: number; label: string; components: Record<string, number> };
 
 function computeMomentum(args: {
@@ -62,35 +68,24 @@ function computeMomentum(args: {
 
   marketMedianReviews: number;
 }): MomentumOut {
-  // 0..100, centered at 50, then we map to -100..+100-ish feel, but store 0..100 for simplicity.
-  // We output as 0..100, where 50 = Flat. UI can still label it.
-
   const authorityDelta = args.authorityYesterday == null ? 0 : args.authorityToday - args.authorityYesterday;
 
   const gapShrink =
     args.gapYesterday == null ? 0 : clamp((args.gapYesterday - args.gapToday) / Math.max(10, args.gapYesterday), -1, 1);
 
-  // Execution proxy (structural activity)
-  const execPosts = clamp(args.posts30d / 12, 0, 1); // 12 posts / 30d ~= 3/wk is strong
-  const execPhotos = clamp(args.photosCount / 200, 0, 1); // soft cap
-  const execQA = clamp(args.qaCount / 50, 0, 1); // soft cap
+  const execPosts = clamp(args.posts30d / 12, 0, 1);
+  const execPhotos = clamp(args.photosCount / 200, 0, 1);
+  const execQA = clamp(args.qaCount / 50, 0, 1);
   const execution = clamp(0.5 * execPosts + 0.35 * execPhotos + 0.15 * execQA, 0, 1);
 
-  // Market pressure proxy: higher median reviews means harder market to move in.
   const marketPressure = clamp(normalize01(args.marketMedianReviews, 300), 0, 1);
 
-  // Compose:
-  // - authorityDelta is a lagging signal, small weight
-  // - gapShrink is a leading signal, stronger weight
-  // - execution is leading, medium weight
-  // - marketPressure subtracts a bit (harder markets are tougher to gain momentum)
   const raw =
-    0.20 * clamp(authorityDelta / 5, -1, 1) +
+    0.2 * clamp(authorityDelta / 5, -1, 1) +
     0.45 * gapShrink +
     0.35 * (execution - 0.5) -
     0.15 * (marketPressure - 0.5);
 
-  // Map raw (-~1..+1) to 0..100 with 50 baseline
   const score = clamp(50 + raw * 50, 0, 100);
 
   let label = "Flat";
@@ -109,6 +104,174 @@ function computeMomentum(args: {
       marketPressure: Math.round(marketPressure * 1000) / 1000,
     },
   };
+}
+
+type StoredProjectAction = {
+  title: string;
+  detail: string;
+  priority: string;
+  category: string;
+};
+
+async function replaceProjectActions(params: {
+  supabase: ReturnType<typeof supabaseAdmin>;
+  projectId: string;
+  capturedAt: string;
+  version: string;
+  actions: StoredProjectAction[];
+}) {
+  const { supabase, projectId, capturedAt, version, actions } = params;
+
+  const { error } = await supabase
+    .from("project_actions")
+    .upsert(
+      [
+        {
+          project_id: projectId,
+          captured_at: capturedAt,
+          version,
+          actions_json: actions,
+        },
+      ],
+      { onConflict: "project_id,captured_at,version" }
+    );
+
+  if (error) {
+    throw new Error(`project_actions upsert error: ${error.message}`);
+  }
+}
+
+function dedupeActions(actions: StoredProjectAction[]) {
+  const seen = new Set<string>();
+  const output: StoredProjectAction[] = [];
+
+  for (const action of actions) {
+    const key = `${action.category}::${action.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(action);
+  }
+
+  return output;
+}
+
+function buildAuthorityActions(args: {
+  yourReviews: number;
+  top3MedianReviews: number;
+  posts30d: number;
+  photosCount: number;
+  qaCount: number;
+  hasPrimaryCategory: boolean;
+  additionalCategoryCount: number;
+  hasDescription: boolean;
+  hasHours: boolean;
+  hasPhone: boolean;
+  hasWebsite: boolean;
+}): StoredProjectAction[] {
+  const actions: StoredProjectAction[] = [];
+  const reviewGap = Math.max(0, args.top3MedianReviews - args.yourReviews);
+
+  if (reviewGap >= 10) {
+    actions.push({
+      title: "Increase review acquisition",
+      detail: `The business trails the top 3 median by ${reviewGap} reviews. Prioritize a structured review acquisition process to close the authority gap.`,
+      priority: reviewGap >= 50 ? "high" : "medium",
+      category: "reviews",
+    });
+  }
+
+  if (args.posts30d < 4) {
+    actions.push({
+      title: "Publish more GBP posts",
+      detail: `Only ${args.posts30d} posts were detected in the last 30 days. Increase posting cadence to strengthen freshness and activity signals.`,
+      priority: "medium",
+      category: "competition",
+    });
+  }
+
+  if (args.photosCount < 25) {
+    actions.push({
+      title: "Add more GBP photos",
+      detail: `The profile currently shows ${args.photosCount} photos. Add more high-quality, service-relevant photos to improve profile completeness and engagement.`,
+      priority: "medium",
+      category: "competition",
+    });
+  }
+
+  if (args.qaCount < 3) {
+    actions.push({
+      title: "Build GBP Q&A depth",
+      detail: `The profile only shows ${args.qaCount} Q&A items. Add common service and customer questions to improve completeness and trust.`,
+      priority: "low",
+      category: "competition",
+    });
+  }
+
+  if (!args.hasPrimaryCategory) {
+    actions.push({
+      title: "Confirm primary category",
+      detail: "The profile appears to be missing a primary category signal. Verify and correct the primary GBP category.",
+      priority: "high",
+      category: "competition",
+    });
+  }
+
+  if (args.additionalCategoryCount < 2) {
+    actions.push({
+      title: "Expand additional categories",
+      detail: `Only ${args.additionalCategoryCount} additional categories were detected. Add relevant secondary categories where appropriate.`,
+      priority: "medium",
+      category: "competition",
+    });
+  }
+
+  if (!args.hasDescription) {
+    actions.push({
+      title: "Add or improve GBP description",
+      detail: "The GBP description signal appears weak or missing. Add a stronger business description aligned to services and location.",
+      priority: "medium",
+      category: "competition",
+    });
+  }
+
+  if (!args.hasHours) {
+    actions.push({
+      title: "Verify business hours",
+      detail: "Business hours appear incomplete or missing. Confirm regular hours and special hours in GBP.",
+      priority: "medium",
+      category: "competition",
+    });
+  }
+
+  if (!args.hasPhone) {
+    actions.push({
+      title: "Verify phone number",
+      detail: "The phone signal appears incomplete or missing. Confirm the primary business phone in GBP.",
+      priority: "high",
+      category: "competition",
+    });
+  }
+
+  if (!args.hasWebsite) {
+    actions.push({
+      title: "Verify website link",
+      detail: "The website signal appears incomplete or missing. Confirm the primary website URL in GBP.",
+      priority: "high",
+      category: "competition",
+    });
+  }
+
+  return actions;
+}
+
+function validateAuthorityOutput(computed: AnyRow) {
+  return (
+    isFiniteNumber(computed?.authorityScore) &&
+    typeof computed?.authorityTier === "string" &&
+    computed.authorityTier.trim() !== "" &&
+    isFiniteNumber(computed?.competitiveStrength) &&
+    isFiniteNumber(computed?.structuralOptimization)
+  );
 }
 
 export interface NightlyAuthorityRunResult {
@@ -150,7 +313,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
     const projectId = project.id as string;
 
     try {
-      // Your GBP profile
       const { data: profile, error: profileError } = await supabase
         .from("gbp_profiles")
         .select("*")
@@ -162,18 +324,17 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         result.projects_skipped++;
         continue;
       }
+
       if (!profile) {
         result.projects_skipped++;
         continue;
       }
 
       const yourReviews = num(profile, "total_reviews", 0);
-
       const posts30d = num(profile, "posts_30d", 0);
       const photosCount = num(profile, "photos_count", 0);
       const qaCount = num(profile, "qa_count", 0);
 
-      // Competitor metrics
       const { data: metrics, error: metricsError } = await supabase
         .from("gbp_competitor_metrics")
         .select("*")
@@ -188,7 +349,9 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const metricsRows = (metrics ?? []) as AnyRow[];
       const competitorReviews = metricsRows.map((r) => num(r, "total_reviews", 0));
 
-      const sortedByReviewsDesc = [...metricsRows].sort((a, b) => num(b, "total_reviews", 0) - num(a, "total_reviews", 0));
+      const sortedByReviewsDesc = [...metricsRows].sort(
+        (a, b) => num(b, "total_reviews", 0) - num(a, "total_reviews", 0)
+      );
       const top3 = sortedByReviewsDesc.slice(0, 3);
 
       const top3MedianReviews = median(top3.map((r) => num(r, "total_reviews", 0)));
@@ -197,7 +360,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const dist = [...competitorReviews, yourReviews];
       const pRank = percentileRank(dist, yourReviews);
 
-      // Market competitiveness heuristics
       const competitorCount = metricsRows.length;
       const densityScore = Math.min(1, competitorCount / 50);
 
@@ -206,10 +368,9 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const reviewCeiling = reviewSorted.length ? reviewSorted[p90Index] : 0;
 
       const marketReviewCeilingScore = normalize01(reviewCeiling, 200);
-      const marketVelocityCeilingScore = 0; // not available yet
+      const marketVelocityCeilingScore = 0;
       const marketDensityScore = normalize01(densityScore, 0.7);
 
-      // Structural flags (best-effort)
       const hasPrimaryCategory = !!profile["primary_category"];
       const additionalCategoryCount = Array.isArray(profile["additional_categories"])
         ? (profile["additional_categories"] as any[]).length
@@ -220,7 +381,6 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const hasPhone = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.phone;
       const hasWebsite = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.website;
 
-      // Compute authority (v1.1 still using same core authority engine)
       const computed = computeAuthority({
         yourReviews,
         top3MedianReviews,
@@ -249,18 +409,22 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         marketAcceleration: 0,
       });
 
-      // Load yesterday's authority row (for momentum)
-      const { data: yRow, error: yErr } = await supabase
+      if (!validateAuthorityOutput(computed)) {
+        result.errors.push({
+          project_id: projectId,
+          message: "Authority engine returned invalid output for this project.",
+        });
+        result.projects_skipped++;
+        continue;
+      }
+
+      const { data: yRow } = await supabase
         .from("project_authority_scores")
         .select("authority_score, inputs, captured_at")
         .eq("project_id", projectId)
         .eq("captured_at", yesterday)
         .eq("version", version)
         .maybeSingle();
-
-      if (yErr) {
-        // Not fatal
-      }
 
       const authorityYesterday = yRow ? Number(yRow.authority_score) : null;
       const gapToday = Math.max(0, top3MedianReviews - yourReviews);
@@ -310,16 +474,12 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
               project_id: projectId,
               captured_at,
               version,
-
               authority_score: computed.authorityScore,
               authority_tier: computed.authorityTier,
-
               competitive_strength: computed.competitiveStrength,
               structural_optimization: computed.structuralOptimization,
-
               momentum_score: m.score,
               momentum_label: m.label,
-
               inputs,
             },
           ],
@@ -332,9 +492,95 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         continue;
       }
 
+      const authorityActions = buildAuthorityActions({
+        yourReviews,
+        top3MedianReviews,
+        posts30d,
+        photosCount,
+        qaCount,
+        hasPrimaryCategory,
+        additionalCategoryCount,
+        hasDescription,
+        hasHours,
+        hasPhone,
+        hasWebsite,
+      });
+
+      const { data: rankKeywords, error: rankKeywordsError } = await supabase
+        .from("project_rank_keywords")
+        .select("keyword, metro")
+        .eq("project_id", projectId)
+        .eq("is_active", true)
+        .order("priority", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      const pressureActions: StoredProjectAction[] = [];
+
+      if (rankKeywordsError) {
+        result.errors.push({
+          project_id: projectId,
+          message: `project_rank_keywords error: ${rankKeywordsError.message}`,
+        });
+      } else {
+        for (const row of (rankKeywords ?? []) as AnyRow[]) {
+          const keyword = typeof row.keyword === "string" ? row.keyword : "";
+          const metro = typeof row.metro === "string" ? row.metro : "";
+
+          if (!keyword || !metro) {
+            continue;
+          }
+
+          try {
+            const pressure = await detectCompetitorPressure({
+              projectId,
+              keyword,
+              metro,
+            });
+
+            const generated = buildPressureActions(pressure);
+
+            for (const action of generated) {
+              pressureActions.push({
+                ...action,
+                detail: `${action.detail} Keyword: ${keyword}. Metro: ${metro}.`,
+              });
+            }
+          } catch (pressureError: any) {
+            result.errors.push({
+              project_id: projectId,
+              message: pressureError?.message
+                ? `pressure action error (${keyword}): ${String(pressureError.message)}`
+                : `pressure action error (${keyword}): Unknown error`,
+            });
+          }
+        }
+      }
+
+      const mergedActions = dedupeActions([...authorityActions, ...pressureActions]).slice(0, 12);
+
+      try {
+        await replaceProjectActions({
+          supabase,
+          projectId,
+          capturedAt: captured_at,
+          version,
+          actions: mergedActions,
+        });
+      } catch (actionStoreError: any) {
+        result.errors.push({
+          project_id: projectId,
+          message: actionStoreError?.message
+            ? String(actionStoreError.message)
+            : "Unknown project_actions error",
+        });
+      }
+
       result.projects_scored++;
     } catch (e: any) {
-      result.errors.push({ project_id: projectId, message: e?.message ? String(e.message) : "Unknown scorer error" });
+      result.errors.push({
+        project_id: projectId,
+        message: e?.message ? String(e.message) : "Unknown scorer error",
+      });
       result.projects_skipped++;
     }
   }
