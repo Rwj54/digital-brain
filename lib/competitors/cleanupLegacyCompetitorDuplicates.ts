@@ -14,7 +14,14 @@ type CompetitorMetricRow = {
 
 function normalizeDomain(input: string | null | undefined): string {
   if (!input) return "";
-  return input.trim().toLowerCase();
+
+  let value = input.trim().toLowerCase();
+
+  value = value.replace(/^https?:\/\//, "");
+  value = value.replace(/^www\./, "");
+  value = value.replace(/\/.*$/, "");
+
+  return value;
 }
 
 function normalizeName(input: string | null | undefined): string {
@@ -25,10 +32,6 @@ function normalizeName(input: string | null | undefined): string {
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-function isPlaceIdentity(value: string | null | undefined) {
-  return typeof value === "string" && value.startsWith("place_id:");
 }
 
 function chooseKeeper(a: CompetitorMetricRow, b: CompetitorMetricRow): CompetitorMetricRow {
@@ -91,18 +94,18 @@ export async function cleanupLegacyCompetitorDuplicates(input: {
   const rowsByDomain = new Map<string, CompetitorMetricRow[]>();
 
   for (const row of rows) {
-    const domain = normalizeDomain(row.domain);
+    const normalizedDomain = normalizeDomain(row.domain);
 
-    if (!domain) {
+    if (!normalizedDomain) {
       continue;
     }
 
-    const existing = rowsByDomain.get(domain);
+    const existing = rowsByDomain.get(normalizedDomain);
 
     if (existing) {
       existing.push(row);
     } else {
-      rowsByDomain.set(domain, [row]);
+      rowsByDomain.set(normalizedDomain, [row]);
     }
   }
 
