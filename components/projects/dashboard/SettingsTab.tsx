@@ -1,4 +1,5 @@
 import { ReviewCapacityCard } from "@/components/projects/dashboard/ReviewCapacityCard";
+import { IdentityResolutionCard } from "@/components/projects/dashboard/IdentityResolutionCard";
 import { GbpSnapshotCard } from "@/components/projects/dashboard/GbpSnapshotCard";
 import { CompetitorsCard } from "@/components/projects/dashboard/CompetitorsCard";
 import type {
@@ -7,6 +8,12 @@ import type {
 } from "@/components/projects/dashboard/types";
 
 type SettingsTabProps = {
+  siteUrl: string | null;
+  projectCategory: string | null;
+  projectMetro: string | null;
+  projectRadiusMiles: number | null;
+  targetDomain: string | null;
+  targetBrandName: string | null;
   labelPlural: string;
   preset: VolumePresetOption;
   presetOptions: VolumePresetOption[];
@@ -54,6 +61,12 @@ type SettingsTabProps = {
 };
 
 export function SettingsTab({
+  siteUrl,
+  projectCategory,
+  projectMetro,
+  projectRadiusMiles,
+  targetDomain,
+  targetBrandName,
   labelPlural,
   preset,
   presetOptions,
@@ -101,6 +114,15 @@ export function SettingsTab({
 }: SettingsTabProps) {
   return (
     <div className="grid gap-4">
+      <IdentityResolutionCard
+        siteUrl={siteUrl}
+        targetDomain={targetDomain}
+        targetBrandName={targetBrandName}
+        category={projectCategory}
+        metro={projectMetro}
+        radiusMiles={projectRadiusMiles}
+      />
+
       <ReviewCapacityCard
         labelPlural={labelPlural}
         preset={preset}

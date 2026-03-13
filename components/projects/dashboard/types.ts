@@ -15,6 +15,8 @@ export type Project = {
   review_conversion_rate: number | null;
   event_label_singular: string | null;
   event_label_plural: string | null;
+  target_domain: string | null;
+  target_brand_name: string | null;
 };
 
 export type GbpProfile = {

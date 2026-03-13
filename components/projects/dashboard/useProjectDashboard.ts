@@ -9,7 +9,10 @@ import type {
   Project,
   TabKey,
 } from "@/components/projects/dashboard/types";
-import { DASHBOARD_PRESET_OPTIONS, DASHBOARD_TABS } from "@/components/projects/dashboard/config";
+import {
+  DASHBOARD_PRESET_OPTIONS,
+  DASHBOARD_TABS,
+} from "@/components/projects/dashboard/config";
 import { computeDashboardDerived } from "@/components/projects/dashboard/calculations";
 import { useProjectDashboardFormState } from "@/components/projects/dashboard/formState";
 import { createProjectDashboardActions } from "@/components/projects/dashboard/actions";
@@ -84,7 +87,8 @@ export function useProjectDashboard({
 
   const preset = useMemo(
     () =>
-      presetOptions.find((option) => option.key === form.volumePreset) || presetOptions[0],
+      presetOptions.find((option) => option.key === form.volumePreset) ||
+      presetOptions[0],
     [presetOptions, form.volumePreset]
   );
 
@@ -98,7 +102,14 @@ export function useProjectDashboard({
         eventLabelPlural: form.eventLabelPlural,
         preset,
       }),
-    [project, gbp, competitors, form.eventLabelSingular, form.eventLabelPlural, preset]
+    [
+      project,
+      gbp,
+      competitors,
+      form.eventLabelSingular,
+      form.eventLabelPlural,
+      preset,
+    ]
   );
 
   const actions = useMemo(

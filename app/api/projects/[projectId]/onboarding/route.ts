@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runProjectOnboarding } from "@/lib/onboarding/runProjectOnboarding";
+import {
+  runProjectOnboarding,
+  type SeedRankKeywordInput,
+} from "@/lib/onboarding/runProjectOnboarding";
 
 type RouteContext = {
   params: Promise<{
@@ -16,6 +19,38 @@ type RequestBody = {
   }>;
 };
 
+function normalizeSeedKeywords(
+  input: RequestBody["seedKeywords"]
+): SeedRankKeywordInput[] {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  const normalizedRows: Array<SeedRankKeywordInput | null> = input.map((row) => {
+    const keyword = typeof row?.keyword === "string" ? row.keyword.trim() : "";
+    const metro = typeof row?.metro === "string" ? row.metro.trim() : "";
+
+    if (!keyword || !metro) {
+      return null;
+    }
+
+    return {
+      keyword,
+      metro,
+      priority:
+        typeof row?.priority === "number" && Number.isFinite(row.priority)
+          ? row.priority
+          : undefined,
+      isActive:
+        typeof row?.isActive === "boolean" ? row.isActive : undefined,
+    };
+  });
+
+  return normalizedRows.filter(
+    (row): row is SeedRankKeywordInput => row !== null
+  );
+}
+
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { projectId } = await context.params;
@@ -25,7 +60,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       projectId,
       mode: "manual",
       userAgent: request.headers.get("user-agent"),
-      seedKeywords: Array.isArray(body.seedKeywords) ? body.seedKeywords : [],
+      seedKeywords: normalizeSeedKeywords(body.seedKeywords),
     });
 
     return NextResponse.json(result, {

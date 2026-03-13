@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type ClientRow = {
@@ -11,74 +11,16 @@ type ClientRow = {
   created_at: string;
 };
 
-type ProjectRow = {
-  id: string;
-  client_id: string;
-  site_url: string;
-  category: string;
-  metro: string;
-  radius_miles: number;
-  created_at: string;
-};
-
-function normalizeSiteUrl(input: string): string {
-  const raw = input.trim();
-
-  if (!raw) {
-    return "";
-  }
-
-  try {
-    const withProtocol =
-      raw.startsWith("http://") || raw.startsWith("https://")
-        ? raw
-        : `https://${raw}`;
-
-    return new URL(withProtocol).toString();
-  } catch {
-    return raw;
-  }
-}
-
-function formatDomain(input: string): string {
-  const raw = input.trim();
-
-  if (!raw) {
-    return "—";
-  }
-
-  try {
-    const withProtocol =
-      raw.startsWith("http://") || raw.startsWith("https://")
-        ? raw
-        : `https://${raw}`;
-
-    return new URL(withProtocol).hostname.replace(/^www\./, "");
-  } catch {
-    return raw.replace(/^www\./, "").replace(/\/+$/, "");
-  }
-}
-
-export default function ClientProjectsPage() {
+export default function ClientsPage() {
   const router = useRouter();
-  const params = useParams<{ clientId: string }>();
-  const clientId = params.clientId;
 
-  const [client, setClient] = useState<ClientRow | null>(null);
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [clients, setClients] = useState<ClientRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
-  const [siteUrl, setSiteUrl] = useState("");
-  const [category, setCategory] = useState("");
-  const [metro, setMetro] = useState("");
-  const [radiusMiles, setRadiusMiles] = useState("25");
-
-  const normalizedPreviewDomain = useMemo(
-    () => formatDomain(siteUrl),
-    [siteUrl]
-  );
+  const [name, setName] = useState("");
+  const [notes, setNotes] = useState("");
 
   const requireAuth = useCallback(async (): Promise<boolean> => {
     const { data } = await supabase.auth.getSession();
@@ -91,86 +33,44 @@ export default function ClientProjectsPage() {
     return true;
   }, [router]);
 
-  const loadClientPage = useCallback(async () => {
+  const loadClients = useCallback(async () => {
     setLoading(true);
     setStatus(null);
 
-    const { data: clientData, error: clientError } = await supabase
+    const { data, error } = await supabase
       .from("clients")
       .select("id, name, notes, created_at")
-      .eq("id", clientId)
-      .single();
-
-    if (clientError) {
-      setStatus(clientError.message);
-      setLoading(false);
-      return;
-    }
-
-    const { data: projectData, error: projectError } = await supabase
-      .from("projects")
-      .select("id, client_id, site_url, category, metro, radius_miles, created_at")
-      .eq("client_id", clientId)
       .order("created_at", { ascending: false });
 
-    if (projectError) {
-      setStatus(projectError.message);
+    if (error) {
+      setStatus(error.message);
       setLoading(false);
       return;
     }
 
-    setClient(clientData as ClientRow);
-    setProjects((projectData ?? []) as ProjectRow[]);
+    setClients((data ?? []) as ClientRow[]);
     setLoading(false);
-  }, [clientId]);
+  }, []);
 
-  async function startProjectOnboarding(e: React.FormEvent<HTMLFormElement>) {
+  async function createClient(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus(null);
     setSubmitting(true);
 
-    const normalizedSiteUrl = normalizeSiteUrl(siteUrl);
-    const normalizedCategory = category.trim();
-    const normalizedMetro = metro.trim();
-    const parsedRadius = Number(radiusMiles);
+    const normalizedName = name.trim();
+    const normalizedNotes = notes.trim();
 
-    if (!normalizedSiteUrl) {
-      setStatus("Website URL is required.");
+    if (!normalizedName) {
+      setStatus("Client name is required.");
       setSubmitting(false);
       return;
     }
-
-    if (!normalizedCategory) {
-      setStatus("Business category is required.");
-      setSubmitting(false);
-      return;
-    }
-
-    if (!normalizedMetro) {
-      setStatus("Target metro is required.");
-      setSubmitting(false);
-      return;
-    }
-
-    if (!Number.isFinite(parsedRadius) || parsedRadius <= 0) {
-      setStatus("Radius miles must be a valid number greater than 0.");
-      setSubmitting(false);
-      return;
-    }
-
-    const roundedRadius = Math.round(parsedRadius);
 
     const { data, error } = await supabase
-      .from("projects")
+      .from("clients")
       .insert({
-        client_id: clientId,
-        site_url: normalizedSiteUrl,
-        category: normalizedCategory,
-        metro: normalizedMetro,
-        radius_miles: roundedRadius,
-        primary_category: normalizedCategory,
-        target_metro: normalizedMetro,
-        target_radius_miles: roundedRadius,
+        name: normalizedName,
+        notes: normalizedNotes ? normalizedNotes : null,
       })
       .select("id")
       .single();
@@ -181,50 +81,11 @@ export default function ClientProjectsPage() {
       return;
     }
 
-    const onboardingResponse = await fetch(
-      `/api/projects/${data.id}/onboarding`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          seedKeywords: [
-            {
-              keyword: normalizedCategory,
-              metro: normalizedMetro,
-              priority: 1,
-              isActive: true,
-            },
-          ],
-        }),
-      }
-    );
-
-    if (!onboardingResponse.ok) {
-      let onboardingError = "Project created, but onboarding could not be started.";
-
-      try {
-        const payload = (await onboardingResponse.json()) as { error?: string };
-        if (payload.error) {
-          onboardingError = payload.error;
-        }
-      } catch {
-        // ignore JSON parsing issues
-      }
-
-      setStatus(onboardingError);
-      setSubmitting(false);
-      return;
-    }
-
-    setSiteUrl("");
-    setCategory("");
-    setMetro("");
-    setRadiusMiles("25");
+    setName("");
+    setNotes("");
     setSubmitting(false);
 
-    router.push(`/clients/${clientId}/projects/${data.id}`);
+    router.push(`/clients/${data.id}`);
   }
 
   useEffect(() => {
@@ -237,38 +98,28 @@ export default function ClientProjectsPage() {
         return;
       }
 
-      await loadClientPage();
+      await loadClients();
     })();
 
     return () => {
       isActive = false;
     };
-  }, [requireAuth, loadClientPage]);
+  }, [requireAuth, loadClients]);
 
   if (loading) {
-    return <div className="p-8">Loading client…</div>;
+    return <div className="p-8">Loading clients…</div>;
   }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={() => router.push("/clients")}
-          className="text-sm font-semibold underline underline-offset-4 opacity-80 hover:opacity-100"
-        >
-          ← Back to clients
-        </button>
-      </div>
-
-      <div className="mt-4">
-        <h1 className="text-2xl font-black tracking-tight md:text-3xl">
-          {client?.name ?? "Client"} — Projects
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-zinc-900 md:text-3xl">
+          Clients
         </h1>
-        {client?.notes ? (
-          <p className="mt-2 max-w-3xl text-sm text-zinc-700 md:text-base">
-            {client.notes}
-          </p>
-        ) : null}
+        <p className="mt-2 max-w-3xl text-sm text-zinc-700 md:text-base">
+          Create a client first, then use the client page to start URL-first
+          project onboarding and open project dashboards.
+        </p>
       </div>
 
       {status ? (
@@ -277,144 +128,90 @@ export default function ClientProjectsPage() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-black text-zinc-900">
-                Start intelligent onboarding
-              </h2>
-              <p className="mt-2 text-sm text-zinc-700">
-                Long-term goal: client enters the website URL and Digital Brain
-                intelligently infers the rest. This page now creates projects in
-                an automation-ready shape from day one.
-              </p>
-            </div>
-            <div className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-extrabold text-zinc-700">
-              URL-first
-            </div>
-          </div>
+          <h2 className="text-xl font-black text-zinc-900">Create client</h2>
+          <p className="mt-2 text-sm text-zinc-700">
+            Keep this step lightweight. The client page will handle project
+            onboarding and automation kickoff.
+          </p>
 
-          <form onSubmit={startProjectOnboarding} className="mt-5 grid gap-4">
+          <form onSubmit={createClient} className="mt-5 grid gap-4">
             <div className="grid gap-2">
               <label className="text-sm font-extrabold text-zinc-900">
-                Website URL
+                Client name
               </label>
               <input
-                value={siteUrl}
-                onChange={(e) => setSiteUrl(e.target.value)}
-                placeholder="example.com"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="JF Evans Lawn & Landscape"
                 className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
                 required
               />
-              <div className="text-xs text-zinc-600">
-                Domain preview:{" "}
-                <span className="font-extrabold text-zinc-900">
-                  {normalizedPreviewDomain}
-                </span>
-              </div>
             </div>
 
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-              <div className="text-sm font-extrabold text-zinc-900">
-                Minimum support inputs for now
-              </div>
-              <div className="mt-1 text-xs text-zinc-600">
-                These still exist for the transition period, but they now feed
-                both UI fields and automation-facing fields.
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <label className="text-sm font-extrabold text-zinc-900">
-                    Business category
-                  </label>
-                  <input
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    placeholder="Landscaper"
-                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label className="text-sm font-extrabold text-zinc-900">
-                    Target metro
-                  </label>
-                  <input
-                    value={metro}
-                    onChange={(e) => setMetro(e.target.value)}
-                    placeholder="Council Bluffs, IA"
-                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-2 md:max-w-[220px]">
-                  <label className="text-sm font-extrabold text-zinc-900">
-                    Radius miles
-                  </label>
-                  <input
-                    value={radiusMiles}
-                    onChange={(e) => setRadiusMiles(e.target.value)}
-                    placeholder="25"
-                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
-                    required
-                  />
-                </div>
-              </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-extrabold text-zinc-900">
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes about this client, market, or engagement."
+                className="min-h-[120px] rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
+              />
             </div>
 
             <button
               disabled={submitting}
               className="w-fit rounded-2xl border border-zinc-900 px-5 py-3 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Creating project…" : "Create project and continue →"}
+              {submitting ? "Creating client…" : "Create client →"}
             </button>
           </form>
         </section>
 
         <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-zinc-900">What happens next</h2>
+
           <div className="mt-4 grid gap-3">
             <div className="rounded-2xl border border-zinc-200 p-4">
               <div className="text-sm font-extrabold text-zinc-900">
-                1) Create project shell
+                1) Open client workspace
               </div>
               <div className="mt-1 text-xs text-zinc-600">
-                Store both user-facing project fields and automation-facing market
-                identity fields.
+                Each client gets its own project list and onboarding entry
+                surface at <span className="font-bold">/clients/[clientId]</span>.
               </div>
             </div>
 
             <div className="rounded-2xl border border-zinc-200 p-4">
               <div className="text-sm font-extrabold text-zinc-900">
-                2) Start onboarding automatically
+                2) Start URL-first project onboarding
               </div>
               <div className="mt-1 text-xs text-zinc-600">
-                Seed the first keyword and launch the onboarding job through a
-                thin API route.
+                Enter the website URL plus transitional support inputs while the
+                identity layer becomes smarter.
               </div>
             </div>
 
             <div className="rounded-2xl border border-zinc-200 p-4">
               <div className="text-sm font-extrabold text-zinc-900">
-                3) Automation can actually run now
+                3) Kick off automation immediately
               </div>
               <div className="mt-1 text-xs text-zinc-600">
-                Competitor discovery can use the newly stored category and metro
-                fields immediately.
+                Onboarding seeds keywords, enriches identity, and can launch
+                competitor discovery from day one.
               </div>
             </div>
 
             <div className="rounded-2xl border border-zinc-200 p-4">
               <div className="text-sm font-extrabold text-zinc-900">
-                4) Land in dashboard
+                4) Land in project dashboard
               </div>
               <div className="mt-1 text-xs text-zinc-600">
-                User reaches the project dashboard immediately instead of an
-                empty manual setup screen.
+                The user moves directly into the project dashboard instead of a
+                dead-end setup flow.
               </div>
             </div>
           </div>
@@ -423,49 +220,36 @@ export default function ClientProjectsPage() {
 
       <div className="mt-8">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-black text-zinc-900">Existing projects</h2>
+          <h2 className="text-xl font-black text-zinc-900">Existing clients</h2>
           <div className="text-sm text-zinc-600">
-            {projects.length} project{projects.length === 1 ? "" : "s"}
+            {clients.length} client{clients.length === 1 ? "" : "s"}
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {clients.length === 0 ? (
           <div className="mt-4 rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-700">
-            No projects yet. Start with the website URL above.
+            No clients yet. Create one above to begin.
           </div>
         ) : (
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
+            {clients.map((client) => (
               <div
-                key={project.id}
+                key={client.id}
                 className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm"
               >
                 <div className="text-lg font-black text-zinc-900">
-                  {formatDomain(project.site_url)}
+                  {client.name}
                 </div>
 
-                <div className="mt-3 space-y-1 text-sm text-zinc-700">
-                  <div>
-                    <span className="font-extrabold text-zinc-900">Category:</span>{" "}
-                    {project.category}
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-zinc-900">Metro:</span>{" "}
-                    {project.metro}
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-zinc-900">Radius:</span>{" "}
-                    {project.radius_miles} mi
-                  </div>
+                <div className="mt-3 text-sm text-zinc-700">
+                  {client.notes?.trim() ? client.notes : "No notes yet."}
                 </div>
 
                 <button
-                  onClick={() =>
-                    router.push(`/clients/${clientId}/projects/${project.id}`)
-                  }
+                  onClick={() => router.push(`/clients/${client.id}`)}
                   className="mt-4 rounded-2xl border border-zinc-900 px-4 py-2 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50"
                 >
-                  Open dashboard →
+                  Open client →
                 </button>
               </div>
             ))}

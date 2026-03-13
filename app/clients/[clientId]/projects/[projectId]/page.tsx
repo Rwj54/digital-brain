@@ -116,6 +116,12 @@ export default function ProjectDashboard() {
 
           {dashboard.tab === "settings" && (
             <SettingsTab
+              siteUrl={dashboard.project?.site_url ?? null}
+              projectCategory={dashboard.project?.category ?? null}
+              projectMetro={dashboard.project?.metro ?? null}
+              projectRadiusMiles={dashboard.project?.radius_miles ?? null}
+              targetDomain={dashboard.project?.target_domain ?? null}
+              targetBrandName={dashboard.project?.target_brand_name ?? null}
               labelPlural={dashboard.labelPlural}
               preset={dashboard.preset}
               presetOptions={dashboard.presetOptions}

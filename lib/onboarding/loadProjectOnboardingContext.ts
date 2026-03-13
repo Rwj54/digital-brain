@@ -2,8 +2,18 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export type ProjectOnboardingRow = {
   id: string;
+  site_url: string | null;
+  category: string | null;
+  metro: string | null;
+  radius_miles: number | null;
+  primary_category: string | null;
+  target_metro: string | null;
+  target_radius_miles: number | null;
+  target_domain: string | null;
+  target_brand_name: string | null;
   rank_lat: number | null;
   rank_lng: number | null;
+  maps_location_code: number | null;
 };
 
 export type ProjectOnboardingKeywordRow = {
@@ -21,12 +31,72 @@ export type ProjectOnboardingContext = {
   activeKeywords: ProjectOnboardingKeywordRow[];
 };
 
+function isProjectOnboardingRow(value: unknown): value is ProjectOnboardingRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return (
+    typeof row.id === "string" &&
+    "site_url" in row &&
+    "category" in row &&
+    "metro" in row &&
+    "radius_miles" in row &&
+    "primary_category" in row &&
+    "target_metro" in row &&
+    "target_radius_miles" in row &&
+    "target_domain" in row &&
+    "target_brand_name" in row &&
+    "rank_lat" in row &&
+    "rank_lng" in row &&
+    "maps_location_code" in row
+  );
+}
+
+function isProjectOnboardingKeywordRow(
+  value: unknown
+): value is ProjectOnboardingKeywordRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return (
+    typeof row.id === "string" &&
+    typeof row.project_id === "string" &&
+    typeof row.keyword === "string" &&
+    typeof row.metro === "string" &&
+    typeof row.is_active === "boolean" &&
+    typeof row.priority === "number" &&
+    typeof row.created_at === "string"
+  );
+}
+
 async function loadProject(projectId: string): Promise<ProjectOnboardingRow> {
   const supabase = supabaseAdmin();
 
   const { data, error } = await supabase
     .from("projects")
-    .select("id, rank_lat, rank_lng")
+    .select(
+      [
+        "id",
+        "site_url",
+        "category",
+        "metro",
+        "radius_miles",
+        "primary_category",
+        "target_metro",
+        "target_radius_miles",
+        "target_domain",
+        "target_brand_name",
+        "rank_lat",
+        "rank_lng",
+        "maps_location_code",
+      ].join(", ")
+    )
     .eq("id", projectId)
     .maybeSingle();
 
@@ -38,7 +108,11 @@ async function loadProject(projectId: string): Promise<ProjectOnboardingRow> {
     throw new Error("Project not found.");
   }
 
-  return data as ProjectOnboardingRow;
+  if (!isProjectOnboardingRow(data)) {
+    throw new Error("Project row shape is invalid for onboarding context.");
+  }
+
+  return data;
 }
 
 async function loadActiveKeywords(
@@ -58,7 +132,21 @@ async function loadActiveKeywords(
     throw new Error(`Failed to load project rank keywords: ${error.message}`);
   }
 
-  return (data ?? []) as ProjectOnboardingKeywordRow[];
+  const rows = data ?? [];
+
+  if (!Array.isArray(rows)) {
+    throw new Error("Project rank keyword rows returned in an invalid format.");
+  }
+
+  const validRows = rows.filter(isProjectOnboardingKeywordRow);
+
+  if (validRows.length !== rows.length) {
+    throw new Error(
+      "One or more project rank keyword rows had an invalid shape."
+    );
+  }
+
+  return validRows;
 }
 
 export async function loadProjectOnboardingContext(
