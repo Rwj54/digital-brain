@@ -5,13 +5,36 @@ import { computeAuthority } from "@/lib/authority/authorityEngine";
 import { detectCompetitorPressure } from "@/lib/domain/rank/detectCompetitorPressure";
 import { buildPressureActions } from "@/lib/domain/rank/buildPressureActions";
 
-type AnyRow = Record<string, any>;
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
+type AnyRow = Record<string, unknown>;
+
+type AuthorityScoreRow = {
+  authority_score?: number | string | null;
+  inputs?: {
+    gap?: number | string | null;
+  } | null;
+  captured_at?: string | null;
+};
+
+type RankKeywordRow = {
+  keyword?: string | null;
+  metro?: string | null;
+};
 
 function num(row: AnyRow | null | undefined, key: string, fallback = 0): number {
   if (!row) return fallback;
-  const v = row[key];
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  const value = row[key];
+
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+
   return fallback;
 }
 
@@ -26,23 +49,25 @@ function percentileRank(values: number[], yourValue: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   let countBelowOrEqual = 0;
-  for (const v of sorted) if (v <= yourValue) countBelowOrEqual++;
+  for (const value of sorted) {
+    if (value <= yourValue) countBelowOrEqual++;
+  }
   return countBelowOrEqual / sorted.length;
 }
 
 function normalize01(x: number, softCap: number): number {
-  const v = Math.max(0, x);
-  return v / (v + Math.max(1, softCap));
+  const value = Math.max(0, x);
+  return value / (value + Math.max(1, softCap));
 }
 
 function todayDateUTC(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date().toISOString().slice(0, 10);
 }
 
 function yesterdayDateUTC(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -53,25 +78,36 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-type MomentumOut = { score: number; label: string; components: Record<string, number> };
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
+}
+
+type MomentumOut = {
+  score: number;
+  label: string;
+  components: Record<string, number>;
+};
 
 function computeMomentum(args: {
   authorityToday: number;
   authorityYesterday: number | null;
-
   gapToday: number;
   gapYesterday: number | null;
-
   posts30d: number;
   photosCount: number;
   qaCount: number;
-
   marketMedianReviews: number;
 }): MomentumOut {
-  const authorityDelta = args.authorityYesterday == null ? 0 : args.authorityToday - args.authorityYesterday;
+  const authorityDelta =
+    args.authorityYesterday == null ? 0 : args.authorityToday - args.authorityYesterday;
 
   const gapShrink =
-    args.gapYesterday == null ? 0 : clamp((args.gapYesterday - args.gapToday) / Math.max(10, args.gapYesterday), -1, 1);
+    args.gapYesterday == null
+      ? 0
+      : clamp((args.gapYesterday - args.gapToday) / Math.max(10, args.gapYesterday), -1, 1);
 
   const execPosts = clamp(args.posts30d / 12, 0, 1);
   const execPhotos = clamp(args.photosCount / 200, 0, 1);
@@ -122,19 +158,17 @@ async function replaceProjectActions(params: {
 }) {
   const { supabase, projectId, capturedAt, version, actions } = params;
 
-  const { error } = await supabase
-    .from("project_actions")
-    .upsert(
-      [
-        {
-          project_id: projectId,
-          captured_at: capturedAt,
-          version,
-          actions_json: actions,
-        },
-      ],
-      { onConflict: "project_id,captured_at,version" }
-    );
+  const { error } = await supabase.from("project_actions").upsert(
+    [
+      {
+        project_id: projectId,
+        captured_at: capturedAt,
+        version,
+        actions_json: actions,
+      },
+    ],
+    { onConflict: "project_id,captured_at,version" }
+  );
 
   if (error) {
     throw new Error(`project_actions upsert error: ${error.message}`);
@@ -264,13 +298,13 @@ function buildAuthorityActions(args: {
   return actions;
 }
 
-function validateAuthorityOutput(computed: AnyRow) {
+function validateAuthorityOutput(computed: Record<string, unknown>) {
   return (
-    isFiniteNumber(computed?.authorityScore) &&
-    typeof computed?.authorityTier === "string" &&
+    isFiniteNumber(computed.authorityScore) &&
+    typeof computed.authorityTier === "string" &&
     computed.authorityTier.trim() !== "" &&
-    isFiniteNumber(computed?.competitiveStrength) &&
-    isFiniteNumber(computed?.structuralOptimization)
+    isFiniteNumber(computed.competitiveStrength) &&
+    isFiniteNumber(computed.structuralOptimization)
   );
 }
 
@@ -302,15 +336,21 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
     .select("id, client_id")
     .order("id", { ascending: true });
 
-  if (projectsError) throw new Error(`Failed to load projects: ${projectsError.message}`);
+  if (projectsError) {
+    throw new Error(`Failed to load projects: ${projectsError.message}`);
+  }
 
-  result.projects_total = projects?.length ?? 0;
-  if (!projects || projects.length === 0) return result;
+  const projectRows = (projects ?? []) as Array<{ id: string; client_id?: string | null }>;
+  result.projects_total = projectRows.length;
+
+  if (projectRows.length === 0) {
+    return result;
+  }
 
   const yesterday = yesterdayDateUTC();
 
-  for (const project of projects as AnyRow[]) {
-    const projectId = project.id as string;
+  for (const project of projectRows) {
+    const projectId = project.id;
 
     try {
       const { data: profile, error: profileError } = await supabase
@@ -320,7 +360,10 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         .maybeSingle();
 
       if (profileError) {
-        result.errors.push({ project_id: projectId, message: `gbp_profiles error: ${profileError.message}` });
+        result.errors.push({
+          project_id: projectId,
+          message: `gbp_profiles error: ${profileError.message}`,
+        });
         result.projects_skipped++;
         continue;
       }
@@ -330,10 +373,11 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         continue;
       }
 
-      const yourReviews = num(profile, "total_reviews", 0);
-      const posts30d = num(profile, "posts_30d", 0);
-      const photosCount = num(profile, "photos_count", 0);
-      const qaCount = num(profile, "qa_count", 0);
+      const profileRow = profile as AnyRow;
+      const yourReviews = num(profileRow, "total_reviews", 0);
+      const posts30d = num(profileRow, "posts_30d", 0);
+      const photosCount = num(profileRow, "photos_count", 0);
+      const qaCount = num(profileRow, "qa_count", 0);
 
       const { data: metrics, error: metricsError } = await supabase
         .from("gbp_competitor_metrics")
@@ -341,20 +385,23 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         .eq("project_id", projectId);
 
       if (metricsError) {
-        result.errors.push({ project_id: projectId, message: `gbp_competitor_metrics error: ${metricsError.message}` });
+        result.errors.push({
+          project_id: projectId,
+          message: `gbp_competitor_metrics error: ${metricsError.message}`,
+        });
         result.projects_skipped++;
         continue;
       }
 
       const metricsRows = (metrics ?? []) as AnyRow[];
-      const competitorReviews = metricsRows.map((r) => num(r, "total_reviews", 0));
+      const competitorReviews = metricsRows.map((row) => num(row, "total_reviews", 0));
 
       const sortedByReviewsDesc = [...metricsRows].sort(
         (a, b) => num(b, "total_reviews", 0) - num(a, "total_reviews", 0)
       );
       const top3 = sortedByReviewsDesc.slice(0, 3);
 
-      const top3MedianReviews = median(top3.map((r) => num(r, "total_reviews", 0)));
+      const top3MedianReviews = median(top3.map((row) => num(row, "total_reviews", 0)));
       const marketMedianReviews = median(competitorReviews);
 
       const dist = [...competitorReviews, yourReviews];
@@ -371,45 +418,45 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
       const marketVelocityCeilingScore = 0;
       const marketDensityScore = normalize01(densityScore, 0.7);
 
-      const hasPrimaryCategory = !!profile["primary_category"];
-      const additionalCategoryCount = Array.isArray(profile["additional_categories"])
-        ? (profile["additional_categories"] as any[]).length
+      const hasPrimaryCategory = Boolean(profileRow["primary_category"]);
+      const additionalCategories = profileRow["additional_categories"];
+      const additionalCategoryCount = Array.isArray(additionalCategories)
+        ? additionalCategories.length
         : 0;
 
-      const hasDescription = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.description;
-      const hasHours = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.hours;
-      const hasPhone = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.phone;
-      const hasWebsite = typeof profile["raw_provider"] === "object" && !!profile["raw_provider"]?.website;
+      const rawProvider =
+        typeof profileRow["raw_provider"] === "object" && profileRow["raw_provider"] !== null
+          ? (profileRow["raw_provider"] as Record<string, unknown>)
+          : null;
+
+      const hasDescription = Boolean(rawProvider?.description);
+      const hasHours = Boolean(rawProvider?.hours);
+      const hasPhone = Boolean(rawProvider?.phone);
+      const hasWebsite = Boolean(rawProvider?.website);
 
       const computed = computeAuthority({
         yourReviews,
         top3MedianReviews,
-
         yourVelocity90: 0,
         top3MedianVelocity90: 0,
-
         percentileRank: pRank,
-
         marketDensityScore,
         marketReviewCeilingScore,
         marketVelocityCeilingScore,
-
         hasPrimaryCategory,
         additionalCategoryCount,
         hasDescription,
         hasHours,
         hasPhone,
         hasWebsite,
-
         reviewResponseRate: undefined,
-
         yourVelocity14: 0,
         yourVelocity30: 0,
         gapChange90: 0,
         marketAcceleration: 0,
       });
 
-      if (!validateAuthorityOutput(computed)) {
+      if (!validateAuthorityOutput(computed as unknown as Record<string, unknown>)) {
         result.errors.push({
           project_id: projectId,
           message: "Authority engine returned invalid output for this project.",
@@ -426,11 +473,14 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         .eq("version", version)
         .maybeSingle();
 
-      const authorityYesterday = yRow ? Number(yRow.authority_score) : null;
+      const previousRow = (yRow ?? null) as AuthorityScoreRow | null;
+      const authorityYesterday =
+        previousRow?.authority_score == null ? null : Number(previousRow.authority_score);
       const gapToday = Math.max(0, top3MedianReviews - yourReviews);
-      const gapYesterday = yRow?.inputs?.gap != null ? Number(yRow.inputs.gap) : null;
+      const gapYesterday =
+        previousRow?.inputs?.gap != null ? Number(previousRow.inputs.gap) : null;
 
-      const m = computeMomentum({
+      const momentum = computeMomentum({
         authorityToday: computed.authorityScore,
         authorityYesterday,
         gapToday,
@@ -441,53 +491,50 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
         marketMedianReviews,
       });
 
-      const inputs = {
+      const inputs: JsonObject = {
         your_reviews: yourReviews,
         top3_median_reviews: top3MedianReviews,
         gap: gapToday,
         percentile_rank: pRank,
-
         competitor_count: competitorCount,
         market_median_reviews: marketMedianReviews,
         review_ceiling_p90: reviewCeiling,
-
         market_density_score: marketDensityScore,
         market_review_ceiling_score: marketReviewCeilingScore,
-
         gbp_activity: {
           posts_30d: posts30d,
           photos_count: photosCount,
           qa_count: qaCount,
         },
-
         momentum: {
-          components: m.components,
+          components: momentum.components,
           note: "v1.1 momentum uses authority delta (if available), gap shrink proxy, and GBP activity signals.",
         },
       };
 
-      const { error: upsertError } = await supabase
-        .from("project_authority_scores")
-        .upsert(
-          [
-            {
-              project_id: projectId,
-              captured_at,
-              version,
-              authority_score: computed.authorityScore,
-              authority_tier: computed.authorityTier,
-              competitive_strength: computed.competitiveStrength,
-              structural_optimization: computed.structuralOptimization,
-              momentum_score: m.score,
-              momentum_label: m.label,
-              inputs,
-            },
-          ],
-          { onConflict: "project_id,captured_at,version" }
-        );
+      const { error: upsertError } = await supabase.from("project_authority_scores").upsert(
+        [
+          {
+            project_id: projectId,
+            captured_at,
+            version,
+            authority_score: computed.authorityScore,
+            authority_tier: computed.authorityTier,
+            competitive_strength: computed.competitiveStrength,
+            structural_optimization: computed.structuralOptimization,
+            momentum_score: momentum.score,
+            momentum_label: momentum.label,
+            inputs,
+          },
+        ],
+        { onConflict: "project_id,captured_at,version" }
+      );
 
       if (upsertError) {
-        result.errors.push({ project_id: projectId, message: `upsert error: ${upsertError.message}` });
+        result.errors.push({
+          project_id: projectId,
+          message: `upsert error: ${upsertError.message}`,
+        });
         result.projects_skipped++;
         continue;
       }
@@ -522,13 +569,13 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
           message: `project_rank_keywords error: ${rankKeywordsError.message}`,
         });
       } else {
-        for (const row of (rankKeywords ?? []) as AnyRow[]) {
+        const keywordRows = (rankKeywords ?? []) as RankKeywordRow[];
+
+        for (const row of keywordRows) {
           const keyword = typeof row.keyword === "string" ? row.keyword : "";
           const metro = typeof row.metro === "string" ? row.metro : "";
 
-          if (!keyword || !metro) {
-            continue;
-          }
+          if (!keyword || !metro) continue;
 
           try {
             const pressure = await detectCompetitorPressure({
@@ -545,12 +592,13 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
                 detail: `${action.detail} Keyword: ${keyword}. Metro: ${metro}.`,
               });
             }
-          } catch (pressureError: any) {
+          } catch (pressureError: unknown) {
             result.errors.push({
               project_id: projectId,
-              message: pressureError?.message
-                ? `pressure action error (${keyword}): ${String(pressureError.message)}`
-                : `pressure action error (${keyword}): Unknown error`,
+              message: `pressure action error (${keyword}): ${getErrorMessage(
+                pressureError,
+                "Unknown error"
+              )}`,
             });
           }
         }
@@ -566,20 +614,18 @@ export async function runNightlyAuthorityScorer(): Promise<NightlyAuthorityRunRe
           version,
           actions: mergedActions,
         });
-      } catch (actionStoreError: any) {
+      } catch (actionStoreError: unknown) {
         result.errors.push({
           project_id: projectId,
-          message: actionStoreError?.message
-            ? String(actionStoreError.message)
-            : "Unknown project_actions error",
+          message: getErrorMessage(actionStoreError, "Unknown project_actions error"),
         });
       }
 
       result.projects_scored++;
-    } catch (e: any) {
+    } catch (error: unknown) {
       result.errors.push({
         project_id: projectId,
-        message: e?.message ? String(e.message) : "Unknown scorer error",
+        message: getErrorMessage(error, "Unknown scorer error"),
       });
       result.projects_skipped++;
     }

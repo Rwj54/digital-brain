@@ -9,17 +9,32 @@ import { discoverMapsCompetitorsForProject } from "@/lib/competitors/discoverCom
 
 export const runtime = "nodejs";
 
+type ProjectRow = {
+  id: string;
+};
+
 function isAuthorized(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // allow local testing if not set
+  if (!secret) return true;
   const auth = req.headers.get("authorization") || "";
   return auth === `Bearer ${secret}`;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Unknown error";
 }
 
 export async function POST(req: Request) {
   try {
     if (!isAuthorized(req)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const supabase = supabaseServer();
@@ -30,14 +45,19 @@ export async function POST(req: Request) {
       .eq("auto_discover_competitors_enabled", true);
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      );
     }
 
     let successCount = 0;
     let failCount = 0;
 
-    for (const p of projects ?? []) {
-      const projectId = p.id as string;
+    const projectRows = (projects ?? []) as ProjectRow[];
+
+    for (const project of projectRows) {
+      const projectId = project.id;
 
       const job = await createProjectJob({
         projectId,
@@ -61,13 +81,17 @@ export async function POST(req: Request) {
         });
 
         successCount += 1;
-      } catch (e: any) {
-        const msg = e?.message ?? "Unknown error";
-        console.error("[nightly-maps-discovery] project failed:", projectId, e);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        console.error(
+          "[nightly-maps-discovery] project failed:",
+          projectId,
+          error
+        );
 
         await finishProjectJobFailed({
           jobId: job.jobId,
-          errorMessage: msg,
+          errorMessage: message,
           resultSummary: { projectId },
         });
 
@@ -77,14 +101,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      projectsProcessed: projects?.length ?? 0,
+      projectsProcessed: projectRows.length,
       successCount,
       failCount,
     });
-  } catch (e: any) {
-    console.error("[nightly-maps-discovery] route crash:", e);
+  } catch (error: unknown) {
+    console.error("[nightly-maps-discovery] route crash:", error);
+
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

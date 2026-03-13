@@ -30,12 +30,22 @@ function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Unknown error";
+}
+
 export async function getAuthorityHistory(input: {
   projectId: string;
   limit?: number;
 }): Promise<GetAuthorityHistoryResult> {
   try {
-    const projectId = typeof input.projectId === "string" ? input.projectId.trim() : "";
+    const projectId =
+      typeof input.projectId === "string" ? input.projectId.trim() : "";
+
     if (!projectId) {
       return { ok: false, error: "Missing projectId", status: 400 };
     }
@@ -43,7 +53,6 @@ export async function getAuthorityHistory(input: {
     const limitRaw = typeof input.limit === "number" ? input.limit : 30;
     const limit = clampInt(Number.isFinite(limitRaw) ? limitRaw : 30, 1, 365);
 
-    // NOTE: In this codebase, supabaseAdmin is a factory function.
     const admin = supabaseAdmin();
 
     const { data, error } = await admin
@@ -70,10 +79,10 @@ export async function getAuthorityHistory(input: {
       limit,
       rows: (data ?? []) as AuthorityHistoryRow[],
     };
-  } catch (e: any) {
+  } catch (error: unknown) {
     return {
       ok: false,
-      error: e?.message ?? "Unknown error",
+      error: getErrorMessage(error),
       status: 500,
     };
   }

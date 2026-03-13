@@ -4,48 +4,75 @@ import { normalizeDataForSeoMapsItems } from "./normalize";
 import { upsertCompetitorsIntoGbpCompetitorMetrics } from "./persist";
 import type { DiscoverCompetitorsResult } from "./types";
 
+type ProjectSettingsRow = {
+  primary_category: string | null;
+  target_metro: string | null;
+  maps_location_code: number | null;
+};
+
+type MapsLiveAdvancedResult = {
+  items: Array<{
+    title?: string;
+    domain?: string | null;
+    place_id?: string;
+    rating?: { value?: number; votes_count?: number } | null;
+  }>;
+  cost: number;
+  checkUrl: string | null;
+  raw?: Record<string, unknown>;
+  locationCode?: number;
+};
+
 export async function discoverMapsCompetitorsForProject(args: {
   projectId: string;
   includeRawProvider?: boolean;
 }): Promise<DiscoverCompetitorsResult> {
   const supabase = supabaseServer();
 
-  // Load full project row (keeps this resilient to schema changes)
   const { data: project, error } = await supabase
     .from("projects")
     .select("*")
     .eq("id", args.projectId)
     .single();
 
-  if (error) throw new Error(`Failed to load project settings: ${error.message}`);
+  if (error) {
+    throw new Error(`Failed to load project settings: ${error.message}`);
+  }
 
-  const category = String(project?.primary_category ?? "").trim();
-  const metro = String(project?.target_metro ?? "").trim();
+  const typedProject = project as ProjectSettingsRow;
+  const category = String(typedProject.primary_category ?? "").trim();
+  const metro = String(typedProject.target_metro ?? "").trim();
 
-  if (!category) throw new Error("Project is missing primary_category (example: 'landscaper')");
-  if (!metro) throw new Error('Project is missing target_metro (example: "Council Bluffs, IA")');
+  if (!category) {
+    throw new Error(
+      "Project is missing primary_category (example: 'landscaper')"
+    );
+  }
+
+  if (!metro) {
+    throw new Error(
+      'Project is missing target_metro (example: "Council Bluffs, IA")'
+    );
+  }
 
   const keyword = `${category} ${metro}`.trim();
-
   const nowIso = new Date().toISOString();
 
-  // IMPORTANT: If maps_location_code exists, use it and avoid the Locations API call.
-  // If missing, the provider will resolve and cache internally, and we’ll persist it below.
   const existingLocationCode =
-    typeof project?.maps_location_code === "number" ? project.maps_location_code : null;
+    typeof typedProject.maps_location_code === "number"
+      ? typedProject.maps_location_code
+      : null;
 
-  const live = await dataForSeoMapsLiveAdvanced({
+  const live = (await dataForSeoMapsLiveAdvanced({
     keyword,
     locationName: metro,
     depth: 20,
     device: "desktop",
-    // new optional param supported by provider (we’ll add next step if missing)
     locationCode: existingLocationCode ?? undefined,
-  } as any);
+  })) as MapsLiveAdvancedResult;
 
-  // Persist resolved location code once (if we didn’t have it before)
-  if (!existingLocationCode && typeof (live as any)?.locationCode === "number") {
-    const resolved = (live as any).locationCode as number;
+  if (!existingLocationCode && typeof live.locationCode === "number") {
+    const resolved = live.locationCode;
 
     const { error: updateErr } = await supabase
       .from("projects")
@@ -53,7 +80,6 @@ export async function discoverMapsCompetitorsForProject(args: {
       .eq("id", args.projectId);
 
     if (updateErr) {
-      // Non-fatal: discovery succeeded; we just couldn’t save the code
       console.warn(
         "[discoverMapsCompetitorsForProject] Could not save maps_location_code:",
         updateErr.message

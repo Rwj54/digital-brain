@@ -7,9 +7,11 @@ import AuthoritySummaryCard from "@/components/authority/AuthoritySummaryCard";
 import ProjectInsightsNav from "@/components/projects/ProjectInsightsNav";
 import AuthorityTrendCard from "@/components/authority/AuthorityTrendCard";
 
+type AuthorityInputs = Record<string, unknown>;
+
 type AuthorityRow = {
   project_id: string;
-  captured_at: string; // date
+  captured_at: string;
   version: string;
   authority_score: number;
   authority_tier: string;
@@ -17,7 +19,7 @@ type AuthorityRow = {
   structural_optimization: number;
   momentum_score: number;
   momentum_label: string;
-  inputs: any;
+  inputs: AuthorityInputs;
   created_at: string;
 };
 
@@ -28,26 +30,28 @@ type ActionItem = {
   category: "reviews" | "photos" | "posts" | "categories" | "citations" | "general";
 };
 
-type ActionsResponse =
-  | {
-      ok: true;
-      projectId: string;
-      capturedAt: string | null;
-      version: string;
-      actions: ActionItem[];
-      authorityScore?: number | null;
-      authorityTier?: string | null;
-      momentumScore?: number | null;
-      momentumLabel?: string | null;
-      profile?: any;
-      market?: any;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
+type ActionsSuccessResponse = {
+  ok: true;
+  projectId: string;
+  capturedAt: string | null;
+  version: string;
+  actions: ActionItem[];
+  authorityScore?: number | null;
+  authorityTier?: string | null;
+  momentumScore?: number | null;
+  momentumLabel?: string | null;
+  profile?: Record<string, unknown>;
+  market?: Record<string, unknown>;
+};
 
-function formatJson(value: any) {
+type ActionsErrorResponse = {
+  ok: false;
+  error: string;
+};
+
+type ActionsResponse = ActionsSuccessResponse | ActionsErrorResponse;
+
+function formatJson(value: unknown) {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -63,6 +67,13 @@ function priorityClasses(priority: ActionItem["priority"]) {
     return "border-amber-200 bg-amber-50 text-amber-700";
   }
   return "border-gray-200 bg-gray-50 text-gray-700";
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
 }
 
 export default function ProjectAuthorityPage() {
@@ -99,7 +110,10 @@ export default function ProjectAuthorityPage() {
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(error.message);
+    }
+
     const first = Array.isArray(data) && data.length > 0 ? (data[0] as AuthorityRow) : null;
     setRow(first);
   }
@@ -111,10 +125,10 @@ export default function ProjectAuthorityPage() {
       cache: "no-store",
     });
 
-    const json = (await res.json()) as ActionsResponse;
+    const json: ActionsResponse = await res.json();
 
-    if (!res.ok || !json || json.ok !== true) {
-      throw new Error((json as any)?.error ?? "Failed to load actions");
+    if (!res.ok || !json.ok) {
+      throw new Error(json.ok ? "Failed to load actions" : json.error);
     }
 
     setActions(Array.isArray(json.actions) ? json.actions : []);
@@ -123,7 +137,7 @@ export default function ProjectAuthorityPage() {
   }
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       setLoading(true);
       setStatus(null);
 
@@ -138,8 +152,8 @@ export default function ProjectAuthorityPage() {
       try {
         await loadLatestAuthority();
         await loadActions();
-      } catch (e: any) {
-        setStatus(e?.message ?? "Failed to load authority");
+      } catch (error: unknown) {
+        setStatus(getErrorMessage(error, "Failed to load authority"));
       } finally {
         setLoading(false);
       }
@@ -147,19 +161,21 @@ export default function ProjectAuthorityPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  if (loading) return <div className="p-4 text-sm text-gray-500">Loading…</div>;
+  if (loading) {
+    return <div className="p-4 text-sm text-gray-500">Loading…</div>;
+  }
 
   return (
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-start justify-between gap-3">
+        <div className="mx-auto flex max-w-7xl items-start justify-between gap-3 px-4 py-3 md:px-6">
           <div className="min-w-0">
             <div className="text-xs text-gray-500">Digital Brain</div>
-            <h1 className="text-lg md:text-xl font-semibold truncate">Authority</h1>
-            <div className="text-xs text-gray-500 mt-0.5 truncate">Project: {projectId}</div>
+            <h1 className="truncate text-lg font-semibold md:text-xl">Authority</h1>
+            <div className="mt-0.5 truncate text-xs text-gray-500">Project: {projectId}</div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <ProjectInsightsNav projectId={projectId} />
 
             <button
@@ -169,11 +185,11 @@ export default function ProjectAuthorityPage() {
                   await loadLatestAuthority();
                   await loadActions();
                   setStatus(null);
-                } catch (e: any) {
-                  setStatus(e?.message ?? "Refresh failed");
+                } catch (error: unknown) {
+                  setStatus(getErrorMessage(error, "Refresh failed"));
                 }
               }}
-              className="rounded-lg px-4 py-2 text-sm font-medium bg-black text-white disabled:opacity-60"
+              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               type="button"
               disabled={!authed}
             >
@@ -184,14 +200,14 @@ export default function ProjectAuthorityPage() {
       </div>
 
       {status ? (
-        <div className="mx-auto max-w-7xl px-4 md:px-6 mt-3">
+        <div className="mx-auto mt-3 max-w-7xl px-4 md:px-6">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
             {status}
           </div>
         </div>
       ) : null}
 
-      <div className="mx-auto max-w-7xl px-4 md:px-6 mt-4 pb-10 space-y-4">
+      <div className="mx-auto mt-4 max-w-7xl space-y-4 px-4 pb-10 md:px-6">
         <AuthoritySummaryCard projectId={projectId} />
 
         <AuthorityTrendCard projectId={projectId} />
@@ -200,7 +216,7 @@ export default function ProjectAuthorityPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Recommended next actions</div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="mt-1 text-xs text-gray-500">
                 Action Engine v0 recommendations based on the latest authority inputs.
               </div>
             </div>
@@ -246,7 +262,7 @@ export default function ProjectAuthorityPage() {
 
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="text-sm font-semibold">Authority details</div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="mt-1 text-xs text-gray-500">
             Read-only inspection for validating the nightly engine.
           </div>
 
@@ -256,35 +272,35 @@ export default function ProjectAuthorityPage() {
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Captured</div>
-                <div className="text-sm font-semibold mt-1">{row.captured_at}</div>
-                <div className="text-xs text-gray-500 mt-1">Version: {row.version}</div>
+                <div className="mt-1 text-sm font-semibold">{row.captured_at}</div>
+                <div className="mt-1 text-xs text-gray-500">Version: {row.version}</div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Tier</div>
-                <div className="text-sm font-semibold mt-1">{row.authority_tier}</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="mt-1 text-sm font-semibold">{row.authority_tier}</div>
+                <div className="mt-1 text-xs text-gray-500">
                   Score: {Number(row.authority_score).toFixed(1)}
                 </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Competitive Strength</div>
-                <div className="text-sm font-semibold mt-1">
+                <div className="mt-1 text-sm font-semibold">
                   {Number(row.competitive_strength).toFixed(1)}
                 </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Structural Optimization</div>
-                <div className="text-sm font-semibold mt-1">
+                <div className="mt-1 text-sm font-semibold">
                   {Number(row.structural_optimization).toFixed(1)}
                 </div>
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:col-span-2">
                 <div className="text-xs text-gray-500">Inputs JSON</div>
-                <pre className="mt-2 max-h-[420px] overflow-auto rounded-lg bg-white border border-gray-200 p-3 text-[11px] text-gray-800">
+                <pre className="mt-2 max-h-[420px] overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-800">
                   {formatJson(row.inputs)}
                 </pre>
               </div>

@@ -7,6 +7,14 @@ function unauthorized() {
   return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Unknown error";
+}
+
 export async function POST(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -19,14 +27,16 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!token || token !== expected) return unauthorized();
+  if (!token || token !== expected) {
+    return unauthorized();
+  }
 
   try {
     const summary = await runNightlyAuthorityScorer();
     return NextResponse.json({ ok: true, summary }, { status: 200 });
-  } catch (e: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, error: e?.message ? String(e.message) : "Unknown error" },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

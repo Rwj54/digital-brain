@@ -8,14 +8,30 @@ import { discoverMapsCompetitorsForProject } from "@/lib/competitors/discoverCom
 
 export const runtime = "nodejs";
 
+type IngestCompetitorsRequestBody = {
+  projectId?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 /**
  * Legacy ingest route kept for compatibility.
  * POST body: { "projectId": "<uuid>" }
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : "";
+    const body = (await req
+      .json()
+      .catch(() => ({}))) as IngestCompetitorsRequestBody;
+
+    const projectId =
+      typeof body.projectId === "string" ? body.projectId.trim() : "";
 
     if (!projectId) {
       return NextResponse.json(
@@ -46,25 +62,26 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ ok: true, jobId: job.jobId, result });
-    } catch (inner: any) {
-      const msg = inner?.message ?? "Unknown discovery error";
-      console.error("[ingest/competitors] discovery error:", inner);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, "Unknown discovery error");
+      console.error("[ingest/competitors] discovery error:", error);
 
       await finishProjectJobFailed({
         jobId: job.jobId,
-        errorMessage: msg,
+        errorMessage: message,
         resultSummary: { projectId },
       });
 
       return NextResponse.json(
-        { ok: false, jobId: job.jobId, error: msg },
+        { ok: false, jobId: job.jobId, error: message },
         { status: 500 }
       );
     }
-  } catch (e: any) {
-    console.error("[ingest/competitors] route crash:", e);
+  } catch (error: unknown) {
+    console.error("[ingest/competitors] route crash:", error);
+
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
+      { ok: false, error: getErrorMessage(error, "Unknown error") },
       { status: 500 }
     );
   }

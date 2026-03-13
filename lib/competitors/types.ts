@@ -1,3 +1,9 @@
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 export type CompetitorCandidate = {
   projectId: string;
 
@@ -12,7 +18,7 @@ export type CompetitorCandidate = {
   source: "maps";
   lastSeenAt: string; // ISO timestamp
 
-  rawProvider?: any;
+  rawProvider?: JsonObject;
 };
 
 export type DiscoverCompetitorsResult = {

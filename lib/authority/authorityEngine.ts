@@ -13,6 +13,12 @@ export type MomentumLabel =
   | "Gaining"
   | "Surging";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 export interface AuthorityInputs {
   // Competitive inputs
   yourReviews: number;
@@ -54,7 +60,7 @@ export interface AuthorityResult {
   momentumScore: number;
   momentumLabel: MomentumLabel;
 
-  inputs: Record<string, any>;
+  inputs: JsonObject;
 }
 
 function clamp(min: number, max: number, value: number) {
@@ -82,6 +88,33 @@ function getMomentumLabel(score: number): MomentumLabel {
   return "Surging";
 }
 
+function toJsonObject(inputs: AuthorityInputs): JsonObject {
+  return {
+    yourReviews: inputs.yourReviews,
+    top3MedianReviews: inputs.top3MedianReviews,
+    yourVelocity90: inputs.yourVelocity90,
+    top3MedianVelocity90: inputs.top3MedianVelocity90,
+    percentileRank: inputs.percentileRank,
+    marketDensityScore: inputs.marketDensityScore,
+    marketReviewCeilingScore: inputs.marketReviewCeilingScore,
+    marketVelocityCeilingScore: inputs.marketVelocityCeilingScore,
+    hasPrimaryCategory: inputs.hasPrimaryCategory,
+    additionalCategoryCount: inputs.additionalCategoryCount,
+    hasDescription: inputs.hasDescription,
+    hasHours: inputs.hasHours,
+    hasPhone: inputs.hasPhone,
+    hasWebsite: inputs.hasWebsite,
+    reviewResponseRate:
+      typeof inputs.reviewResponseRate === "number"
+        ? inputs.reviewResponseRate
+        : null,
+    yourVelocity14: inputs.yourVelocity14,
+    yourVelocity30: inputs.yourVelocity30,
+    gapChange90: inputs.gapChange90,
+    marketAcceleration: inputs.marketAcceleration,
+  };
+}
+
 export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   // -----------------------
   // MARKET COMPETITIVENESS INDEX
@@ -94,10 +127,7 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   // -----------------------
   // GAP SCORE
   // -----------------------
-  const gap = Math.max(
-    0,
-    inputs.top3MedianReviews - inputs.yourReviews
-  );
+  const gap = Math.max(0, inputs.top3MedianReviews - inputs.yourReviews);
 
   const G = 60 + 40 * MCI; // harder markets increase gap sensitivity
   const gapScore = 100 * Math.exp(-gap / G);
@@ -111,11 +141,9 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   // VELOCITY SCORE
   // -----------------------
   const velocityRatio =
-    inputs.yourVelocity90 /
-    Math.max(1, inputs.top3MedianVelocity90);
+    inputs.yourVelocity90 / Math.max(1, inputs.top3MedianVelocity90);
 
-  const velocityScore =
-    100 * Math.pow(Math.min(1, velocityRatio), 0.7);
+  const velocityScore = 100 * Math.pow(Math.min(1, velocityRatio), 0.7);
 
   // -----------------------
   // CATEGORY STRENGTH SCORE
@@ -131,7 +159,7 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   // -----------------------
   // STRUCTURAL OPTIMIZATION
   // -----------------------
-  let structuralComponents: number[] = [];
+  const structuralComponents: number[] = [];
 
   const completenessSignals = [
     inputs.hasPrimaryCategory ? 1 : 0,
@@ -150,24 +178,23 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   structuralComponents.push(0.3 * completenessScore);
 
   if (inputs.reviewResponseRate !== undefined) {
-    structuralComponents.push(
-      0.25 * (inputs.reviewResponseRate * 100)
-    );
+    structuralComponents.push(0.25 * (inputs.reviewResponseRate * 100));
   }
 
+  const structuralWeightTotal = structuralComponents.reduce((a, b) => a + b, 0);
+
   const structuralOptimization =
-    structuralComponents.reduce((a, b) => a + b, 0) /
-    structuralComponents
-      .map((v) => v)
-      .reduce((a, b) => a + b, 0) *
-    100;
+    structuralWeightTotal > 0
+      ? (structuralComponents.reduce((a, b) => a + b, 0) /
+          structuralWeightTotal) *
+        100
+      : 0;
 
   // -----------------------
   // AUTHORITY SCORE
   // -----------------------
   const baseAuthority =
-    0.6 * competitiveStrength +
-    0.4 * structuralOptimization;
+    0.6 * competitiveStrength + 0.4 * structuralOptimization;
 
   const authorityScore = diminishingReturns(baseAuthority);
   const authorityTier = getTier(authorityScore);
@@ -186,9 +213,7 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
   const C = relativeAccel;
 
   const momentumScore =
-    50 * Math.tanh(A) +
-    30 * Math.tanh(B) +
-    20 * Math.tanh(C);
+    50 * Math.tanh(A) + 30 * Math.tanh(B) + 20 * Math.tanh(C);
 
   const momentumLabel = getMomentumLabel(momentumScore);
 
@@ -196,14 +221,12 @@ export function computeAuthority(inputs: AuthorityInputs): AuthorityResult {
     authorityScore: Math.round(authorityScore * 10) / 10,
     authorityTier,
 
-    competitiveStrength:
-      Math.round(competitiveStrength * 10) / 10,
-    structuralOptimization:
-      Math.round(structuralOptimization * 10) / 10,
+    competitiveStrength: Math.round(competitiveStrength * 10) / 10,
+    structuralOptimization: Math.round(structuralOptimization * 10) / 10,
 
     momentumScore: Math.round(momentumScore * 10) / 10,
     momentumLabel,
 
-    inputs,
+    inputs: toJsonObject(inputs),
   };
 }

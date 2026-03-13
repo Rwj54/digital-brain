@@ -24,6 +24,18 @@ type DataForSeoMapsItem = {
   type?: string;
 };
 
+type DataForSeoTaskResult = {
+  items?: DataForSeoMapsItem[];
+};
+
+type DataForSeoTask = {
+  result?: DataForSeoTaskResult[];
+};
+
+type DataForSeoMapsResponse = {
+  tasks?: DataForSeoTask[];
+};
+
 type RankCandidate = {
   rankPosition: number;
   title: string | null;
@@ -47,7 +59,7 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-function normalizeMapsItems(payload: any): RankCandidate[] {
+function normalizeMapsItems(payload: DataForSeoMapsResponse): RankCandidate[] {
   const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
   const normalized: RankCandidate[] = [];
 
@@ -160,7 +172,7 @@ export async function discoverRankCandidates(
     );
   }
 
-  const payload = await response.json();
+  const payload = (await response.json()) as DataForSeoMapsResponse;
   const candidates = normalizeMapsItems(payload);
 
   return {

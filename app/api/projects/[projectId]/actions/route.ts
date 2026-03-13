@@ -4,21 +4,38 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
+type RouteParams = {
+  projectId?: string;
+};
+
+type RouteContext = {
+  params?: RouteParams | Promise<RouteParams>;
+};
+
 function getProjectIdFromUrl(req: Request): string {
   const url = new URL(req.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const idx = parts.indexOf("projects");
-  if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+
+  if (idx >= 0 && parts[idx + 1]) {
+    return parts[idx + 1];
+  }
+
   return "";
 }
 
-async function readProjectIdFromContext(context: any): Promise<string> {
+async function readProjectIdFromContext(context: RouteContext): Promise<string> {
   const paramsMaybe = context?.params;
-  if (!paramsMaybe) return "";
+
+  if (!paramsMaybe) {
+    return "";
+  }
 
   try {
     const params =
-      typeof paramsMaybe?.then === "function" ? await paramsMaybe : paramsMaybe;
+      typeof (paramsMaybe as Promise<RouteParams>)?.then === "function"
+        ? await (paramsMaybe as Promise<RouteParams>)
+        : (paramsMaybe as RouteParams);
 
     const projectId = params?.projectId;
     return typeof projectId === "string" ? projectId.trim() : "";
@@ -27,7 +44,15 @@ async function readProjectIdFromContext(context: any): Promise<string> {
   }
 }
 
-export async function GET(req: NextRequest, context: any) {
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Unknown error";
+}
+
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const paramProjectId = await readProjectIdFromContext(context);
     const projectId = paramProjectId || getProjectIdFromUrl(req);
@@ -62,9 +87,9 @@ export async function GET(req: NextRequest, context: any) {
       projectId,
       actionsRow: data ?? null,
     });
-  } catch (e: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Unknown error" },
+      { ok: false, error: getErrorMessage(error) },
       { status: 500 }
     );
   }

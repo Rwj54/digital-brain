@@ -1,9 +1,15 @@
 import { supabaseServer } from "../supabase/server";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 export async function createProjectJob(args: {
   projectId: string;
   jobType: string;
-  metadata?: any;
+  metadata?: JsonObject | null;
 }) {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
@@ -20,14 +26,16 @@ export async function createProjectJob(args: {
     .select("id")
     .single();
 
-  if (error) throw new Error(`Failed to create project_jobs row: ${error.message}`);
+  if (error) {
+    throw new Error(`Failed to create project_jobs row: ${error.message}`);
+  }
 
   return { jobId: data.id as string, startedAt: now };
 }
 
 export async function finishProjectJobSuccess(args: {
   jobId: string;
-  resultSummary?: any;
+  resultSummary?: JsonObject | null;
 }) {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
@@ -41,13 +49,15 @@ export async function finishProjectJobSuccess(args: {
     })
     .eq("id", args.jobId);
 
-  if (error) throw new Error(`Failed to update project_jobs success: ${error.message}`);
+  if (error) {
+    throw new Error(`Failed to update project_jobs success: ${error.message}`);
+  }
 }
 
 export async function finishProjectJobFailed(args: {
   jobId: string;
   errorMessage: string;
-  resultSummary?: any;
+  resultSummary?: JsonObject | null;
 }) {
   const supabase = supabaseServer();
   const now = new Date().toISOString();
@@ -62,5 +72,7 @@ export async function finishProjectJobFailed(args: {
     })
     .eq("id", args.jobId);
 
-  if (error) throw new Error(`Failed to update project_jobs failed: ${error.message}`);
+  if (error) {
+    throw new Error(`Failed to update project_jobs failed: ${error.message}`);
+  }
 }

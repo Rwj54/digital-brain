@@ -7,6 +7,15 @@ type DataForSeoClientOptions = {
   retryBaseDelayMs?: number;
 };
 
+type DataForSeoTaskWithCost = {
+  cost?: number;
+};
+
+type DataForSeoResponseEnvelope = {
+  cost?: number;
+  tasks?: DataForSeoTaskWithCost[];
+};
+
 export type DataForSeoResponse<T> = {
   ok: true;
   status: number;
@@ -27,13 +36,15 @@ export type DataForSeoError = {
 };
 
 function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error("Missing env var: " + name);
-  return v;
+  const value = process.env[name];
+  if (!value) {
+    throw new Error("Missing env var: " + name);
+  }
+  return value;
 }
 
 function basicAuthHeader(login: string, password: string) {
@@ -42,6 +53,7 @@ function basicAuthHeader(login: string, password: string) {
     typeof btoa === "function"
       ? btoa(value)
       : Buffer.from(value).toString("base64");
+
   return "Basic " + token;
 }
 
@@ -49,6 +61,38 @@ function shouldRetry(status?: number) {
   if (!status) return true;
   if (status === 429) return true;
   return status >= 500 && status <= 599;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function extractCost(value: unknown): number | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const payload = value as DataForSeoResponseEnvelope;
+
+  if (typeof payload.cost === "number") {
+    return payload.cost;
+  }
+
+  const firstTask = Array.isArray(payload.tasks) ? payload.tasks[0] : undefined;
+
+  if (firstTask && typeof firstTask.cost === "number") {
+    return firstTask.cost;
+  }
+
+  return undefined;
 }
 
 export class DataForSeoClient {
@@ -131,23 +175,20 @@ export class DataForSeoClient {
         }
 
         const elapsedSeconds = (Date.now() - startedAt) / 1000;
-        const maybeCost =
-          typeof (json as any)?.cost === "number"
-            ? (json as any).cost
-            : typeof (json as any)?.tasks?.[0]?.cost === "number"
-              ? (json as any).tasks[0].cost
-              : undefined;
+        const maybeCost = extractCost(json);
 
         return {
           ok: true,
           status,
           data: json as T,
           raw: json,
-          meta: { requestId, cost: maybeCost, timeSeconds: elapsedSeconds },
+          meta: {
+            requestId,
+            cost: maybeCost,
+            timeSeconds: elapsedSeconds,
+          },
         };
-      } catch (err: any) {
-        const isAbort = err?.name === "AbortError";
-
+      } catch (error: unknown) {
         if (attempt < this.maxRetries) {
           const delay = this.retryBaseDelayMs * Math.pow(2, attempt);
           await sleep(delay);
@@ -156,7 +197,7 @@ export class DataForSeoClient {
 
         return {
           ok: false,
-          message: isAbort
+          message: isAbortError(error)
             ? "DataForSEO request timed out after " +
               this.timeoutMs +
               "ms (" +
@@ -164,8 +205,13 @@ export class DataForSeoClient {
               " " +
               path +
               ")"
-            : "DataForSEO request failed (" + method + " " + path + ")",
-          raw: String(err),
+            : "DataForSEO request failed (" +
+              method +
+              " " +
+              path +
+              "): " +
+              getErrorMessage(error),
+          raw: getErrorMessage(error),
         };
       } finally {
         clearTimeout(timer);

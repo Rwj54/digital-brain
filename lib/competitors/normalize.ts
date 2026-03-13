@@ -1,16 +1,24 @@
 import type { CompetitorCandidate } from "./types";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
+type DataForSeoMapsItem = {
+  title?: string;
+  domain?: string | null;
+  place_id?: string;
+  rating?: { value?: number; votes_count?: number } | null;
+};
+
 export function normalizeDataForSeoMapsItems(args: {
   projectId: string;
-  items: Array<{
-    title?: string;
-    domain?: string | null;
-    place_id?: string;
-    rating?: { value?: number; votes_count?: number } | null;
-  }>;
+  items: DataForSeoMapsItem[];
   nowIso: string;
   includeRaw?: boolean;
-  raw?: any;
+  raw?: JsonObject;
 }): CompetitorCandidate[] {
   const { projectId, items, nowIso, includeRaw, raw } = args;
 

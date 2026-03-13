@@ -4,23 +4,38 @@ import { discoverCompetitorsForProject } from "@/lib/domain/competitors/discover
 
 export const runtime = "nodejs";
 
+type RouteParams = {
+  projectId?: string;
+};
+
+type RouteContext = {
+  params?: RouteParams | Promise<RouteParams>;
+};
+
 function getProjectIdFromUrl(req: Request): string {
-  // Expected path: /api/projects/<projectId>/discover-competitors
   const url = new URL(req.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const idx = parts.indexOf("projects");
-  if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+
+  if (idx >= 0 && parts[idx + 1]) {
+    return parts[idx + 1];
+  }
+
   return "";
 }
 
-async function readProjectIdFromContext(context: any): Promise<string> {
+async function readProjectIdFromContext(context: RouteContext): Promise<string> {
   const paramsMaybe = context?.params;
 
-  if (!paramsMaybe) return "";
+  if (!paramsMaybe) {
+    return "";
+  }
 
   try {
     const params =
-      typeof (paramsMaybe as any)?.then === "function" ? await paramsMaybe : paramsMaybe;
+      typeof (paramsMaybe as Promise<RouteParams>)?.then === "function"
+        ? await (paramsMaybe as Promise<RouteParams>)
+        : (paramsMaybe as RouteParams);
 
     const projectId = params?.projectId;
     return typeof projectId === "string" ? projectId.trim() : "";
@@ -29,7 +44,7 @@ async function readProjectIdFromContext(context: any): Promise<string> {
   }
 }
 
-export async function POST(req: NextRequest, context: any) {
+export async function POST(req: NextRequest, context: RouteContext) {
   const paramProjectId = await readProjectIdFromContext(context);
   const projectId = paramProjectId || getProjectIdFromUrl(req);
 

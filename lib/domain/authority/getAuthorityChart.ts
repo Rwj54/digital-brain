@@ -6,6 +6,12 @@ export type AuthorityChartPoint = {
   momentum: number | null;
 };
 
+type AuthorityChartRow = {
+  captured_at: string | null;
+  authority_score: number | string | null;
+  momentum_score: number | string | null;
+};
+
 export type GetAuthorityChartResult =
   | {
       ok: true;
@@ -18,11 +24,30 @@ export type GetAuthorityChartResult =
       status: number;
     };
 
+function toNullableNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Unknown error";
+}
+
 export async function getAuthorityChart(input: {
   projectId: string;
 }): Promise<GetAuthorityChartResult> {
   try {
-    const projectId = typeof input.projectId === "string" ? input.projectId.trim() : "";
+    const projectId =
+      typeof input.projectId === "string" ? input.projectId.trim() : "";
+
     if (!projectId) {
       return { ok: false, error: "Missing projectId", status: 400 };
     }
@@ -39,21 +64,16 @@ export async function getAuthorityChart(input: {
       return { ok: false, error: error.message, status: 500 };
     }
 
-    const series: AuthorityChartPoint[] =
-      data?.map((row: any) => ({
-        date: String(row?.captured_at ?? ""),
-        authority:
-          row?.authority_score === null || row?.authority_score === undefined
-            ? null
-            : Number(row.authority_score),
-        momentum:
-          row?.momentum_score === null || row?.momentum_score === undefined
-            ? null
-            : Number(row.momentum_score),
-      })) ?? [];
+    const rows = (data ?? []) as AuthorityChartRow[];
+
+    const series: AuthorityChartPoint[] = rows.map((row) => ({
+      date: String(row.captured_at ?? ""),
+      authority: toNullableNumber(row.authority_score),
+      momentum: toNullableNumber(row.momentum_score),
+    }));
 
     return { ok: true, projectId, series };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? "Unknown error", status: 500 };
+  } catch (error: unknown) {
+    return { ok: false, error: getErrorMessage(error), status: 500 };
   }
 }

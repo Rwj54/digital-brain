@@ -1,128 +1,476 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
 
-type Client = {
+type ClientRow = {
   id: string;
   name: string;
   notes: string | null;
   created_at: string;
 };
 
-export default function ClientsPage() {
-  const router = useRouter();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [name, setName] = useState("");
-  const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<string | null>(null);
+type ProjectRow = {
+  id: string;
+  client_id: string;
+  site_url: string;
+  category: string;
+  metro: string;
+  radius_miles: number;
+  created_at: string;
+};
 
-  async function requireAuth() {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) router.replace("/login");
+function normalizeSiteUrl(input: string): string {
+  const raw = input.trim();
+
+  if (!raw) {
+    return "";
   }
 
-  async function loadClients() {
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .order("created_at", { ascending: false });
+  try {
+    const withProtocol =
+      raw.startsWith("http://") || raw.startsWith("https://")
+        ? raw
+        : `https://${raw}`;
 
-    if (error) {
-      setStatus(error.message);
-      return;
+    return new URL(withProtocol).toString();
+  } catch {
+    return raw;
+  }
+}
+
+function formatDomain(input: string): string {
+  const raw = input.trim();
+
+  if (!raw) {
+    return "—";
+  }
+
+  try {
+    const withProtocol =
+      raw.startsWith("http://") || raw.startsWith("https://")
+        ? raw
+        : `https://${raw}`;
+
+    return new URL(withProtocol).hostname.replace(/^www\./, "");
+  } catch {
+    return raw.replace(/^www\./, "").replace(/\/+$/, "");
+  }
+}
+
+export default function ClientProjectsPage() {
+  const router = useRouter();
+  const params = useParams<{ clientId: string }>();
+  const clientId = params.clientId;
+
+  const [client, setClient] = useState<ClientRow | null>(null);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [siteUrl, setSiteUrl] = useState("");
+  const [category, setCategory] = useState("");
+  const [metro, setMetro] = useState("");
+  const [radiusMiles, setRadiusMiles] = useState("25");
+
+  const normalizedPreviewDomain = useMemo(
+    () => formatDomain(siteUrl),
+    [siteUrl]
+  );
+
+  const requireAuth = useCallback(async (): Promise<boolean> => {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session) {
+      router.replace("/login");
+      return false;
     }
 
-    setClients(data ?? []);
-  }
+    return true;
+  }, [router]);
 
-  async function addClient(e: React.FormEvent) {
-    e.preventDefault();
+  const loadClientPage = useCallback(async () => {
+    setLoading(true);
     setStatus(null);
 
-    const { error } = await supabase.from("clients").insert({
-      name,
-      notes: notes || null,
-    });
+    const { data: clientData, error: clientError } = await supabase
+      .from("clients")
+      .select("id, name, notes, created_at")
+      .eq("id", clientId)
+      .single();
 
-    if (error) {
-      setStatus(error.message);
+    if (clientError) {
+      setStatus(clientError.message);
+      setLoading(false);
       return;
     }
 
-    setName("");
-    setNotes("");
-    await loadClients();
+    const { data: projectData, error: projectError } = await supabase
+      .from("projects")
+      .select("id, client_id, site_url, category, metro, radius_miles, created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    if (projectError) {
+      setStatus(projectError.message);
+      setLoading(false);
+      return;
+    }
+
+    setClient(clientData as ClientRow);
+    setProjects((projectData ?? []) as ProjectRow[]);
+    setLoading(false);
+  }, [clientId]);
+
+  async function startProjectOnboarding(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus(null);
+    setSubmitting(true);
+
+    const normalizedSiteUrl = normalizeSiteUrl(siteUrl);
+    const normalizedCategory = category.trim();
+    const normalizedMetro = metro.trim();
+    const parsedRadius = Number(radiusMiles);
+
+    if (!normalizedSiteUrl) {
+      setStatus("Website URL is required.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!normalizedCategory) {
+      setStatus("Business category is required.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!normalizedMetro) {
+      setStatus("Target metro is required.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!Number.isFinite(parsedRadius) || parsedRadius <= 0) {
+      setStatus("Radius miles must be a valid number greater than 0.");
+      setSubmitting(false);
+      return;
+    }
+
+    const roundedRadius = Math.round(parsedRadius);
+
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        client_id: clientId,
+        site_url: normalizedSiteUrl,
+        category: normalizedCategory,
+        metro: normalizedMetro,
+        radius_miles: roundedRadius,
+        primary_category: normalizedCategory,
+        target_metro: normalizedMetro,
+        target_radius_miles: roundedRadius,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      setStatus(error.message);
+      setSubmitting(false);
+      return;
+    }
+
+    const onboardingResponse = await fetch(
+      `/api/projects/${data.id}/onboarding`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          seedKeywords: [
+            {
+              keyword: normalizedCategory,
+              metro: normalizedMetro,
+              priority: 1,
+              isActive: true,
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!onboardingResponse.ok) {
+      let onboardingError = "Project created, but onboarding could not be started.";
+
+      try {
+        const payload = (await onboardingResponse.json()) as { error?: string };
+        if (payload.error) {
+          onboardingError = payload.error;
+        }
+      } catch {
+        // ignore JSON parsing issues
+      }
+
+      setStatus(onboardingError);
+      setSubmitting(false);
+      return;
+    }
+
+    setSiteUrl("");
+    setCategory("");
+    setMetro("");
+    setRadiusMiles("25");
+    setSubmitting(false);
+
+    router.push(`/clients/${clientId}/projects/${data.id}`);
   }
 
   useEffect(() => {
-    requireAuth();
-    loadClients();
-  }, []);
+    let isActive = true;
+
+    void (async () => {
+      const isAuthed = await requireAuth();
+
+      if (!isAuthed || !isActive) {
+        return;
+      }
+
+      await loadClientPage();
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [requireAuth, loadClientPage]);
+
+  if (loading) {
+    return <div className="p-8">Loading client…</div>;
+  }
 
   return (
-    <div style={{ maxWidth: 800, margin: "40px auto", padding: 20 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 900 }}>Clients</h1>
-
-      <form onSubmit={addClient} style={{ marginTop: 20 }}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Client name"
-          required
-          style={{ padding: 10, width: "100%", marginBottom: 10 }}
-        />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (optional)"
-          style={{ padding: 10, width: "100%", marginBottom: 10 }}
-        />
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="flex flex-wrap items-center gap-3">
         <button
-          style={{
-            padding: 10,
-            borderRadius: 8,
-            border: "1px solid #111",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
+          onClick={() => router.push("/clients")}
+          className="text-sm font-semibold underline underline-offset-4 opacity-80 hover:opacity-100"
         >
-          Add client
+          ← Back to clients
         </button>
-      </form>
+      </div>
 
-      {status && <p style={{ marginTop: 10 }}>{status}</p>}
+      <div className="mt-4">
+        <h1 className="text-2xl font-black tracking-tight md:text-3xl">
+          {client?.name ?? "Client"} — Projects
+        </h1>
+        {client?.notes ? (
+          <p className="mt-2 max-w-3xl text-sm text-zinc-700 md:text-base">
+            {client.notes}
+          </p>
+        ) : null}
+      </div>
 
-      <div style={{ marginTop: 30 }}>
-        {clients.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 12,
-            }}
-          >
-            <h2 style={{ fontWeight: 900 }}>{c.name}</h2>
-            {c.notes && <p>{c.notes}</p>}
+      {status ? (
+        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-900">
+          {status}
+        </div>
+      ) : null}
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-zinc-900">
+                Start intelligent onboarding
+              </h2>
+              <p className="mt-2 text-sm text-zinc-700">
+                Long-term goal: client enters the website URL and Digital Brain
+                intelligently infers the rest. This page now creates projects in
+                an automation-ready shape from day one.
+              </p>
+            </div>
+            <div className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-extrabold text-zinc-700">
+              URL-first
+            </div>
+          </div>
+
+          <form onSubmit={startProjectOnboarding} className="mt-5 grid gap-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-extrabold text-zinc-900">
+                Website URL
+              </label>
+              <input
+                value={siteUrl}
+                onChange={(e) => setSiteUrl(e.target.value)}
+                placeholder="example.com"
+                className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
+                required
+              />
+              <div className="text-xs text-zinc-600">
+                Domain preview:{" "}
+                <span className="font-extrabold text-zinc-900">
+                  {normalizedPreviewDomain}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                Minimum support inputs for now
+              </div>
+              <div className="mt-1 text-xs text-zinc-600">
+                These still exist for the transition period, but they now feed
+                both UI fields and automation-facing fields.
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <label className="text-sm font-extrabold text-zinc-900">
+                    Business category
+                  </label>
+                  <input
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder="Landscaper"
+                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-extrabold text-zinc-900">
+                    Target metro
+                  </label>
+                  <input
+                    value={metro}
+                    onChange={(e) => setMetro(e.target.value)}
+                    placeholder="Council Bluffs, IA"
+                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
+                    required
+                  />
+                </div>
+
+                <div className="grid gap-2 md:max-w-[220px]">
+                  <label className="text-sm font-extrabold text-zinc-900">
+                    Radius miles
+                  </label>
+                  <input
+                    value={radiusMiles}
+                    onChange={(e) => setRadiusMiles(e.target.value)}
+                    placeholder="25"
+                    className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
 
             <button
-              onClick={() => router.push(`/clients/${c.id}`)}
-              style={{
-                marginTop: 10,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid #111",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
+              disabled={submitting}
+              className="w-fit rounded-2xl border border-zinc-900 px-5 py-3 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              View projects →
+              {submitting ? "Creating project…" : "Create project and continue →"}
             </button>
+          </form>
+        </section>
+
+        <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-zinc-900">What happens next</h2>
+          <div className="mt-4 grid gap-3">
+            <div className="rounded-2xl border border-zinc-200 p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                1) Create project shell
+              </div>
+              <div className="mt-1 text-xs text-zinc-600">
+                Store both user-facing project fields and automation-facing market
+                identity fields.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                2) Start onboarding automatically
+              </div>
+              <div className="mt-1 text-xs text-zinc-600">
+                Seed the first keyword and launch the onboarding job through a
+                thin API route.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                3) Automation can actually run now
+              </div>
+              <div className="mt-1 text-xs text-zinc-600">
+                Competitor discovery can use the newly stored category and metro
+                fields immediately.
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                4) Land in dashboard
+              </div>
+              <div className="mt-1 text-xs text-zinc-600">
+                User reaches the project dashboard immediately instead of an
+                empty manual setup screen.
+              </div>
+            </div>
           </div>
-        ))}
+        </section>
+      </div>
+
+      <div className="mt-8">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xl font-black text-zinc-900">Existing projects</h2>
+          <div className="text-sm text-zinc-600">
+            {projects.length} project{projects.length === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="mt-4 rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-700">
+            No projects yet. Start with the website URL above.
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm"
+              >
+                <div className="text-lg font-black text-zinc-900">
+                  {formatDomain(project.site_url)}
+                </div>
+
+                <div className="mt-3 space-y-1 text-sm text-zinc-700">
+                  <div>
+                    <span className="font-extrabold text-zinc-900">Category:</span>{" "}
+                    {project.category}
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-zinc-900">Metro:</span>{" "}
+                    {project.metro}
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-zinc-900">Radius:</span>{" "}
+                    {project.radius_miles} mi
+                  </div>
+                </div>
+
+                <button
+                  onClick={() =>
+                    router.push(`/clients/${clientId}/projects/${project.id}`)
+                  }
+                  className="mt-4 rounded-2xl border border-zinc-900 px-4 py-2 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50"
+                >
+                  Open dashboard →
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

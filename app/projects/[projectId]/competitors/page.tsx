@@ -58,6 +58,13 @@ function daysBetween(aIso: string, bIso: string) {
   return Math.abs(a - b) / (1000 * 60 * 60 * 24);
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
 function findClosestSnapshotToDate(
   snapshotsDesc: CompetitorSnapshot[],
   targetDate: Date,
@@ -277,8 +284,8 @@ export default function CompetitorsPage() {
 
       const snaps = await loadSnapshotsForCompetitor(thresholdLocal ?? null);
       setSnapshotsForThreshold(snaps);
-    } catch (e: any) {
-      setStatus(e?.message ?? "Unknown load error");
+    } catch (error: unknown) {
+      setStatus(getErrorMessage(error, "Unknown load error"));
     } finally {
       setLoading(false);
     }
@@ -316,8 +323,8 @@ export default function CompetitorsPage() {
 
       setStatus(text || "Discovery complete.");
       await refreshAll();
-    } catch (e: any) {
-      setStatus(`Discovery error: ${e?.message ?? "Unknown error"}`);
+    } catch (error: unknown) {
+      setStatus(`Discovery error: ${getErrorMessage(error, "Unknown error")}`);
     } finally {
       setRunning(false);
     }

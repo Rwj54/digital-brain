@@ -6,28 +6,43 @@ import { supabase } from "@/lib/supabaseClient";
 import AuthoritySummaryCard from "@/components/authority/AuthoritySummaryCard";
 import ProjectInsightsNav from "@/components/projects/ProjectInsightsNav";
 
+type MomentumInputs = {
+  momentum?: {
+    components?: Record<string, unknown>;
+  };
+};
+
 type AuthorityRow = {
   project_id: string;
-  captured_at: string; // date
+  captured_at: string;
   version: string;
-
   momentum_score: number;
   momentum_label: string;
-
   authority_score: number;
   authority_tier: string;
-
-  inputs: any;
+  inputs: MomentumInputs | null;
   created_at: string;
 };
 
 type AuthorityChartPoint = {
-  date: string; // YYYY-MM-DD
+  date: string;
   authority: number;
   momentum: number;
 };
 
-function formatJson(value: any) {
+type AuthorityChartApiSuccess = {
+  ok: true;
+  series: unknown[];
+};
+
+type AuthorityChartApiError = {
+  ok?: false;
+  error?: string;
+};
+
+type AuthorityChartApiResponse = AuthorityChartApiSuccess | AuthorityChartApiError | null;
+
+function formatJson(value: unknown) {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -35,7 +50,7 @@ function formatJson(value: any) {
   }
 }
 
-function asNumber(v: any): number | null {
+function asNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return null;
@@ -49,6 +64,27 @@ function clamp01(n: number) {
 function fmt1(n: number | null | undefined) {
   if (typeof n !== "number" || !Number.isFinite(n)) return "—";
   return n.toFixed(1);
+}
+
+function isChartApiSuccess(value: AuthorityChartApiResponse): value is AuthorityChartApiSuccess {
+  return !!value && value.ok === true && Array.isArray(value.series);
+}
+
+function normalizeChartPoint(point: unknown): AuthorityChartPoint | null {
+  if (!point || typeof point !== "object") return null;
+
+  const record = point as Record<string, unknown>;
+  const date = typeof record.date === "string" ? record.date : "";
+  const authority = asNumber(record.authority);
+  const momentum = asNumber(record.momentum);
+
+  if (!date || authority === null || momentum === null) return null;
+
+  return {
+    date,
+    authority,
+    momentum,
+  };
 }
 
 export default function ProjectMomentumPage() {
@@ -100,31 +136,27 @@ export default function ProjectMomentumPage() {
         cache: "no-store",
       });
 
-      const json = await res.json().catch(() => null);
+      const json = (await res.json().catch(() => null)) as AuthorityChartApiResponse;
 
       if (!res.ok) {
-        const msg = json?.error ? String(json.error) : `Trend request failed (${res.status})`;
+        const msg =
+          json && typeof json === "object" && "error" in json && typeof json.error === "string"
+            ? json.error
+            : `Trend request failed (${res.status})`;
         throw new Error(msg);
       }
 
-      if (!json?.ok || !Array.isArray(json.series)) {
+      if (!isChartApiSuccess(json)) {
         throw new Error("Trend response was not in the expected format.");
       }
 
-      const raw = json.series as any[];
-
-      // Normalize + validate
-      const normalized: AuthorityChartPoint[] = raw
-        .map((p) => ({
-          date: typeof p?.date === "string" ? p.date : "",
-          authority: typeof p?.authority === "number" ? p.authority : Number(p?.authority),
-          momentum: typeof p?.momentum === "number" ? p.momentum : Number(p?.momentum),
-        }))
-        .filter((p) => p.date && Number.isFinite(p.authority) && Number.isFinite(p.momentum));
+      const normalized = json.series
+        .map((point) => normalizeChartPoint(point))
+        .filter((point): point is AuthorityChartPoint => point !== null);
 
       setTrendSeries(normalized);
-    } catch (e: any) {
-      setTrendStatus(e?.message ?? "Failed to load authority trend");
+    } catch (e: unknown) {
+      setTrendStatus(e instanceof Error ? e.message : "Failed to load authority trend");
       setTrendSeries([]);
     } finally {
       setTrendLoading(false);
@@ -145,8 +177,8 @@ export default function ProjectMomentumPage() {
       try {
         await loadLatestAuthority();
         await loadAuthorityTrend();
-      } catch (e: any) {
-        setStatus(e?.message ?? "Failed to load momentum");
+      } catch (e: unknown) {
+        setStatus(e instanceof Error ? e.message : "Failed to load momentum");
       } finally {
         setLoading(false);
       }
@@ -155,9 +187,10 @@ export default function ProjectMomentumPage() {
   }, [projectId]);
 
   const components = useMemo(() => {
-    const c = row?.inputs?.momentum?.components;
-    if (!c || typeof c !== "object") return null;
-    const entries = Object.entries(c).map(([k, v]) => [k, v] as const);
+    const rawComponents = row?.inputs?.momentum?.components;
+    if (!rawComponents || typeof rawComponents !== "object") return null;
+
+    const entries = Object.entries(rawComponents).map(([k, v]) => [k, v] as const);
     entries.sort((a, b) => a[0].localeCompare(b[0]));
     return entries;
   }, [row]);
@@ -167,8 +200,6 @@ export default function ProjectMomentumPage() {
   const gapShrinkRatio = asNumber(row?.inputs?.momentum?.components?.gapShrinkRatio);
   const marketPressure = asNumber(row?.inputs?.momentum?.components?.marketPressure);
 
-  // Deduplicate same-day entries (e.g., v1.0 and v1.1 both on the same captured_at)
-  // Keep the "best/most-informative" point for that date.
   const trendDeduped = useMemo(() => {
     const byDate = new Map<string, AuthorityChartPoint>();
 
@@ -179,7 +210,6 @@ export default function ProjectMomentumPage() {
         continue;
       }
 
-      // Prefer higher momentum (v1.1 vs v1.0 usually), then higher authority as tie-breaker
       if (p.momentum > existing.momentum) byDate.set(p.date, p);
       else if (p.momentum === existing.momentum && p.authority > existing.authority) byDate.set(p.date, p);
     }
@@ -212,7 +242,7 @@ export default function ProjectMomentumPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 py-3 flex items-start justify-between gap-3">
+        <div className="mx-auto max-w-7xl px-4 py-3 md:px-6 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs text-gray-500">Digital Brain</div>
             <h1 className="text-lg md:text-xl font-semibold truncate">Momentum</h1>
@@ -231,8 +261,8 @@ export default function ProjectMomentumPage() {
                   await loadLatestAuthority();
                   await loadAuthorityTrend();
                   setStatus(null);
-                } catch (e: any) {
-                  setStatus(e?.message ?? "Refresh failed");
+                } catch (e: unknown) {
+                  setStatus(e instanceof Error ? e.message : "Refresh failed");
                 }
               }}
               className="rounded-lg px-4 py-2 text-sm font-medium bg-black text-white"
@@ -253,7 +283,6 @@ export default function ProjectMomentumPage() {
       <div className="mx-auto max-w-7xl px-4 md:px-6 mt-4 pb-10 space-y-4">
         <AuthoritySummaryCard projectId={projectId} />
 
-        {/* NEW: Authority Trend (History) */}
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -285,14 +314,16 @@ export default function ProjectMomentumPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-4">
-              {/* Summary row */}
               {trendStats ? (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div className="rounded-lg bg-gray-50 p-3">
                     <div className="text-xs text-gray-500">Latest authority</div>
                     <div className="text-lg font-semibold">{fmt1(trendStats.latest.authority)}</div>
                     <div className="text-xs text-gray-500">
-                      Δ vs prior: {trendStats.deltaA == null ? "—" : (trendStats.deltaA >= 0 ? "+" : "") + trendStats.deltaA.toFixed(1)}
+                      Δ vs prior:{" "}
+                      {trendStats.deltaA == null
+                        ? "—"
+                        : (trendStats.deltaA >= 0 ? "+" : "") + trendStats.deltaA.toFixed(1)}
                     </div>
                   </div>
 
@@ -300,7 +331,10 @@ export default function ProjectMomentumPage() {
                     <div className="text-xs text-gray-500">Latest momentum</div>
                     <div className="text-lg font-semibold">{fmt1(trendStats.latest.momentum)}</div>
                     <div className="text-xs text-gray-500">
-                      Δ vs prior: {trendStats.deltaM == null ? "—" : (trendStats.deltaM >= 0 ? "+" : "") + trendStats.deltaM.toFixed(1)}
+                      Δ vs prior:{" "}
+                      {trendStats.deltaM == null
+                        ? "—"
+                        : (trendStats.deltaM >= 0 ? "+" : "") + trendStats.deltaM.toFixed(1)}
                     </div>
                   </div>
 
@@ -322,7 +356,6 @@ export default function ProjectMomentumPage() {
                 </div>
               ) : null}
 
-              {/* Simple visual bar list (no chart libs) */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <div className="text-xs text-gray-500">Daily points</div>
 
@@ -386,10 +419,11 @@ export default function ProjectMomentumPage() {
           )}
         </div>
 
-        {/* Existing: Momentum inspector */}
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="text-sm font-semibold">Momentum details</div>
-          <div className="text-xs text-gray-500 mt-1">Leading indicator. Moves weekly and reflects market-relative acceleration.</div>
+          <div className="text-xs text-gray-500 mt-1">
+            Leading indicator. Moves weekly and reflects market-relative acceleration.
+          </div>
 
           {!row ? (
             <div className="mt-3 text-sm text-gray-500">No momentum row found yet.</div>
