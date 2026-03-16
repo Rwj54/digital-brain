@@ -40,15 +40,11 @@ export async function requireDashboardAuth() {
   return !!data.session;
 }
 
-function getSingleRowFromArray<T>(
-  rows: T[] | null | undefined,
-  missingMessage: string
-): T | DashboardLoadFailure {
+function getFirstRow<T>(
+  rows: T[] | null | undefined
+): T | null {
   if (!Array.isArray(rows) || rows.length === 0) {
-    return {
-      ok: false,
-      error: missingMessage,
-    };
+    return null;
   }
 
   return rows[0];
@@ -69,16 +65,13 @@ export async function loadProjectDashboardData({
     return { ok: false, error: clientError.message };
   }
 
-  const clientResult = getSingleRowFromArray<RawClientRow>(
-    clientRows as RawClientRow[] | null | undefined,
-    "Client not found."
+  const client = getFirstRow<RawClientRow>(
+    clientRows as RawClientRow[] | null | undefined
   );
 
-  if ("ok" in clientResult && clientResult.ok === false) {
-    return clientResult;
+  if (!client) {
+    return { ok: false, error: "Client not found." };
   }
-
-  const client = clientResult;
 
   const { data: projectRows, error: projectError } = await supabase
     .from("projects")
@@ -91,16 +84,13 @@ export async function loadProjectDashboardData({
     return { ok: false, error: projectError.message };
   }
 
-  const projectResult = getSingleRowFromArray<RawProjectRow>(
-    projectRows as RawProjectRow[] | null | undefined,
-    "Project not found for this client."
+  const project = getFirstRow<RawProjectRow>(
+    projectRows as RawProjectRow[] | null | undefined
   );
 
-  if ("ok" in projectResult && projectResult.ok === false) {
-    return projectResult;
+  if (!project) {
+    return { ok: false, error: "Project not found for this client." };
   }
-
-  const project = projectResult;
 
   const savedSingular = project.event_label_singular || "";
   const savedPlural = project.event_label_plural || "";
@@ -153,9 +143,9 @@ export async function loadProjectDashboardData({
     return { ok: false, error: gbpError.message };
   }
 
-  const gbp = Array.isArray(gbpRows) && gbpRows.length > 0
-    ? (gbpRows[0] as RawGbpRow)
-    : null;
+  const gbp = getFirstRow<RawGbpRow>(
+    gbpRows as RawGbpRow[] | null | undefined
+  );
 
   const { data: competitorData, error: competitorError } = await supabase
     .from("gbp_competitor_metrics")
