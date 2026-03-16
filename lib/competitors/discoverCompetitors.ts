@@ -56,7 +56,9 @@ function normalizeDomain(input: string | null | undefined): string | null {
   return withoutWww || null;
 }
 
-function extractDomainFromSiteUrl(siteUrl: string | null | undefined): string | null {
+function extractDomainFromSiteUrl(
+  siteUrl: string | null | undefined
+): string | null {
   if (typeof siteUrl !== "string") {
     return null;
   }
@@ -76,6 +78,72 @@ function extractDomainFromSiteUrl(siteUrl: string | null | undefined): string | 
     return normalizeDomain(new URL(withProtocol).hostname);
   } catch {
     return normalizeDomain(trimmed);
+  }
+}
+
+async function cleanupSelfCompetitorRows(args: {
+  projectId: string;
+  targetDomain: string | null;
+  targetPlaceId: string | null;
+}): Promise<void> {
+  const supabase = supabaseServer();
+
+  if (!args.targetDomain && !args.targetPlaceId) {
+    return;
+  }
+
+  if (args.targetDomain) {
+    const { error: metricsDomainError } = await supabase
+      .from("gbp_competitor_metrics")
+      .delete()
+      .eq("project_id", args.projectId)
+      .or(
+        `competitor_domain.eq.${args.targetDomain},domain.eq.${args.targetDomain}`
+      );
+
+    if (metricsDomainError) {
+      throw new Error(
+        `Failed to remove self competitor metric rows by domain: ${metricsDomainError.message}`
+      );
+    }
+
+    const { error: snapshotDomainError } = await supabase
+      .from("gbp_competitor_snapshots")
+      .delete()
+      .eq("project_id", args.projectId)
+      .eq("competitor_domain", args.targetDomain);
+
+    if (snapshotDomainError) {
+      throw new Error(
+        `Failed to remove self competitor snapshot rows by domain: ${snapshotDomainError.message}`
+      );
+    }
+  }
+
+  if (args.targetPlaceId) {
+    const { error: metricsPlaceError } = await supabase
+      .from("gbp_competitor_metrics")
+      .delete()
+      .eq("project_id", args.projectId)
+      .eq("place_id", args.targetPlaceId);
+
+    if (metricsPlaceError) {
+      throw new Error(
+        `Failed to remove self competitor metric rows by place_id: ${metricsPlaceError.message}`
+      );
+    }
+
+    const { error: snapshotPlaceError } = await supabase
+      .from("gbp_competitor_snapshots")
+      .delete()
+      .eq("project_id", args.projectId)
+      .eq("place_id", args.targetPlaceId);
+
+    if (snapshotPlaceError) {
+      throw new Error(
+        `Failed to remove self competitor snapshot rows by place_id: ${snapshotPlaceError.message}`
+      );
+    }
   }
 }
 
@@ -121,10 +189,14 @@ export async function discoverMapsCompetitorsForProject(args: {
     .limit(1);
 
   if (gbpProfileError) {
-    throw new Error(`Failed to load project GBP profile: ${gbpProfileError.message}`);
+    throw new Error(
+      `Failed to load project GBP profile: ${gbpProfileError.message}`
+    );
   }
 
-  const gbpProfile = ((gbpProfileData ?? [])[0] ?? null) as GbpProfileRow | null;
+  const gbpProfile = ((gbpProfileData ?? [])[0] ?? null) as
+    | GbpProfileRow
+    | null;
 
   const targetPlaceId =
     typeof gbpProfile?.place_id === "string" && gbpProfile.place_id.trim()
@@ -134,6 +206,12 @@ export async function discoverMapsCompetitorsForProject(args: {
   const targetDomain =
     normalizeDomain(typedProject.target_domain) ??
     extractDomainFromSiteUrl(typedProject.site_url);
+
+  await cleanupSelfCompetitorRows({
+    projectId: args.projectId,
+    targetDomain,
+    targetPlaceId,
+  });
 
   const keyword = `${category} ${metro}`.trim();
   const nowIso = new Date().toISOString();
