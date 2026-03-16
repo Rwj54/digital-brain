@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   Client,
@@ -50,81 +50,97 @@ export function useProjectDashboard({
     setLoading(true);
     setStatus(null);
 
-    const result = await loadProjectDashboardData({
-      clientId,
-      projectId,
-      presetOptions,
-    });
+    try {
+      const result = await loadProjectDashboardData({
+        clientId,
+        projectId,
+        presetOptions,
+      });
 
-    if (!result.ok) {
-      setStatus(result.error);
-      setLoading(false);
-      return;
-    }
-
-    setClient(result.client);
-    setProject(result.project);
-    setGbp(result.gbp);
-    setCompetitors(result.competitors);
-    form.applyLoadedFormState(result.formState);
-
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    async function bootstrap() {
-      const isAuthed = await requireDashboardAuth();
-      if (!isAuthed) {
-        router.replace("/login");
+      if (!result.ok) {
+        setStatus(result.error);
+        setLoading(false);
         return;
       }
 
-      await loadAll();
+      setClient(result.client);
+      setProject(result.project);
+      setGbp(result.gbp);
+      setCompetitors(result.competitors);
+      form.applyLoadedFormState(result.formState);
+      setLoading(false);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unexpected dashboard load error.";
+
+      setStatus(message);
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function bootstrap() {
+      try {
+        const isAuthed = await requireDashboardAuth();
+
+        if (!isActive) {
+          return;
+        }
+
+        if (!isAuthed) {
+          router.replace("/login");
+          return;
+        }
+
+        await loadAll();
+      } catch (error: unknown) {
+        if (!isActive) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unexpected dashboard bootstrap error.";
+
+        setStatus(message);
+        setLoading(false);
+      }
     }
 
     void bootstrap();
+
+    return () => {
+      isActive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, projectId, router]);
 
-  const preset = useMemo(
-    () =>
-      presetOptions.find((option) => option.key === form.volumePreset) ||
-      presetOptions[0],
-    [presetOptions, form.volumePreset]
-  );
+  const preset =
+    presetOptions.find((option) => option.key === form.volumePreset) ||
+    presetOptions[0];
 
-  const derived = useMemo(
-    () =>
-      computeDashboardDerived({
-        project,
-        gbp,
-        competitors,
-        eventLabelSingular: form.eventLabelSingular,
-        eventLabelPlural: form.eventLabelPlural,
-        preset,
-      }),
-    [
-      project,
-      gbp,
-      competitors,
-      form.eventLabelSingular,
-      form.eventLabelPlural,
-      preset,
-    ]
-  );
+  const derived = computeDashboardDerived({
+    project,
+    gbp,
+    competitors,
+    eventLabelSingular: form.eventLabelSingular,
+    eventLabelPlural: form.eventLabelPlural,
+    preset,
+  });
 
-  const actions = useMemo(
-    () =>
-      createProjectDashboardActions({
-        clientId,
-        projectId,
-        form,
-        preset,
-        loadAll,
-        setStatus,
-      }),
-    [clientId, projectId, form, preset]
-  );
+  const actions = createProjectDashboardActions({
+    clientId,
+    projectId,
+    form,
+    preset,
+    loadAll,
+    setStatus,
+  });
 
   return {
     client,
