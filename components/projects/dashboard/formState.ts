@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 export type DashboardFormStateValues = {
   volumePreset: string;
@@ -40,7 +40,7 @@ export function useProjectDashboardFormState() {
   const [monthlyEvents, setMonthlyEvents] = useState("");
   const [reviewConvRate, setReviewConvRate] = useState("");
 
-  function applyLoadedFormState(values: DashboardFormStateValues) {
+  const applyLoadedFormState = useCallback((values: DashboardFormStateValues) => {
     setVolumePreset(values.volumePreset);
     setShowAdvancedLabels(values.showAdvancedLabels);
     setEventLabelSingular(values.eventLabelSingular);
@@ -55,15 +55,15 @@ export function useProjectDashboardFormState() {
     setRating(values.rating);
     setTotalReviews(values.totalReviews);
     setPhotosCount(values.photosCount);
-  }
+  }, []);
 
-  function resetCompetitorForm() {
+  const resetCompetitorForm = useCallback(() => {
     setCompDomain("");
     setCompName("");
     setCompSource("manual");
     setCompRating("");
     setCompReviews("");
-  }
+  }, []);
 
   return {
     gbpName,

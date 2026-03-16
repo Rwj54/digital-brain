@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   Client,
@@ -46,7 +46,7 @@ export function useProjectDashboard({
   const presetOptions = DASHBOARD_PRESET_OPTIONS;
   const tabs = DASHBOARD_TABS;
 
-  const loadAll = useCallback(async () => {
+  async function loadAll() {
     setLoading(true);
     setStatus(null);
 
@@ -69,7 +69,7 @@ export function useProjectDashboard({
     form.applyLoadedFormState(result.formState);
 
     setLoading(false);
-  }, [clientId, projectId, presetOptions, form]);
+  }
 
   useEffect(() => {
     async function bootstrap() {
@@ -83,7 +83,8 @@ export function useProjectDashboard({
     }
 
     void bootstrap();
-  }, [clientId, projectId, loadAll, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, projectId, router]);
 
   const preset = useMemo(
     () =>
@@ -122,7 +123,7 @@ export function useProjectDashboard({
         loadAll,
         setStatus,
       }),
-    [clientId, projectId, form, preset, loadAll]
+    [clientId, projectId, form, preset]
   );
 
   return {
