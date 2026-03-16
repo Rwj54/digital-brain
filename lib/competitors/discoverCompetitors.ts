@@ -1,8 +1,5 @@
 import { supabaseServer } from "../supabase/server";
-import {
-  dataForSeoMapsLiveAdvanced,
-  type DataForSeoMapsLiveAdvancedResult,
-} from "../providers/dataforseo/maps";
+import { dataForSeoMapsLiveAdvanced } from "../providers/dataforseo/maps";
 import { normalizeDataForSeoMapsItems } from "./normalize";
 import { upsertCompetitorsIntoGbpCompetitorMetrics } from "./persist";
 import type { DiscoverCompetitorsResult } from "./types";
@@ -14,46 +11,72 @@ type JsonObject = {
 };
 
 type ProjectSettingsRow = {
+  id: string;
+  site_url: string | null;
   primary_category: string | null;
-  category?: string | null;
   target_metro: string | null;
-  metro?: string | null;
   maps_location_code: number | null;
+  target_domain: string | null;
 };
 
-function isJsonValue(value: unknown): value is JsonValue {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return true;
+type GbpProfileRow = {
+  place_id: string | null;
+};
+
+type MapsLiveAdvancedItem = {
+  title?: string;
+  domain?: string | null;
+  place_id?: string;
+  rating?: { value?: number; votes_count?: number } | null;
+};
+
+type MapsLiveAdvancedResult = {
+  items: MapsLiveAdvancedItem[];
+  cost: number;
+  checkUrl: string | null;
+  raw?: JsonObject;
+  locationCode?: number;
+};
+
+function normalizeDomain(input: string | null | undefined): string | null {
+  if (typeof input !== "string") {
+    return null;
   }
 
-  if (Array.isArray(value)) {
-    return value.every(isJsonValue);
+  const trimmed = input.trim().toLowerCase();
+
+  if (!trimmed) {
+    return null;
   }
 
-  if (typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).every(isJsonValue);
-  }
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const withoutPath = withoutProtocol.split("/")[0]?.trim() ?? "";
+  const withoutWww = withoutPath.replace(/^www\./, "");
 
-  return false;
+  return withoutWww || null;
 }
 
-function toJsonObject(value: unknown): JsonObject | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
+function extractDomainFromSiteUrl(siteUrl: string | null | undefined): string | null {
+  if (typeof siteUrl !== "string") {
+    return null;
   }
 
-  const record = value as Record<string, unknown>;
+  const trimmed = siteUrl.trim();
 
-  if (!Object.values(record).every(isJsonValue)) {
-    return undefined;
+  if (!trimmed) {
+    return null;
   }
 
-  return record as JsonObject;
+  try {
+    const withProtocol =
+      trimmed.startsWith("http://") || trimmed.startsWith("https://")
+        ? trimmed
+        : `https://${trimmed}`;
+
+    return normalizeDomain(new URL(withProtocol).hostname);
+  } catch {
+    return normalizeDomain(trimmed);
+  }
 }
 
 export async function discoverMapsCompetitorsForProject(args: {
@@ -65,7 +88,7 @@ export async function discoverMapsCompetitorsForProject(args: {
   const { data: project, error } = await supabase
     .from("projects")
     .select(
-      "primary_category, category, target_metro, metro, maps_location_code"
+      "id, site_url, primary_category, target_metro, maps_location_code, target_domain"
     )
     .eq("id", args.projectId)
     .single();
@@ -75,67 +98,97 @@ export async function discoverMapsCompetitorsForProject(args: {
   }
 
   const typedProject = project as ProjectSettingsRow;
-
-  const category = String(
-    typedProject.primary_category ?? typedProject.category ?? ""
-  ).trim();
-
-  const metro = String(
-    typedProject.target_metro ?? typedProject.metro ?? ""
-  ).trim();
+  const category = String(typedProject.primary_category ?? "").trim();
+  const metro = String(typedProject.target_metro ?? "").trim();
 
   if (!category) {
     throw new Error(
-      "Project is missing primary_category/category (example: 'landscaper')"
+      "Project is missing primary_category (example: 'landscaper')"
     );
   }
 
   if (!metro) {
     throw new Error(
-      'Project is missing target_metro/metro (example: "Council Bluffs, IA")'
+      'Project is missing target_metro (example: "Council Bluffs, IA")'
     );
   }
+
+  const { data: gbpProfileData, error: gbpProfileError } = await supabase
+    .from("gbp_profiles")
+    .select("place_id")
+    .eq("project_id", args.projectId)
+    .order("last_fetched_at", { ascending: false })
+    .limit(1);
+
+  if (gbpProfileError) {
+    throw new Error(`Failed to load project GBP profile: ${gbpProfileError.message}`);
+  }
+
+  const gbpProfile = ((gbpProfileData ?? [])[0] ?? null) as GbpProfileRow | null;
+
+  const targetPlaceId =
+    typeof gbpProfile?.place_id === "string" && gbpProfile.place_id.trim()
+      ? gbpProfile.place_id.trim()
+      : null;
+
+  const targetDomain =
+    normalizeDomain(typedProject.target_domain) ??
+    extractDomainFromSiteUrl(typedProject.site_url);
 
   const keyword = `${category} ${metro}`.trim();
   const nowIso = new Date().toISOString();
 
   const existingLocationCode =
-    typeof typedProject.maps_location_code === "number" &&
-    Number.isFinite(typedProject.maps_location_code)
+    typeof typedProject.maps_location_code === "number"
       ? typedProject.maps_location_code
       : null;
 
-  const live: DataForSeoMapsLiveAdvancedResult =
-    await dataForSeoMapsLiveAdvanced({
-      keyword,
-      locationName: metro,
-      depth: 20,
-      device: "desktop",
-      locationCode: existingLocationCode ?? undefined,
-    });
+  const live = (await dataForSeoMapsLiveAdvanced({
+    keyword,
+    locationName: metro,
+    depth: 20,
+    device: "desktop",
+    locationCode: existingLocationCode ?? undefined,
+  })) as MapsLiveAdvancedResult;
 
   if (!existingLocationCode && typeof live.locationCode === "number") {
-    const resolvedLocationCode = live.locationCode;
+    const resolved = live.locationCode;
 
-    const { error: updateError } = await supabase
+    const { error: updateErr } = await supabase
       .from("projects")
-      .update({ maps_location_code: resolvedLocationCode })
+      .update({ maps_location_code: resolved })
       .eq("id", args.projectId);
 
-    if (updateError) {
+    if (updateErr) {
       console.warn(
         "[discoverMapsCompetitorsForProject] Could not save maps_location_code:",
-        updateError.message
+        updateErr.message
       );
     }
   }
 
+  const filteredItems = live.items.filter((item) => {
+    const itemPlaceId =
+      typeof item.place_id === "string" ? item.place_id.trim() : "";
+    const itemDomain = normalizeDomain(item.domain);
+
+    if (targetPlaceId && itemPlaceId && itemPlaceId === targetPlaceId) {
+      return false;
+    }
+
+    if (targetDomain && itemDomain && itemDomain === targetDomain) {
+      return false;
+    }
+
+    return true;
+  });
+
   const candidates = normalizeDataForSeoMapsItems({
     projectId: args.projectId,
-    items: live.items,
+    items: filteredItems,
     nowIso,
     includeRaw: args.includeRawProvider ?? false,
-    raw: args.includeRawProvider ? toJsonObject(live.raw) : undefined,
+    raw: args.includeRawProvider ? live.raw : undefined,
   });
 
   const upserted = await upsertCompetitorsIntoGbpCompetitorMetrics(candidates);
