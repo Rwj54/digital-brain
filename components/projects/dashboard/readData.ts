@@ -30,9 +30,28 @@ type DashboardLoadFailure = {
 
 export type DashboardLoadResult = DashboardLoadSuccess | DashboardLoadFailure;
 
+type RawProjectRow = Project;
+type RawClientRow = Client;
+type RawGbpRow = GbpProfile;
+type RawCompetitorRow = CompetitorMetric;
+
 export async function requireDashboardAuth() {
   const { data } = await supabase.auth.getSession();
   return !!data.session;
+}
+
+function getSingleRowFromArray<T>(
+  rows: T[] | null | undefined,
+  missingMessage: string
+): T | DashboardLoadFailure {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return {
+      ok: false,
+      error: missingMessage,
+    };
+  }
+
+  return rows[0];
 }
 
 export async function loadProjectDashboardData({
@@ -40,29 +59,51 @@ export async function loadProjectDashboardData({
   projectId,
   presetOptions,
 }: DashboardLoadArgs): Promise<DashboardLoadResult> {
-  const { data: clientData, error: clientError } = await supabase
+  const { data: clientRows, error: clientError } = await supabase
     .from("clients")
     .select("id, name")
     .eq("id", clientId)
-    .single();
+    .limit(1);
 
   if (clientError) {
     return { ok: false, error: clientError.message };
   }
 
-  const { data: projectData, error: projectError } = await supabase
+  const clientResult = getSingleRowFromArray<RawClientRow>(
+    clientRows as RawClientRow[] | null | undefined,
+    "Client not found."
+  );
+
+  if ("ok" in clientResult && clientResult.ok === false) {
+    return clientResult;
+  }
+
+  const client = clientResult;
+
+  const { data: projectRows, error: projectError } = await supabase
     .from("projects")
     .select("*")
     .eq("id", projectId)
     .eq("client_id", clientId)
-    .single();
+    .limit(1);
 
   if (projectError) {
     return { ok: false, error: projectError.message };
   }
 
-  const savedSingular = projectData.event_label_singular || "";
-  const savedPlural = projectData.event_label_plural || "";
+  const projectResult = getSingleRowFromArray<RawProjectRow>(
+    projectRows as RawProjectRow[] | null | undefined,
+    "Project not found for this client."
+  );
+
+  if ("ok" in projectResult && projectResult.ok === false) {
+    return projectResult;
+  }
+
+  const project = projectResult;
+
+  const savedSingular = project.event_label_singular || "";
+  const savedPlural = project.event_label_plural || "";
 
   const matchingPreset =
     presetOptions.find(
@@ -90,26 +131,31 @@ export async function loadProjectDashboardData({
   }
 
   const monthlyEvents =
-    projectData.monthly_customer_events === null ||
-    projectData.monthly_customer_events === undefined
+    project.monthly_customer_events === null ||
+    project.monthly_customer_events === undefined
       ? ""
-      : String(projectData.monthly_customer_events);
+      : String(project.monthly_customer_events);
 
   const reviewConvRate =
-    projectData.review_conversion_rate === null ||
-    projectData.review_conversion_rate === undefined
+    project.review_conversion_rate === null ||
+    project.review_conversion_rate === undefined
       ? ""
-      : String(projectData.review_conversion_rate);
+      : String(project.review_conversion_rate);
 
-  const { data: gbpData, error: gbpError } = await supabase
+  const { data: gbpRows, error: gbpError } = await supabase
     .from("gbp_profiles")
     .select("*")
     .eq("project_id", projectId)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   if (gbpError) {
     return { ok: false, error: gbpError.message };
   }
+
+  const gbp = Array.isArray(gbpRows) && gbpRows.length > 0
+    ? (gbpRows[0] as RawGbpRow)
+    : null;
 
   const { data: competitorData, error: competitorError } = await supabase
     .from("gbp_competitor_metrics")
@@ -123,10 +169,10 @@ export async function loadProjectDashboardData({
 
   return {
     ok: true,
-    client: clientData,
-    project: projectData,
-    gbp: gbpData ?? null,
-    competitors: competitorData ?? [],
+    client,
+    project,
+    gbp,
+    competitors: (competitorData ?? []) as RawCompetitorRow[],
     formState: {
       volumePreset,
       showAdvancedLabels,
@@ -134,21 +180,21 @@ export async function loadProjectDashboardData({
       eventLabelPlural,
       monthlyEvents,
       reviewConvRate,
-      gbpName: gbpData?.gbp_name ?? "",
-      placeId: gbpData?.place_id ?? "",
-      gbpUrl: gbpData?.gbp_url ?? "",
-      primaryCategory: gbpData?.primary_category ?? "",
+      gbpName: gbp?.gbp_name ?? "",
+      placeId: gbp?.place_id ?? "",
+      gbpUrl: gbp?.gbp_url ?? "",
+      primaryCategory: gbp?.primary_category ?? "",
       rating:
-        gbpData?.rating !== null && gbpData?.rating !== undefined
-          ? String(gbpData.rating)
+        gbp?.rating !== null && gbp?.rating !== undefined
+          ? String(gbp.rating)
           : "",
       totalReviews:
-        gbpData?.total_reviews !== null && gbpData?.total_reviews !== undefined
-          ? String(gbpData.total_reviews)
+        gbp?.total_reviews !== null && gbp?.total_reviews !== undefined
+          ? String(gbp.total_reviews)
           : "",
       photosCount:
-        gbpData?.photos_count !== null && gbpData?.photos_count !== undefined
-          ? String(gbpData.photos_count)
+        gbp?.photos_count !== null && gbp?.photos_count !== undefined
+          ? String(gbp.photos_count)
           : "",
     },
   };
