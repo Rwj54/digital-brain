@@ -19,39 +19,45 @@ export default function ProjectDashboard() {
   const dashboard = useProjectDashboard({ clientId, projectId });
 
   if (dashboard.loading) {
-    return <div className="p-8">Loading dashboard…</div>;
+    return (
+      <div className="p-8 text-zinc-900 dark:text-zinc-100">
+        Loading dashboard…
+      </div>
+    );
   }
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-4 py-6 pb-28 md:px-6 md:pb-6">
+      <div className="mx-auto max-w-6xl px-4 py-6 pb-28 text-zinc-900 dark:text-zinc-100 md:px-6 md:pb-6">
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => router.push(`/clients/${clientId}`)}
-            className="text-sm font-semibold underline underline-offset-4 opacity-80 hover:opacity-100"
+            className="text-sm font-semibold text-zinc-800 underline underline-offset-4 opacity-90 hover:opacity-100 dark:text-zinc-100"
           >
             ← Back to projects
           </button>
           <button
             onClick={() => router.push("/clients")}
-            className="text-sm font-semibold underline underline-offset-4 opacity-60 hover:opacity-100"
+            className="text-sm font-semibold text-zinc-700 underline underline-offset-4 opacity-80 hover:opacity-100 dark:text-zinc-300"
           >
             Clients
           </button>
         </div>
 
         <div className="mt-4">
-          <div className="text-2xl font-black tracking-tight md:text-3xl">
+          <div className="text-2xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 md:text-3xl">
             {dashboard.client ? dashboard.client.name : "Client"} — Project Dashboard
           </div>
           {dashboard.project && (
-            <div className="mt-2 text-sm text-zinc-700 md:text-base">
-              <span className="font-bold">{dashboard.project.site_url}</span>
-              <span className="mx-2 opacity-40">•</span>
+            <div className="mt-2 text-sm text-zinc-800 dark:text-zinc-200 md:text-base">
+              <span className="font-bold text-zinc-950 dark:text-zinc-50">
+                {dashboard.project.site_url}
+              </span>
+              <span className="mx-2 opacity-50">•</span>
               {dashboard.project.category}
-              <span className="mx-2 opacity-40">•</span>
+              <span className="mx-2 opacity-50">•</span>
               {dashboard.project.metro}
-              <span className="mx-2 opacity-40">•</span>
+              <span className="mx-2 opacity-50">•</span>
               {dashboard.project.radius_miles} mi
             </div>
           )}
@@ -71,7 +77,7 @@ export default function ProjectDashboard() {
         </div>
 
         {dashboard.status && (
-          <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-900">
+          <div className="mt-4 rounded-2xl border border-zinc-300 bg-zinc-100 p-3 text-sm text-zinc-950 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
             {dashboard.status}
           </div>
         )}

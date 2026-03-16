@@ -23,14 +23,21 @@ export function SetupChecklistCard({
       <button
         onClick={onGoToSettings}
         className={[
-          "w-full rounded-2xl border p-3 text-left transition",
-          ok ? "border-emerald-200 bg-emerald-50/30" : "border-zinc-200 hover:bg-zinc-50",
+          "w-full rounded-2xl border p-3 text-left transition-colors",
+          ok
+            ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/40"
+            : "border-zinc-300 bg-white hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800",
         ].join(" ")}
+        type="button"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-extrabold text-zinc-900">{title}</div>
-            <div className="mt-1 text-xs text-zinc-600">{desc}</div>
+            <div className="text-sm font-extrabold text-zinc-950 dark:text-zinc-50">
+              {title}
+            </div>
+            <div className="mt-1 text-xs text-zinc-700 dark:text-zinc-200">
+              {desc}
+            </div>
           </div>
           <Badge ok={ok} label={ok ? "Done" : "Next"} />
         </div>
