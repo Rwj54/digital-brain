@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRankSummary } from "@/lib/domain/rank/getRankSummary";
+import { getActiveRankContext } from "@/lib/domain/rank/getActiveRankContext";
 
 type RouteContext = {
   params: Promise<{
@@ -19,19 +20,37 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const url = new URL(request.url);
-    const keyword = url.searchParams.get("keyword");
-    const metro = url.searchParams.get("metro");
+    const requestedKeyword = url.searchParams.get("keyword")?.trim() ?? "";
+    const requestedMetro = url.searchParams.get("metro")?.trim() ?? "";
+
+    const activeRankContext = await getActiveRankContext(projectId);
+
+    if (!activeRankContext) {
+      return NextResponse.json(
+        { ok: false, error: "Project not found." },
+        { status: 404 }
+      );
+    }
+
+    const keyword = requestedKeyword || activeRankContext.keyword || "";
+    const metro = requestedMetro || activeRankContext.metro || "";
 
     if (!keyword) {
       return NextResponse.json(
-        { ok: false, error: "Missing keyword query param." },
+        {
+          ok: false,
+          error: "Project has no active rank keyword.",
+        },
         { status: 400 }
       );
     }
 
     if (!metro) {
       return NextResponse.json(
-        { ok: false, error: "Missing metro query param." },
+        {
+          ok: false,
+          error: "Project has no active rank metro.",
+        },
         { status: 400 }
       );
     }
@@ -47,6 +66,7 @@ export async function GET(request: Request, context: RouteContext) {
       projectId,
       keyword,
       metro,
+      resolvedFromActiveConfig: !requestedKeyword || !requestedMetro,
       summary,
     });
   } catch (error) {

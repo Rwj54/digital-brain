@@ -2,7 +2,23 @@ type DataForSeoMapsItem = {
   type?: string;
   title?: string;
   domain?: string | null;
+  url?: string | null;
   place_id?: string;
+  cid?: string | null;
+  data_id?: string | null;
+  category?: string | null;
+  phone?: string | null;
+  description?: string | null;
+  additional_categories?:
+    | Array<
+        | string
+        | {
+            title?: string | null;
+          }
+      >
+    | null;
+  category_ids?: string[] | null;
+  work_hours?: unknown;
   rating?:
     | {
         value?: number;
@@ -43,6 +59,55 @@ type DataForSeoLocationsResponse = {
   }>;
 };
 
+export type DataForSeoBusinessInfoItem = {
+  type?: string;
+  title?: string;
+  domain?: string | null;
+  url?: string | null;
+  place_id?: string | null;
+  cid?: string | null;
+  data_id?: string | null;
+  category?: string | null;
+  phone?: string | null;
+  description?: string | null;
+  additional_categories?:
+    | Array<
+        | string
+        | {
+            title?: string | null;
+          }
+      >
+    | null;
+  category_ids?: string[] | null;
+  work_hours?: unknown;
+  latitude?: number | null;
+  longitude?: number | null;
+  rating?:
+    | {
+        value?: number | null;
+        votes_count?: number | null;
+      }
+    | number
+    | null;
+};
+
+type DataForSeoBusinessInfoResult = {
+  items?: DataForSeoBusinessInfoItem[];
+  check_url?: string;
+  datetime?: string;
+};
+
+type DataForSeoBusinessInfoResponse = {
+  status_code?: number;
+  status_message?: string;
+  tasks?: Array<{
+    status_code?: number;
+    status_message?: string;
+    cost?: number;
+    result?: DataForSeoBusinessInfoResult[];
+  }>;
+};
+
 export type DataForSeoMapsSearchParams = {
   keyword: string;
   locationName: string;
@@ -57,6 +122,23 @@ export type DataForSeoMapsLiveAdvancedResult = {
   datetimeUtc: string | null;
   items: DataForSeoMapsItem[];
   raw: DataForSeoResponse;
+  locationCode: number;
+};
+
+export type DataForSeoResolvedBusinessCoordinates = {
+  latitude: number;
+  longitude: number;
+  matchedBy: "domain" | "title" | "first_item";
+  matchedTitle: string | null;
+  matchedDomain: string | null;
+  locationCode: number;
+};
+
+export type DataForSeoResolvedBusinessProfile = {
+  item: DataForSeoBusinessInfoItem;
+  matchedBy: "place_id" | "domain" | "title" | "first_item";
+  matchedTitle: string | null;
+  matchedDomain: string | null;
   locationCode: number;
 };
 
@@ -125,6 +207,58 @@ function normalizeMetroKey(input: string): string {
   return input.trim().toLowerCase();
 }
 
+function normalizeDomain(input: string | null | undefined): string {
+  if (typeof input !== "string") {
+    return "";
+  }
+
+  const trimmed = input.trim().toLowerCase();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const firstPathSegment = withoutProtocol.split("/")[0] ?? "";
+  return firstPathSegment.replace(/^www\./, "");
+}
+
+function normalizeBusinessTitle(input: string | null | undefined): string {
+  if (typeof input !== "string") {
+    return "";
+  }
+
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizePlaceId(input: string | null | undefined): string {
+  if (typeof input !== "string") {
+    return "";
+  }
+
+  return input.trim();
+}
+
+function hasFiniteCoordinates(
+  item: DataForSeoBusinessInfoItem
+): item is DataForSeoBusinessInfoItem & {
+  latitude: number;
+  longitude: number;
+} {
+  return (
+    typeof item.latitude === "number" &&
+    Number.isFinite(item.latitude) &&
+    typeof item.longitude === "number" &&
+    Number.isFinite(item.longitude)
+  );
+}
+
 function parseCityState(input: string): { city: string; stateAbbr: string } | null {
   const value = input.trim();
   const match = value.match(/^(.+),\s*([A-Za-z]{2})$/);
@@ -143,11 +277,94 @@ function parseCityState(input: string): { city: string; stateAbbr: string } | nu
   return { city, stateAbbr };
 }
 
-async function resolveUsLocationCode(args: {
+function getBusinessInfoEndpoint(): string {
+  return "https://api.dataforseo.com/v3/business_data/google/my_business_info/live";
+}
+
+async function fetchBusinessInfoItems(args: {
+  businessName: string;
+  locationCode: number;
+}): Promise<DataForSeoBusinessInfoItem[]> {
+  const login = process.env.DATAFORSEO_LOGIN;
+  const password = process.env.DATAFORSEO_PASSWORD;
+
+  if (!login) {
+    throw new Error("Missing DATAFORSEO_LOGIN");
+  }
+
+  if (!password) {
+    throw new Error("Missing DATAFORSEO_PASSWORD");
+  }
+
+  const businessName = args.businessName.trim();
+
+  if (!businessName) {
+    throw new Error("Missing businessName for business info lookup.");
+  }
+
+  if (
+    typeof args.locationCode !== "number" ||
+    !Number.isFinite(args.locationCode) ||
+    args.locationCode <= 0
+  ) {
+    throw new Error("Missing valid locationCode for business info lookup.");
+  }
+
+  const response = await fetch(getBusinessInfoEndpoint(), {
+    method: "POST",
+    headers: {
+      Authorization: basicAuthHeader(login, password),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify([
+      {
+        language_code: "en",
+        location_code: args.locationCode,
+        keyword: businessName,
+      },
+    ]),
+  });
+
+  const json = (await response.json()) as DataForSeoBusinessInfoResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      `DataForSEO business info HTTP ${response.status}: ${JSON.stringify(json).slice(0, 600)}`
+    );
+  }
+
+  const task = json.tasks?.[0];
+
+  if (!task) {
+    throw new Error("DataForSEO business info: missing tasks[0].");
+  }
+
+  if ((task.status_code ?? 0) >= 40000) {
+    throw new Error(
+      `DataForSEO business info task error: ${task.status_code} ${task.status_message}`
+    );
+  }
+
+  const result = task.result?.[0];
+  return (result?.items ?? []).filter(
+    (item): item is DataForSeoBusinessInfoItem => item.type === "google_business_info"
+  );
+}
+
+export async function resolveDataForSeoUsLocationCode(args: {
   metroCityState: string;
-  login: string;
-  password: string;
 }): Promise<number> {
+  const login = process.env.DATAFORSEO_LOGIN;
+  const password = process.env.DATAFORSEO_PASSWORD;
+
+  if (!login) {
+    throw new Error("Missing DATAFORSEO_LOGIN");
+  }
+
+  if (!password) {
+    throw new Error("Missing DATAFORSEO_PASSWORD");
+  }
+
   const cacheKey = normalizeMetroKey(args.metroCityState);
   const cached = locationCodeCache.get(cacheKey);
 
@@ -168,13 +385,12 @@ async function resolveUsLocationCode(args: {
   const stateName = US_STATE_ABBR_TO_NAME[parsed.stateAbbr];
   const city = parsed.city;
 
-  const locationsEndpoint =
-    "https://api.dataforseo.com/v3/serp/google/locations/us";
+  const locationsEndpoint = "https://api.dataforseo.com/v3/serp/google/locations/us";
 
   const response = await fetch(locationsEndpoint, {
     method: "GET",
     headers: {
-      Authorization: basicAuthHeader(args.login, args.password),
+      Authorization: basicAuthHeader(login, password),
       "Content-Type": "application/json",
     },
   });
@@ -226,6 +442,122 @@ async function resolveUsLocationCode(args: {
   return match.location_code;
 }
 
+export async function resolveBusinessProfileFromDataForSeo(args: {
+  businessName: string;
+  locationCode: number;
+  targetPlaceId?: string | null;
+  targetDomain?: string | null;
+}): Promise<DataForSeoResolvedBusinessProfile> {
+  const items = await fetchBusinessInfoItems({
+    businessName: args.businessName,
+    locationCode: args.locationCode,
+  });
+
+  if (items.length === 0) {
+    throw new Error("DataForSEO business info returned no business items.");
+  }
+
+  const normalizedTargetPlaceId = normalizePlaceId(args.targetPlaceId);
+  const normalizedTargetDomain = normalizeDomain(args.targetDomain);
+  const normalizedBusinessName = normalizeBusinessTitle(args.businessName);
+
+  if (normalizedTargetPlaceId) {
+    const placeMatch =
+      items.find(
+        (item) =>
+          normalizePlaceId(item.place_id) === normalizedTargetPlaceId ||
+          normalizePlaceId(item.cid) === normalizedTargetPlaceId ||
+          normalizePlaceId(item.data_id) === normalizedTargetPlaceId
+      ) ?? null;
+
+    if (placeMatch) {
+      return {
+        item: placeMatch,
+        matchedBy: "place_id",
+        matchedTitle: placeMatch.title ?? null,
+        matchedDomain: normalizeDomain(placeMatch.domain || placeMatch.url) || null,
+        locationCode: args.locationCode,
+      };
+    }
+  }
+
+  if (normalizedTargetDomain) {
+    const domainMatch =
+      items.find(
+        (item) =>
+          normalizeDomain(item.domain) === normalizedTargetDomain ||
+          normalizeDomain(item.url) === normalizedTargetDomain
+      ) ?? null;
+
+    if (domainMatch) {
+      return {
+        item: domainMatch,
+        matchedBy: "domain",
+        matchedTitle: domainMatch.title ?? null,
+        matchedDomain: normalizeDomain(domainMatch.domain || domainMatch.url) || null,
+        locationCode: args.locationCode,
+      };
+    }
+  }
+
+  const titleMatch =
+    items.find(
+      (item) => normalizeBusinessTitle(item.title) === normalizedBusinessName
+    ) ?? null;
+
+  if (titleMatch) {
+    return {
+      item: titleMatch,
+      matchedBy: "title",
+      matchedTitle: titleMatch.title ?? null,
+      matchedDomain: normalizeDomain(titleMatch.domain || titleMatch.url) || null,
+      locationCode: args.locationCode,
+    };
+  }
+
+  const firstItem = items[0];
+
+  return {
+    item: firstItem,
+    matchedBy: "first_item",
+    matchedTitle: firstItem.title ?? null,
+    matchedDomain: normalizeDomain(firstItem.domain || firstItem.url) || null,
+    locationCode: args.locationCode,
+  };
+}
+
+export async function resolveBusinessCoordinatesFromDataForSeo(args: {
+  businessName: string;
+  locationCode: number;
+  targetPlaceId?: string | null;
+  targetDomain?: string | null;
+}): Promise<DataForSeoResolvedBusinessCoordinates> {
+  const resolved = await resolveBusinessProfileFromDataForSeo({
+    businessName: args.businessName,
+    locationCode: args.locationCode,
+    targetPlaceId: args.targetPlaceId ?? null,
+    targetDomain: args.targetDomain ?? null,
+  });
+
+  if (!hasFiniteCoordinates(resolved.item)) {
+    throw new Error("DataForSEO business info returned no coordinate-bearing items.");
+  }
+
+  return {
+    latitude: resolved.item.latitude,
+    longitude: resolved.item.longitude,
+    matchedBy:
+      resolved.matchedBy === "place_id"
+        ? "domain"
+        : resolved.matchedBy === "first_item"
+          ? "first_item"
+          : resolved.matchedBy,
+    matchedTitle: resolved.matchedTitle,
+    matchedDomain: resolved.matchedDomain,
+    locationCode: resolved.locationCode,
+  };
+}
+
 export async function dataForSeoMapsLiveAdvanced(
   params: DataForSeoMapsSearchParams
 ): Promise<DataForSeoMapsLiveAdvancedResult> {
@@ -243,10 +575,8 @@ export async function dataForSeoMapsLiveAdvanced(
   const locationCode =
     typeof params.locationCode === "number" && Number.isFinite(params.locationCode)
       ? params.locationCode
-      : await resolveUsLocationCode({
+      : await resolveDataForSeoUsLocationCode({
           metroCityState: params.locationName,
-          login,
-          password,
         });
 
   const endpoint = "https://api.dataforseo.com/v3/serp/google/maps/live/advanced";

@@ -70,6 +70,114 @@ const COMPACT_BUSINESS_SUFFIXES: Array<{
   { compact: "contractor", label: "Contractor" },
 ];
 
+const CATEGORY_PRIORITY_RULES: Array<{
+  label: string;
+  patterns: RegExp[];
+}> = [
+  {
+    label: "Landscaper",
+    patterns: [
+      /\blandscap(?:e|er|ing)\b/i,
+      /\blawn\s*&?\s*landscap(?:e|ing)\b/i,
+      /\blawn\s*care\b/i,
+      /\blandscape\s*design\b/i,
+      /\blandscape\s*construction\b/i,
+      /\boutdoor\s*living\b/i,
+    ],
+  },
+  {
+    label: "Hardscape Contractor",
+    patterns: [
+      /\bhardscap(?:e|es|ing)?\b/i,
+      /\bretaining\s*wall(?:s)?\b/i,
+      /\bpatio(?:s)?\b/i,
+      /\bpaver(?:s)?\b/i,
+      /\bwalkway(?:s)?\b/i,
+      /\bdriveway(?:s)?\b/i,
+      /\bsidewalk(?:s)?\b/i,
+      /\bstone\s*work\b/i,
+      /\bmasonry\b/i,
+    ],
+  },
+  {
+    label: "Tree Service",
+    patterns: [
+      /\btree\s*service\b/i,
+      /\btree\s*care\b/i,
+      /\barborist\b/i,
+      /\bstump\s*grinding\b/i,
+      /\bstump\s*removal\b/i,
+    ],
+  },
+  {
+    label: "Irrigation Contractor",
+    patterns: [/\birrigation\b/i, /\bsprinkler(?:s)?\b/i, /\bdrainage\b/i],
+  },
+  {
+    label: "Concrete Contractor",
+    patterns: [
+      /\bconcrete\b/i,
+      /\bflatwork\b/i,
+      /\bconcrete\s*driveway(?:s)?\b/i,
+      /\bconcrete\s*patio(?:s)?\b/i,
+    ],
+  },
+];
+
+const US_STATE_NAME_TO_ABBR: Record<string, string> = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
+};
+
 function normalizeTrimmedString(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
     return null;
@@ -223,6 +331,119 @@ function inferBrandNameFromDomain(domain: string | null): string | null {
   return titleCaseToken(firstSegment);
 }
 
+function normalizeCategoryInput(value: string | null): string | null {
+  const normalized = normalizeTrimmedString(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.replace(/\s+/g, " ").trim();
+}
+
+function splitCategoryCandidates(value: string): string[] {
+  return value
+    .split(/[,;/|]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeCategoryCandidateLabel(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w+/g, (token) => titleCaseToken(token));
+}
+
+function inferCanonicalCategoryFromRawCategory(
+  rawCategory: string | null
+): {
+  canonicalCategory: string | null;
+  source:
+    | "stored_primary_category"
+    | "rule_inference"
+    | "single_category_fallback"
+    | "raw_category_fallback"
+    | "missing";
+} {
+  const normalized = normalizeCategoryInput(rawCategory);
+
+  if (!normalized) {
+    return {
+      canonicalCategory: null,
+      source: "missing",
+    };
+  }
+
+  for (const rule of CATEGORY_PRIORITY_RULES) {
+    if (rule.patterns.some((pattern) => pattern.test(normalized))) {
+      return {
+        canonicalCategory: rule.label,
+        source: "rule_inference",
+      };
+    }
+  }
+
+  const parts = splitCategoryCandidates(normalized);
+
+  if (parts.length === 1) {
+    return {
+      canonicalCategory: normalizeCategoryCandidateLabel(parts[0]),
+      source: "single_category_fallback",
+    };
+  }
+
+  if (parts.length > 1) {
+    return {
+      canonicalCategory: normalizeCategoryCandidateLabel(parts[0]),
+      source: "raw_category_fallback",
+    };
+  }
+
+  return {
+    canonicalCategory: normalizeCategoryCandidateLabel(normalized),
+    source: "raw_category_fallback",
+  };
+}
+
+function normalizeCityToken(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((token) => titleCaseToken(token))
+    .join(" ");
+}
+
+function normalizeMetroValue(value: string | null): string | null {
+  const normalized = normalizeTrimmedString(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const compact = normalized.replace(/\s+/g, " ").trim();
+  const parts = compact.split(",").map((part) => part.trim()).filter(Boolean);
+
+  if (parts.length < 2) {
+    return compact;
+  }
+
+  const city = normalizeCityToken(parts[0]);
+  const stateRaw = parts[1].replace(/\./g, "").trim();
+
+  if (/^[A-Za-z]{2}$/.test(stateRaw)) {
+    return `${city}, ${stateRaw.toUpperCase()}`;
+  }
+
+  const stateAbbr = US_STATE_NAME_TO_ABBR[stateRaw.toLowerCase()];
+
+  if (stateAbbr) {
+    return `${city}, ${stateAbbr}`;
+  }
+
+  return `${city}, ${parts[1]}`;
+}
+
 export function enrichProjectIdentity(
   input: ProjectIdentityInput
 ): ProjectIdentityEnrichment {
@@ -246,13 +467,15 @@ export function enrichProjectIdentity(
       ? "domain_inference"
       : "missing";
 
-  const canonicalCategory =
-    normalizeTrimmedString(input.primaryCategory) ??
-    normalizeTrimmedString(input.category);
+  const storedPrimaryCategory = normalizeTrimmedString(input.primaryCategory);
+  const rawCategory = normalizeCategoryInput(input.category);
+  const inferredCategory = inferCanonicalCategoryFromRawCategory(rawCategory);
+  const canonicalCategory = storedPrimaryCategory ?? inferredCategory.canonicalCategory;
 
-  const canonicalMetro =
+  const canonicalMetro = normalizeMetroValue(
     normalizeTrimmedString(input.targetMetro) ??
-    normalizeTrimmedString(input.metro);
+      normalizeTrimmedString(input.metro)
+  );
 
   const canonicalRadiusMiles =
     normalizeRadius(input.targetRadiusMiles) ??
@@ -266,76 +489,73 @@ export function enrichProjectIdentity(
 
   const hasMapsLocationCode =
     typeof input.mapsLocationCode === "number" &&
-    Number.isFinite(input.mapsLocationCode);
+    Number.isFinite(input.mapsLocationCode) &&
+    input.mapsLocationCode > 0;
 
-  const hasResolvedBusinessName = Boolean(resolvedBusinessName);
   const hasCanonicalCategory = Boolean(canonicalCategory);
   const hasCanonicalMetro = Boolean(canonicalMetro);
+  const hasResolvedBusinessName = Boolean(resolvedBusinessName);
   const hasTargetDomain = Boolean(canonicalDomain);
   const hasTargetBrandName = Boolean(storedTargetBrandName);
 
   const notes: string[] = [];
 
   if (canonicalSiteUrl) {
-    notes.push(`Resolved canonical site URL: ${canonicalSiteUrl}`);
+    notes.push(`Canonical site URL resolved: ${canonicalSiteUrl}`);
   } else {
-    notes.push(
-      "Project is missing a valid canonical site URL, so deeper business identity inference remains limited."
-    );
+    notes.push("Canonical site URL could not be resolved yet.");
   }
 
   if (canonicalDomain) {
-    notes.push(`Resolved canonical domain: ${canonicalDomain}`);
+    notes.push(`Canonical domain resolved: ${canonicalDomain}`);
   } else {
-    notes.push("Project does not yet have a resolved target domain.");
+    notes.push("Canonical domain is still missing.");
   }
 
-  if (businessNameSource === "stored_target_brand_name" && resolvedBusinessName) {
-    notes.push(`Using stored target brand name: ${resolvedBusinessName}`);
-  } else if (businessNameSource === "domain_inference" && resolvedBusinessName) {
+  if (resolvedBusinessName) {
     notes.push(
-      `Inferred cleaner provisional business name from domain: ${resolvedBusinessName}`
+      `Resolved business name: ${resolvedBusinessName} (${businessNameSource}).`
     );
   } else {
-    notes.push(
-      "Business name could not be resolved yet, so identity quality remains partial."
-    );
+    notes.push("Resolved business name is still missing.");
   }
 
-  if (hasCanonicalCategory) {
-    notes.push(`Resolved canonical category: ${canonicalCategory}`);
+  if (canonicalCategory) {
+    if (storedPrimaryCategory) {
+      notes.push(`Canonical category resolved from stored primary_category: ${canonicalCategory}`);
+    } else if (rawCategory) {
+      notes.push(
+        `Canonical category inferred from raw category text: ${canonicalCategory} (${inferredCategory.source}).`
+      );
+    } else {
+      notes.push(`Canonical category resolved: ${canonicalCategory}`);
+    }
   } else {
-    notes.push(
-      "Project is missing a canonical category, so competitor discovery cannot start safely."
-    );
+    notes.push("Canonical category is still missing.");
   }
 
-  if (hasCanonicalMetro) {
-    notes.push(`Resolved canonical metro: ${canonicalMetro}`);
+  if (canonicalMetro) {
+    notes.push(`Canonical metro resolved: ${canonicalMetro}`);
   } else {
-    notes.push(
-      "Project is missing a canonical metro, so location-based automation remains blocked."
-    );
+    notes.push("Canonical metro is still missing.");
   }
 
-  if (canonicalRadiusMiles !== null) {
-    notes.push(`Resolved canonical radius miles: ${canonicalRadiusMiles}`);
+  if (canonicalRadiusMiles) {
+    notes.push(`Canonical radius resolved: ${canonicalRadiusMiles} miles`);
+  } else {
+    notes.push("Canonical radius is still missing.");
   }
 
   if (hasRankCoordinates) {
-    notes.push("Project already has rank coordinates for baseline rank discovery.");
+    notes.push("Rank coordinates already exist on the project.");
   } else {
-    notes.push(
-      "Project is missing rank_lat or rank_lng, so baseline rank discovery is not ready yet."
-    );
+    notes.push("Rank coordinates are still missing.");
   }
 
   if (hasMapsLocationCode) {
-    notes.push("Project already has a stored maps_location_code for provider lookups.");
+    notes.push("Maps location code already exists on the project.");
   } else {
-    notes.push(
-      "Project does not have a stored maps_location_code yet. Competitor discovery may still resolve it from target metro."
-    );
+    notes.push("Maps location code is still missing.");
   }
 
   return {

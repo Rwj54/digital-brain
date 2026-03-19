@@ -1,12 +1,25 @@
-import {
-  createProjectJob,
-  finishProjectJobFailed,
-  finishProjectJobSuccess,
-} from "@/lib/jobs/projectJobs";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { loadProjectOnboardingContext } from "@/lib/onboarding/loadProjectOnboardingContext";
 import { enrichProjectIdentity } from "@/lib/onboarding/enrichProjectIdentity";
+import { buildOnboardingNotes } from "@/lib/onboarding/buildOnboardingNotes";
+import { buildProjectOnboardingJobSuccessSummary } from "@/lib/onboarding/buildProjectOnboardingJobSuccessSummary";
+import {
+  normalizeProjectOnboardingRankKeywords,
+  upsertProjectOnboardingSeedKeywords,
+} from "@/lib/onboarding/projectOnboardingKeywords";
+import {
+  persistProjectOnboardingAutomationFields,
+  persistProjectOnboardingIdentityFields,
+} from "@/lib/onboarding/projectOnboardingPersistence";
+import { persistProjectOnboardingRankCoordinates } from "@/lib/onboarding/projectOnboardingRankCoordinates";
+import { normalizeProjectOnboardingLegacyRankSnapshots } from "@/lib/onboarding/projectOnboardingRankSnapshots";
+import {
+  completeProjectOnboardingJobFailed,
+  completeProjectOnboardingJobSuccess,
+  startProjectOnboardingJob,
+} from "@/lib/onboarding/projectOnboardingJob";
 import { discoverCompetitorsForProject } from "@/lib/domain/competitors/discoverCompetitorsForProject";
+import { runBaselineRankDiscovery } from "@/lib/domain/rank/runBaselineRankDiscovery";
+import { runAuthorityBaseline } from "@/lib/authority/runAuthorityBaseline";
 
 export type SeedRankKeywordInput = {
   keyword: string;
@@ -68,124 +81,21 @@ function todayDateUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function upsertSeedKeywords(params: {
-  projectId: string;
-  seedKeywords: SeedRankKeywordInput[];
-}): Promise<number> {
-  const supabase = supabaseAdmin();
-
-  const rows = params.seedKeywords
-    .map((row, index) => {
-      const keyword = typeof row.keyword === "string" ? row.keyword.trim() : "";
-      const metro = typeof row.metro === "string" ? row.metro.trim() : "";
-
-      if (!keyword || !metro) {
-        return null;
-      }
-
-      return {
-        project_id: params.projectId,
-        keyword,
-        metro,
-        is_active: row.isActive ?? true,
-        priority:
-          typeof row.priority === "number" && Number.isFinite(row.priority)
-            ? Math.round(row.priority)
-            : index + 1,
-      };
-    })
-    .filter(
-      (
-        row
-      ): row is {
-        project_id: string;
-        keyword: string;
-        metro: string;
-        is_active: boolean;
-        priority: number;
-      } => row !== null
-    );
-
-  if (rows.length === 0) {
-    return 0;
-  }
-
-  const { error } = await supabase
-    .from("project_rank_keywords")
-    .upsert(rows, { onConflict: "project_id,keyword,metro" });
-
-  if (error) {
-    throw new Error(`Failed to upsert project_rank_keywords: ${error.message}`);
-  }
-
-  return rows.length;
+function normalizeString(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-async function persistResolvedIdentityFields(params: {
-  projectId: string;
-  currentTargetDomain: string | null;
-  currentTargetBrandName: string | null;
-  canonicalDomain: string | null;
-  resolvedBusinessName: string | null;
-}): Promise<{
-  targetDomainPersisted: boolean;
-  targetBrandNamePersisted: boolean;
-}> {
-  const currentTargetDomain =
-    typeof params.currentTargetDomain === "string"
-      ? params.currentTargetDomain.trim().toLowerCase()
-      : "";
-
-  const currentTargetBrandName =
-    typeof params.currentTargetBrandName === "string"
-      ? params.currentTargetBrandName.trim()
-      : "";
-
-  const canonicalDomain =
-    typeof params.canonicalDomain === "string"
-      ? params.canonicalDomain.trim().toLowerCase()
-      : "";
-
-  const resolvedBusinessName =
-    typeof params.resolvedBusinessName === "string"
-      ? params.resolvedBusinessName.trim()
-      : "";
-
-  const updates: {
-    target_domain?: string;
-    target_brand_name?: string;
-  } = {};
-
-  if (!currentTargetDomain && canonicalDomain) {
-    updates.target_domain = canonicalDomain;
+function normalizePositiveInteger(value: number | null | undefined): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
   }
 
-  if (!currentTargetBrandName && resolvedBusinessName) {
-    updates.target_brand_name = resolvedBusinessName;
-  }
+  const rounded = Math.round(value);
+  return rounded > 0 ? rounded : null;
+}
 
-  if (!updates.target_domain && !updates.target_brand_name) {
-    return {
-      targetDomainPersisted: false,
-      targetBrandNamePersisted: false,
-    };
-  }
-
-  const supabase = supabaseAdmin();
-
-  const { error } = await supabase
-    .from("projects")
-    .update(updates)
-    .eq("id", params.projectId);
-
-  if (error) {
-    throw new Error(`Failed to persist identity fields: ${error.message}`);
-  }
-
-  return {
-    targetDomainPersisted: Boolean(updates.target_domain),
-    targetBrandNamePersisted: Boolean(updates.target_brand_name),
-  };
+function normalizeKeywordValue(value: string | null | undefined): string {
+  return normalizeString(value).toLowerCase();
 }
 
 export async function runProjectOnboarding(
@@ -206,26 +116,17 @@ export async function runProjectOnboarding(
     };
   }
 
-  const job = await createProjectJob({
+  const job = await startProjectOnboardingJob({
     projectId,
-    jobType: "project_onboarding_v1",
-    metadata: {
-      mode,
-      userAgent: input.userAgent ?? null,
-      seedKeywordCount: Array.isArray(input.seedKeywords)
-        ? input.seedKeywords.length
-        : 0,
-    },
+    mode,
+    userAgent: input.userAgent ?? null,
+    seedKeywordCount: Array.isArray(input.seedKeywords)
+      ? input.seedKeywords.length
+      : 0,
   });
 
   try {
-    const seededKeywordCount = await upsertSeedKeywords({
-      projectId,
-      seedKeywords: input.seedKeywords ?? [],
-    });
-
-    const { project, activeKeywords } =
-      await loadProjectOnboardingContext(projectId);
+    const { project } = await loadProjectOnboardingContext(projectId);
 
     const identity = enrichProjectIdentity({
       siteUrl: project.site_url,
@@ -242,7 +143,13 @@ export async function runProjectOnboarding(
       mapsLocationCode: project.maps_location_code,
     });
 
-    const persistedIdentity = await persistResolvedIdentityFields({
+    const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
+      projectId,
+      seedKeywords: input.seedKeywords ?? [],
+      canonicalMetro: identity.canonicalMetro,
+    });
+
+    const persistedIdentity = await persistProjectOnboardingIdentityFields({
       projectId,
       currentTargetDomain: project.target_domain,
       currentTargetBrandName: project.target_brand_name,
@@ -250,44 +157,84 @@ export async function runProjectOnboarding(
       resolvedBusinessName: identity.resolvedBusinessName,
     });
 
-    const notes: string[] = [
-      "Phase 3E onboarding identity enrichment is now running before downstream automation.",
-      ...identity.notes,
-    ];
+    const persistedAutomationFields =
+      await persistProjectOnboardingAutomationFields({
+        projectId,
+        currentPrimaryCategory: project.primary_category,
+        currentTargetMetro: project.target_metro,
+        currentTargetRadiusMiles: project.target_radius_miles,
+        currentMapsLocationCode: project.maps_location_code,
+        canonicalCategory: identity.canonicalCategory,
+        canonicalMetro: identity.canonicalMetro,
+        canonicalRadiusMiles: identity.canonicalRadiusMiles,
+      });
 
-    if (persistedIdentity.targetDomainPersisted && identity.canonicalDomain) {
-      notes.push(`Persisted target_domain: ${identity.canonicalDomain}`);
-    }
+    const effectiveCanonicalDomain =
+      normalizeString(identity.canonicalDomain).toLowerCase() ||
+      normalizeString(project.target_domain).toLowerCase() ||
+      null;
 
-    if (
-      persistedIdentity.targetBrandNamePersisted &&
-      identity.resolvedBusinessName
-    ) {
-      notes.push(`Persisted target_brand_name: ${identity.resolvedBusinessName}`);
-    }
+    const effectiveResolvedBusinessName =
+      normalizeString(identity.resolvedBusinessName) ||
+      normalizeString(project.target_brand_name) ||
+      null;
 
-    if (seededKeywordCount > 0) {
-      notes.push(
-        `Seeded ${seededKeywordCount} keyword(s) during onboarding startup.`
-      );
-    }
+    const effectiveMapsLocationCode =
+      persistedAutomationFields.resolvedMapsLocationCode ??
+      normalizePositiveInteger(project.maps_location_code);
 
-    const hasActiveKeywords = activeKeywords.length > 0;
-    const baselineRankPlanned =
-      identity.readiness.rankBaselineReady && hasActiveKeywords;
-    const authorityBaselinePlanned = baselineRankPlanned;
+    const persistedRankCoordinates =
+      await persistProjectOnboardingRankCoordinates({
+        projectId,
+        currentRankLat: project.rank_lat,
+        currentRankLng: project.rank_lng,
+        resolvedBusinessName: effectiveResolvedBusinessName,
+        canonicalDomain: effectiveCanonicalDomain,
+        mapsLocationCode: effectiveMapsLocationCode,
+      });
 
-    if (!hasActiveKeywords) {
-      notes.push(
-        "Project has no active rank keywords yet, so rank and authority baselines remain blocked."
-      );
-    } else {
-      notes.push(
-        `Project has ${activeKeywords.length} active rank keyword(s) ready for downstream workflows.`
-      );
-    }
+    const normalizedKeywords = await normalizeProjectOnboardingRankKeywords({
+      projectId,
+      canonicalMetro: identity.canonicalMetro,
+    });
+
+    const canonicalKeywordForSnapshots =
+      normalizeKeywordValue((input.seedKeywords ?? [])[0]?.keyword) ||
+      normalizeKeywordValue(identity.canonicalCategory);
+
+    const normalizedRankSnapshots =
+      await normalizeProjectOnboardingLegacyRankSnapshots({
+        projectId,
+        canonicalKeyword: canonicalKeywordForSnapshots,
+        canonicalMetro: identity.canonicalMetro,
+      });
+
+    const refreshedContext = await loadProjectOnboardingContext(projectId);
+    const refreshedActiveKeywords = refreshedContext.activeKeywords.map((row) => ({
+      keyword: row.keyword,
+      metro: row.metro,
+      priority: row.priority,
+    }));
+
+    const baselineRankDiscovery = await runBaselineRankDiscovery({
+      projectId,
+      activeKeywords: refreshedActiveKeywords,
+      rankLat:
+        persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null,
+      rankLng:
+        persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null,
+      capturedAt,
+    });
+
+    const hasActiveKeywords = refreshedActiveKeywords.length > 0;
+    const hasRankCoordinates =
+      (persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null) !== null &&
+      (persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null) !== null;
+
+    const baselineRankPlanned = hasRankCoordinates && hasActiveKeywords;
 
     let competitorDiscoveryStarted = false;
+    let competitorDiscoveryFailureNote: string | null = null;
 
     if (identity.readiness.competitorDiscoveryReady) {
       const discoveryResult = await discoverCompetitorsForProject({
@@ -298,29 +245,51 @@ export async function runProjectOnboarding(
 
       if (discoveryResult.ok) {
         competitorDiscoveryStarted = true;
-        notes.push(
-          "Competitor discovery started successfully during onboarding."
-        );
       } else {
-        notes.push(
-          `Competitor discovery did not start cleanly during onboarding: ${discoveryResult.error}`
-        );
+        competitorDiscoveryFailureNote = `Competitor discovery did not start cleanly during onboarding: ${discoveryResult.error}`;
       }
-    } else {
-      notes.push(
-        "Competitor discovery was skipped because canonical category or canonical metro is still missing."
-      );
     }
 
-    if (baselineRankPlanned) {
-      notes.push(
-        "Baseline rank discovery is now structurally ready once the rank workflow is invoked."
-      );
-    } else {
-      notes.push(
-        "Baseline rank discovery is not ready yet because rank coordinates or active keywords are still missing."
-      );
-    }
+    const authorityBaseline =
+      baselineRankDiscovery.executed && competitorDiscoveryStarted
+        ? await runAuthorityBaseline({
+            projectId,
+            capturedAt,
+            version: "v1.1",
+          })
+        : {
+            executed: false,
+            authorityScore: null,
+            authorityTier: null,
+            momentumScore: null,
+            momentumLabel: null,
+            actionsCount: 0,
+            skippedReason:
+              baselineRankDiscovery.executed && !competitorDiscoveryStarted
+                ? "Authority baseline was skipped because competitor discovery did not complete successfully."
+                : "Authority baseline was skipped because baseline rank discovery did not execute.",
+          };
+
+    const authorityBaselinePlanned =
+      baselineRankPlanned && competitorDiscoveryStarted;
+
+    const notes = buildOnboardingNotes({
+      identity,
+      persistedIdentity,
+      persistedAutomationFields,
+      persistedRankCoordinates,
+      normalizedKeywords,
+      normalizedRankSnapshots,
+      baselineRankDiscovery,
+      authorityBaseline,
+      seededKeywordCount,
+      refreshedActiveKeywords,
+      canonicalKeywordForSnapshots,
+      competitorDiscoveryStarted,
+      competitorDiscoveryFailureNote,
+      baselineRankPlanned,
+      authorityBaselinePlanned,
+    });
 
     const result: RunProjectOnboardingResult = {
       ok: true,
@@ -329,7 +298,7 @@ export async function runProjectOnboarding(
       mode,
       capturedAt,
       seededKeywordCount,
-      activeKeywordCount: activeKeywords.length,
+      activeKeywordCount: refreshedActiveKeywords.length,
       identity: {
         canonicalSiteUrl: identity.canonicalSiteUrl,
         canonicalDomain: identity.canonicalDomain,
@@ -343,7 +312,7 @@ export async function runProjectOnboarding(
       steps: {
         projectValidated: true,
         identityEnriched: true,
-        rankInputsValidated: identity.readiness.hasRankCoordinates,
+        rankInputsValidated: hasRankCoordinates,
         keywordSeeded: seededKeywordCount > 0,
         competitorDiscoveryStarted,
         baselineRankPlanned,
@@ -352,9 +321,66 @@ export async function runProjectOnboarding(
       notes,
     };
 
-    await finishProjectJobSuccess({
+    const jobSuccessSummary = buildProjectOnboardingJobSuccessSummary({
+      capturedAt,
+      seededKeywordCount,
+      activeKeywordCount: refreshedActiveKeywords.length,
+      competitorDiscoveryStarted,
+      baselineRankPlanned,
+      authorityBaselinePlanned,
+      canonicalDomain: identity.canonicalDomain,
+      resolvedBusinessName: identity.resolvedBusinessName,
+      canonicalCategory: identity.canonicalCategory,
+      canonicalMetro: identity.canonicalMetro,
+      canonicalRadiusMiles: identity.canonicalRadiusMiles,
+      targetDomainPersisted: persistedIdentity.targetDomainPersisted,
+      targetBrandNamePersisted: persistedIdentity.targetBrandNamePersisted,
+      primaryCategoryPersisted:
+        persistedAutomationFields.primaryCategoryPersisted,
+      targetMetroPersisted: persistedAutomationFields.targetMetroPersisted,
+      targetRadiusMilesPersisted:
+        persistedAutomationFields.targetRadiusMilesPersisted,
+      mapsLocationCodePersisted:
+        persistedAutomationFields.mapsLocationCodePersisted,
+      resolvedMapsLocationCode:
+        persistedAutomationFields.resolvedMapsLocationCode,
+      rankCoordinatesPersisted:
+        persistedRankCoordinates.rankCoordinatesPersisted,
+      rankLatPersisted: persistedRankCoordinates.rankLatPersisted,
+      rankLngPersisted: persistedRankCoordinates.rankLngPersisted,
+      resolvedRankLat: persistedRankCoordinates.resolvedRankLat,
+      resolvedRankLng: persistedRankCoordinates.resolvedRankLng,
+      rankCoordinateMatchedBy: persistedRankCoordinates.matchedBy,
+      rankCoordinateMatchedTitle: persistedRankCoordinates.matchedTitle,
+      rankCoordinateMatchedDomain: persistedRankCoordinates.matchedDomain,
+      normalizedKeywordCount: normalizedKeywords.normalizedKeywordCount,
+      normalizedRankSnapshotCount:
+        normalizedRankSnapshots.normalizedSnapshotCount,
+      baselineRankDiscoveryExecuted: baselineRankDiscovery.executed,
+      baselineRankDiscoveryKeyword: baselineRankDiscovery.keyword,
+      baselineRankDiscoveryMetro: baselineRankDiscovery.metro,
+      baselineRankDiscoveryCandidateCount:
+        baselineRankDiscovery.candidateCount,
+      baselineRankDiscoveryStoredCount: baselineRankDiscovery.storedCount,
+      baselineTargetProfileHydrated:
+        baselineRankDiscovery.targetProfileHydrated,
+      baselineTargetProfilePlaceId:
+        baselineRankDiscovery.targetProfilePlaceId,
+      baselineTargetProfileName:
+        baselineRankDiscovery.targetProfileName,
+      baselineTargetProfileMatchedBy:
+        baselineRankDiscovery.targetProfileMatchedBy,
+      authorityBaselineExecuted: authorityBaseline.executed,
+      authorityBaselineScore: authorityBaseline.authorityScore,
+      authorityBaselineTier: authorityBaseline.authorityTier,
+      authorityBaselineMomentumScore: authorityBaseline.momentumScore,
+      authorityBaselineMomentumLabel: authorityBaseline.momentumLabel,
+      authorityBaselineActionsCount: authorityBaseline.actionsCount,
+    });
+
+    await completeProjectOnboardingJobSuccess({
       jobId: job.jobId,
-      resultSummary: result,
+      ...jobSuccessSummary,
     });
 
     return result;
@@ -362,10 +388,10 @@ export async function runProjectOnboarding(
     const message =
       error instanceof Error ? error.message : "Unknown onboarding error.";
 
-    await finishProjectJobFailed({
+    await completeProjectOnboardingJobFailed({
       jobId: job.jobId,
+      capturedAt,
       errorMessage: message,
-      resultSummary: { projectId },
     });
 
     return {

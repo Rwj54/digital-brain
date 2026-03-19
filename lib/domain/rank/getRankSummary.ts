@@ -19,22 +19,16 @@ type RankSnapshotRow = {
     placeId?: string | null;
     cid?: string | null;
     data_id?: string | null;
+    domain?: string | null;
+    url?: string | null;
   } | null;
-};
-
-type RankMarketResultRow = {
-  id: string;
-  position: number;
-  is_target: boolean | null;
-  matched_competitor_id: string | null;
-  result_name: string;
-  result_place_id: string | null;
-  captured_at: string;
 };
 
 type ProjectTargetRow = {
   target_business_name: string | null;
   target_place_id: string | null;
+  target_brand_name: string | null;
+  target_domain: string | null;
 };
 
 type RankSummary = {
@@ -77,6 +71,22 @@ function normalizeBusinessName(value: string | null | undefined) {
     .trim();
 }
 
+function normalizeDomain(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim().toLowerCase();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const firstSegment = withoutProtocol.split("/")[0] ?? "";
+  return firstSegment.replace(/^www\./, "");
+}
+
 function getSnapshotPlaceId(row: RankSnapshotRow) {
   return (
     row.raw_result?.place_id ??
@@ -91,15 +101,26 @@ function getSnapshotTitle(row: RankSnapshotRow) {
   return row.raw_result?.title ?? row.raw_result?.name ?? null;
 }
 
+function getSnapshotDomain(row: RankSnapshotRow) {
+  return normalizeDomain(row.raw_result?.domain ?? row.raw_result?.url ?? null);
+}
+
 function isTargetSnapshotMatch(
   row: RankSnapshotRow,
   targetBusinessName: string | null,
-  targetPlaceId: string | null
+  targetPlaceId: string | null,
+  targetDomain: string | null
 ) {
   const rowPlaceId = getSnapshotPlaceId(row);
   const rowTitle = getSnapshotTitle(row);
+  const rowDomain = getSnapshotDomain(row);
+  const normalizedTargetDomain = normalizeDomain(targetDomain);
 
   if (targetPlaceId && rowPlaceId && targetPlaceId === rowPlaceId) {
+    return true;
+  }
+
+  if (normalizedTargetDomain && rowDomain && normalizedTargetDomain === rowDomain) {
     return true;
   }
 
@@ -108,26 +129,6 @@ function isTargetSnapshotMatch(
   }
 
   return normalizeBusinessName(targetBusinessName) === normalizeBusinessName(rowTitle);
-}
-
-function isTargetMarketResultMatch(
-  row: RankMarketResultRow,
-  targetBusinessName: string | null,
-  targetPlaceId: string | null
-) {
-  if (row.is_target === true) {
-    return true;
-  }
-
-  if (targetPlaceId && row.result_place_id && targetPlaceId === row.result_place_id) {
-    return true;
-  }
-
-  if (!targetBusinessName || !row.result_name) {
-    return false;
-  }
-
-  return normalizeBusinessName(targetBusinessName) === normalizeBusinessName(row.result_name);
 }
 
 function roundRate(value: number) {
@@ -146,7 +147,7 @@ export async function getRankSummary(
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
-    .select("target_business_name, target_place_id")
+    .select("target_business_name, target_place_id, target_brand_name, target_domain")
     .eq("id", projectId)
     .maybeSingle();
 
@@ -155,6 +156,10 @@ export async function getRankSummary(
   }
 
   const projectTarget = (project ?? null) as ProjectTargetRow | null;
+  const effectiveTargetBusinessName =
+    projectTarget?.target_brand_name ?? projectTarget?.target_business_name ?? null;
+  const effectiveTargetPlaceId = projectTarget?.target_place_id ?? null;
+  const effectiveTargetDomain = projectTarget?.target_domain ?? null;
 
   const { data, error } = await supabase
     .from("gbp_rank_snapshots")
@@ -181,8 +186,9 @@ export async function getRankSummary(
   const latestTargetRow = latestDayRows.find((row) =>
     isTargetSnapshotMatch(
       row,
-      projectTarget?.target_business_name ?? null,
-      projectTarget?.target_place_id ?? null
+      effectiveTargetBusinessName,
+      effectiveTargetPlaceId,
+      effectiveTargetDomain
     )
   );
 
@@ -199,69 +205,25 @@ export async function getRankSummary(
   }
 
   const targetRanksByDay: number[] = [];
+  let top3PresenceCount = 0;
+  let top10PresenceCount = 0;
+  let top20PresenceCount = 0;
 
   for (const rows of rowsByDay.values()) {
     const matchedRow = rows.find((row) =>
       isTargetSnapshotMatch(
         row,
-        projectTarget?.target_business_name ?? null,
-        projectTarget?.target_place_id ?? null
+        effectiveTargetBusinessName,
+        effectiveTargetPlaceId,
+        effectiveTargetDomain
       )
     );
+
+    const rankForDay = matchedRow?.rank_position ?? 21;
 
     if (matchedRow) {
       targetRanksByDay.push(matchedRow.rank_position);
     }
-  }
-
-  const capturedDates = Array.from(rowsByDay.keys());
-
-  const { data: marketResults, error: marketResultsError } = await supabase
-    .from("gbp_rank_market_results")
-    .select(
-      "id, position, is_target, matched_competitor_id, result_name, result_place_id, captured_at"
-    )
-    .eq("project_id", projectId)
-    .eq("keyword", keyword)
-    .eq("metro", metro)
-    .in("captured_at", capturedDates)
-    .order("captured_at", { ascending: false })
-    .order("position", { ascending: true });
-
-  if (marketResultsError) {
-    throw new Error(
-      `Failed to load market results for rank summary: ${marketResultsError.message}`
-    );
-  }
-
-  const marketRows = (marketResults ?? []) as RankMarketResultRow[];
-  const marketRowsByDay = new Map<string, RankMarketResultRow[]>();
-
-  for (const row of marketRows) {
-    const existing = marketRowsByDay.get(row.captured_at);
-
-    if (existing) {
-      existing.push(row);
-    } else {
-      marketRowsByDay.set(row.captured_at, [row]);
-    }
-  }
-
-  let top3PresenceCount = 0;
-  let top10PresenceCount = 0;
-  let top20PresenceCount = 0;
-
-  for (const capturedAt of capturedDates) {
-    const rows = marketRowsByDay.get(capturedAt) ?? [];
-    const matchedRow = rows.find((row) =>
-      isTargetMarketResultMatch(
-        row,
-        projectTarget?.target_business_name ?? null,
-        projectTarget?.target_place_id ?? null
-      )
-    );
-
-    const rankForDay = matchedRow?.position ?? 21;
 
     if (rankForDay <= 3) {
       top3PresenceCount += 1;
@@ -276,7 +238,7 @@ export async function getRankSummary(
     }
   }
 
-  const dayCount = capturedDates.length || 1;
+  const dayCount = rowsByDay.size || 1;
   const top3PresenceRate = roundRate(top3PresenceCount / dayCount);
   const top10PresenceRate = roundRate(top10PresenceCount / dayCount);
   const top20PresenceRate = roundRate(top20PresenceCount / dayCount);

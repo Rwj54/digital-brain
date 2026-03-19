@@ -27,7 +27,13 @@ type MapsLiveAdvancedItem = {
   title?: string;
   domain?: string | null;
   place_id?: string;
+  url?: string | null;
+  category?: string | null;
+  additional_categories?: unknown;
   rating?: { value?: number; votes_count?: number } | null;
+  photos_count?: number | null;
+  posts_30d?: number | null;
+  qa_count?: number | null;
 };
 
 type MapsLiveAdvancedResult = {
@@ -78,6 +84,129 @@ function extractDomainFromSiteUrl(
     return normalizeDomain(new URL(withProtocol).hostname);
   } catch {
     return normalizeDomain(trimmed);
+  }
+}
+
+function normalizePositiveInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const rounded = Math.round(value);
+  return rounded >= 0 ? rounded : null;
+}
+
+function normalizeNumeric(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return value;
+}
+
+function extractAdditionalCategories(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const out = value
+    .map((item) => {
+      if (typeof item === "string") {
+        return item.trim();
+      }
+
+      if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        const title =
+          typeof record.title === "string"
+            ? record.title.trim()
+            : typeof record.name === "string"
+              ? record.name.trim()
+              : "";
+
+        return title;
+      }
+
+      return "";
+    })
+    .filter((item) => item.length > 0);
+
+  return out.length > 0 ? out : null;
+}
+
+function matchesTargetBusiness(args: {
+  item: MapsLiveAdvancedItem;
+  targetPlaceId: string | null;
+  targetDomain: string | null;
+}): boolean {
+  const itemPlaceId =
+    typeof args.item.place_id === "string" ? args.item.place_id.trim() : "";
+  const itemDomain =
+    normalizeDomain(args.item.domain) ?? normalizeDomain(args.item.url);
+
+  if (args.targetPlaceId && itemPlaceId && args.targetPlaceId === itemPlaceId) {
+    return true;
+  }
+
+  if (args.targetDomain && itemDomain && args.targetDomain === itemDomain) {
+    return true;
+  }
+
+  return false;
+}
+
+async function upsertTargetBusinessProfile(args: {
+  projectId: string;
+  item: MapsLiveAdvancedItem;
+  fetchedAtIso: string;
+}): Promise<void> {
+  const supabase = supabaseServer();
+
+  const placeId =
+    typeof args.item.place_id === "string" ? args.item.place_id.trim() : null;
+  const gbpName =
+    typeof args.item.title === "string" ? args.item.title.trim() : null;
+  const gbpUrl =
+    typeof args.item.url === "string" && args.item.url.trim()
+      ? args.item.url.trim()
+      : null;
+  const primaryCategory =
+    typeof args.item.category === "string" && args.item.category.trim()
+      ? args.item.category.trim()
+      : null;
+
+  const additionalCategories = extractAdditionalCategories(
+    args.item.additional_categories
+  );
+
+  const rating = normalizeNumeric(args.item.rating?.value);
+  const totalReviews = normalizePositiveInteger(args.item.rating?.votes_count);
+  const photosCount = normalizePositiveInteger(args.item.photos_count);
+  const posts30d = normalizePositiveInteger(args.item.posts_30d);
+  const qaCount = normalizePositiveInteger(args.item.qa_count);
+
+  const { error } = await supabase.from("gbp_profiles").upsert(
+    [
+      {
+        project_id: args.projectId,
+        place_id: placeId,
+        gbp_name: gbpName,
+        gbp_url: gbpUrl,
+        primary_category: primaryCategory,
+        additional_categories: additionalCategories,
+        rating,
+        total_reviews: totalReviews,
+        photos_count: photosCount,
+        posts_30d: posts30d,
+        qa_count: qaCount,
+        last_fetched_at: args.fetchedAtIso,
+      },
+    ],
+    { onConflict: "project_id" }
+  );
+
+  if (error) {
+    throw new Error(`Failed to upsert gbp_profiles row: ${error.message}`);
   }
 }
 
@@ -198,7 +327,7 @@ export async function discoverMapsCompetitorsForProject(args: {
     | GbpProfileRow
     | null;
 
-  const targetPlaceId =
+  const existingTargetPlaceId =
     typeof gbpProfile?.place_id === "string" && gbpProfile.place_id.trim()
       ? gbpProfile.place_id.trim()
       : null;
@@ -206,12 +335,6 @@ export async function discoverMapsCompetitorsForProject(args: {
   const targetDomain =
     normalizeDomain(typedProject.target_domain) ??
     extractDomainFromSiteUrl(typedProject.site_url);
-
-  await cleanupSelfCompetitorRows({
-    projectId: args.projectId,
-    targetDomain,
-    targetPlaceId,
-  });
 
   const keyword = `${category} ${metro}`.trim();
   const nowIso = new Date().toISOString();
@@ -245,12 +368,44 @@ export async function discoverMapsCompetitorsForProject(args: {
     }
   }
 
+  const targetItem =
+    live.items.find((item) =>
+      matchesTargetBusiness({
+        item,
+        targetPlaceId: existingTargetPlaceId,
+        targetDomain,
+      })
+    ) ?? null;
+
+  if (targetItem) {
+    await upsertTargetBusinessProfile({
+      projectId: args.projectId,
+      item: targetItem,
+      fetchedAtIso: nowIso,
+    });
+  }
+
+  const effectiveTargetPlaceId =
+    typeof targetItem?.place_id === "string" && targetItem.place_id.trim()
+      ? targetItem.place_id.trim()
+      : existingTargetPlaceId;
+
+  await cleanupSelfCompetitorRows({
+    projectId: args.projectId,
+    targetDomain,
+    targetPlaceId: effectiveTargetPlaceId,
+  });
+
   const filteredItems = live.items.filter((item) => {
     const itemPlaceId =
       typeof item.place_id === "string" ? item.place_id.trim() : "";
-    const itemDomain = normalizeDomain(item.domain);
+    const itemDomain = normalizeDomain(item.domain) ?? normalizeDomain(item.url);
 
-    if (targetPlaceId && itemPlaceId && itemPlaceId === targetPlaceId) {
+    if (
+      effectiveTargetPlaceId &&
+      itemPlaceId &&
+      itemPlaceId === effectiveTargetPlaceId
+    ) {
       return false;
     }
 
