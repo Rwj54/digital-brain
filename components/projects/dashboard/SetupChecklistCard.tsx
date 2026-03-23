@@ -1,6 +1,3 @@
-import { Badge } from "@/components/projects/dashboard/Badge";
-import { Card } from "@/components/projects/dashboard/Card";
-
 type SetupChecklistCardProps = {
   setupDoneCount: number;
   hasGbp: boolean;
@@ -9,6 +6,20 @@ type SetupChecklistCardProps = {
   labelPlural: string;
   onGoToSettings: () => void;
 };
+
+function StepStatusPill({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className="rounded-full px-2.5 py-1 text-xs font-semibold"
+      style={{
+        backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
+        color: ok ? "var(--success)" : "var(--warning)",
+      }}
+    >
+      {ok ? "Done" : "Next"}
+    </span>
+  );
+}
 
 export function SetupChecklistCard({
   setupDoneCount,
@@ -21,52 +32,64 @@ export function SetupChecklistCard({
   function renderSetupStep(ok: boolean, title: string, desc: string) {
     return (
       <button
-        onClick={onGoToSettings}
-        className={[
-          "w-full rounded-2xl border p-3 text-left transition-colors",
-          ok
-            ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/40"
-            : "border-zinc-300 bg-white hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800",
-        ].join(" ")}
         type="button"
+        onClick={onGoToSettings}
+        className="w-full rounded-[24px] border px-4 py-4 text-left shadow-sm transition hover:translate-y-[-1px]"
+        style={{
+          borderColor: ok ? "rgba(21, 128, 61, 0.18)" : "var(--border)",
+          backgroundColor: ok ? "var(--success-soft)" : "var(--reference-soft)",
+        }}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-extrabold text-zinc-950 dark:text-zinc-50">
-              {title}
-            </div>
-            <div className="mt-1 text-xs text-zinc-700 dark:text-zinc-200">
-              {desc}
-            </div>
+            <p className="text-sm font-semibold text-[var(--text-strong)]">{title}</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{desc}</p>
           </div>
-          <Badge ok={ok} label={ok ? "Done" : "Next"} />
+
+          <StepStatusPill ok={ok} />
         </div>
       </button>
     );
   }
 
   return (
-    <Card
-      title="Setup checklist"
-      subtitle={`Complete these 3 steps once — then everything else becomes automatic. (${setupDoneCount}/3 done)`}
-    >
-      <div className="grid gap-3 md:grid-cols-3">
+    <section className="rounded-[28px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            Setup checklist
+          </p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+            Complete these once, then the project gets much more useful.
+          </h3>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+            This is the minimum setup layer that helps Digital Brain produce more
+            grounded recommendations and better targets.
+          </p>
+        </div>
+
+        <div className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)]">
+          {setupDoneCount}/3 done
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
         {renderSetupStep(
           hasGbp,
           "1) Add your GBP snapshot",
-          "Business name, category, rating, total reviews (manual MVP)."
+          "Business name, category, rating, and total reviews. This gives the project a real starting point.",
         )}
         {renderSetupStep(
           hasCompetitors,
           "2) Add 3–4 competitors",
-          "Start with the top businesses you see in Google Maps for this category/metro."
+          "Start with the businesses you see most often in Google Maps for this category and metro.",
         )}
         {renderSetupStep(
           hasCapacity,
           "3) Set monthly volume + review rate",
-          `How many ${labelPlural}/month and what % leave a review when asked.`
+          `Tell Digital Brain how many ${labelPlural} you handle and what percent typically leave a review when asked.`,
         )}
       </div>
-    </Card>
+    </section>
   );
 }
