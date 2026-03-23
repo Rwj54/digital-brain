@@ -107,155 +107,177 @@ export default function ClientsPage() {
   }, [requireAuth, loadClients]);
 
   if (loading) {
-    return <div className="p-8">Loading clients…</div>;
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-[28px] border border-[var(--border)] bg-white px-6 py-6 shadow-sm">
+            <p className="text-base text-[var(--text-body)]">Loading clients...</p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-zinc-900 md:text-3xl">
-          Clients
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-zinc-700 md:text-base">
-          Create a client first, then use the client page to start URL-first
-          project onboarding and open project dashboards.
-        </p>
-      </div>
-
-      {status ? (
-        <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-900">
-          {status}
-        </div>
-      ) : null}
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-zinc-900">Create client</h2>
-          <p className="mt-2 text-sm text-zinc-700">
-            Keep this step lightweight. The client page will handle project
-            onboarding and automation kickoff.
-          </p>
-
-          <form onSubmit={createClient} className="mt-5 grid gap-4">
-            <div className="grid gap-2">
-              <label className="text-sm font-extrabold text-zinc-900">
-                Client name
-              </label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="JF Evans Lawn & Landscape"
-                className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
-                required
-              />
+    <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
+        <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-7 sm:py-6">
+          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+                Client intake
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
+                Create the client first, then start URL-first onboarding.
+              </h1>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                This keeps setup simple. Once the client exists, the next screen
+                becomes the project intake surface where Digital Brain starts
+                turning a website into an automation-ready local search project.
+              </p>
             </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-extrabold text-zinc-900">
-                Notes
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes about this client, market, or engagement."
-                className="min-h-[120px] rounded-2xl border border-zinc-300 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-500"
-              />
-            </div>
+            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--primary-soft)] px-5 py-5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)]">
+                What happens next
+              </p>
 
-            <button
-              disabled={submitting}
-              className="w-fit rounded-2xl border border-zinc-900 px-5 py-3 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? "Creating client…" : "Create client →"}
-            </button>
-          </form>
-        </section>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl bg-white/80 px-4 py-3">
+                  <p className="text-sm font-semibold text-[var(--text-strong)]">
+                    1) Open client workspace
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
+                    Each client gets a dedicated workspace for project intake and
+                    dashboards.
+                  </p>
+                </div>
 
-        <section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-zinc-900">What happens next</h2>
+                <div className="rounded-2xl bg-white/80 px-4 py-3">
+                  <p className="text-sm font-semibold text-[var(--text-strong)]">
+                    2) Start URL-first project onboarding
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
+                    Enter the website first. Digital Brain will infer what it
+                    can immediately and store automation-facing identity fields.
+                  </p>
+                </div>
 
-          <div className="mt-4 grid gap-3">
-            <div className="rounded-2xl border border-zinc-200 p-4">
-              <div className="text-sm font-extrabold text-zinc-900">
-                1) Open client workspace
-              </div>
-              <div className="mt-1 text-xs text-zinc-600">
-                Each client gets its own project list and onboarding entry
-                surface at <span className="font-bold">/clients/[clientId]</span>.
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 p-4">
-              <div className="text-sm font-extrabold text-zinc-900">
-                2) Start URL-first project onboarding
-              </div>
-              <div className="mt-1 text-xs text-zinc-600">
-                Enter the website URL plus transitional support inputs while the
-                identity layer becomes smarter.
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 p-4">
-              <div className="text-sm font-extrabold text-zinc-900">
-                3) Kick off automation immediately
-              </div>
-              <div className="mt-1 text-xs text-zinc-600">
-                Onboarding seeds keywords, enriches identity, and can launch
-                competitor discovery from day one.
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 p-4">
-              <div className="text-sm font-extrabold text-zinc-900">
-                4) Land in project dashboard
-              </div>
-              <div className="mt-1 text-xs text-zinc-600">
-                The user moves directly into the project dashboard instead of a
-                dead-end setup flow.
+                <div className="rounded-2xl bg-white/80 px-4 py-3">
+                  <p className="text-sm font-semibold text-[var(--text-strong)]">
+                    3) Land in the project dashboard
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
+                    The user moves directly into a working project instead of a
+                    dead-end setup flow.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </section>
-      </div>
 
-      <div className="mt-8">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-black text-zinc-900">Existing clients</h2>
-          <div className="text-sm text-zinc-600">
-            {clients.length} client{clients.length === 1 ? "" : "s"}
-          </div>
-        </div>
+        {status ? (
+          <section className="rounded-[24px] border border-[var(--danger)] bg-[var(--danger-soft)] px-5 py-4 shadow-sm">
+            <p className="text-sm font-medium text-[var(--danger)]">{status}</p>
+          </section>
+        ) : null}
 
-        {clients.length === 0 ? (
-          <div className="mt-4 rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-700">
-            No clients yet. Create one above to begin.
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {clients.map((client) => (
-              <div
-                key={client.id}
-                className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm"
+        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Create client
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Keep this step lightweight.
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+              The client page will handle project intake, onboarding kickoff,
+              and the move into dashboard review.
+            </p>
+
+            <form onSubmit={createClient} className="mt-5 grid gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-semibold text-[var(--text-strong)]">
+                  Client name
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="JF Evans Lawn & Landscape"
+                  className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                  required
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <label className="text-sm font-semibold text-[var(--text-strong)]">
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional notes about this client, market, or engagement."
+                  className="min-h-[120px] rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                />
+              </div>
+
+              <button
+                disabled={submitting}
+                className="inline-flex w-fit items-center justify-center rounded-2xl bg-[var(--brand-600)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <div className="text-lg font-black text-zinc-900">
-                  {client.name}
-                </div>
+                {submitting ? "Creating client..." : "Create client"}
+              </button>
+            </form>
+          </section>
 
-                <div className="mt-3 text-sm text-zinc-700">
-                  {client.notes?.trim() ? client.notes : "No notes yet."}
-                </div>
-
-                <button
-                  onClick={() => router.push(`/clients/${client.id}`)}
-                  className="mt-4 rounded-2xl border border-zinc-900 px-4 py-2 text-sm font-extrabold text-zinc-900 transition hover:bg-zinc-50"
-                >
-                  Open client →
-                </button>
+          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  Existing clients
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  Open a client workspace
+                </h2>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)]">
+                {clients.length} client{clients.length === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            {clients.length === 0 ? (
+              <div className="mt-5 rounded-[24px] border border-dashed border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5 text-sm text-[var(--text-body)]">
+                No clients yet. Create one above to begin.
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {clients.map((client) => (
+                  <article
+                    key={client.id}
+                    className="rounded-[24px] border border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5"
+                  >
+                    <h3 className="text-lg font-semibold text-[var(--text-strong)]">
+                      {client.name}
+                    </h3>
+
+                    <p className="mt-3 min-h-[72px] text-sm leading-7 text-[var(--text-body)]">
+                      {client.notes?.trim() ? client.notes : "No notes yet."}
+                    </p>
+
+                    <button
+                      onClick={() => router.push(`/clients/${client.id}`)}
+                      className="mt-4 inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[var(--brand-50)]"
+                    >
+                      Open client
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        </section>
       </div>
-    </div>
+    </main>
   );
-}
