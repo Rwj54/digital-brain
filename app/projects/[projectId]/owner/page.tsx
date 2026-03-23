@@ -356,7 +356,6 @@ function getStepNumberTone(index: number): Tone {
   };
 }
 
-
 function DetailStat({
   label,
   value,
@@ -394,6 +393,25 @@ function CompactStateStat({
         {label}
       </p>
       <p className="mt-1 text-base font-semibold leading-6" style={{ color: accent }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function IdentityMetaStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[var(--border)] bg-[var(--reference-soft)] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text-strong)]">
         {value}
       </p>
     </div>
@@ -608,75 +626,66 @@ export default function OwnerDashboardPage({ params }: Props) {
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
-      <section
-        className="w-full"
-        style={{
-          background:
-            "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 58%, #1798bb 100%)",
-        }}
-      >
-        <div className="mx-auto max-w-7xl px-4 py-1.5 sm:px-6 sm:py-2">
-          <div className="grid gap-3 lg:grid-cols-[110px_1fr] lg:items-start">
-            <div className="mt-[18px] flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] border border-white/20 bg-white/10 text-sm font-semibold text-white shadow-sm backdrop-blur-sm">
-              Logo
-            </div>
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
+        <section className="rounded-[30px] border border-[var(--border)] bg-white px-5 py-4 shadow-sm sm:px-6">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.25fr)] xl:items-center">
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] text-sm font-semibold text-white shadow-sm"
+                style={{
+                  background:
+                    "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 100%)",
+                }}
+              >
+                DB
+              </div>
 
-            <div className="justify-self-center self-end w-full max-w-4xl lg:pl-[100px]">
-              <div className="grid gap-x-16 gap-y-1 sm:grid-cols-2">
-                <div className="space-y-1 text-white/92">
-                  <p className="text-sm leading-5">
-                    <span className="font-semibold text-white">Business:</span>{" "}
-                    {dashboard.projectDisplayName ?? "Not set"}
-                  </p>
-                  <p className="text-sm leading-5">
-                    <span className="font-semibold text-white">Domain:</span>{" "}
-                    {dashboard.domainDisplayValue ?? "Not set"}
-                  </p>
-                  <p className="text-sm leading-5">
-                    <span className="font-semibold text-white">Location / Market:</span>{" "}
-                    {dashboard.projectLocationLabel ?? dashboard.projectMetro ?? "Not set"}
-                  </p>
-                </div>
-
-                <div className="space-y-1 text-white/92">
-                  <p className="text-sm leading-5">
-                    <span className="font-semibold text-white">Scope:</span>{" "}
-                    {dashboard.pageScopeLabel}
-                  </p>
-                  <p className="text-sm leading-5">
-                    <span className="font-semibold text-white">Snapshot:</span>{" "}
-                    {formatDate(dashboard.capturedAt)}
-                  </p>
-                </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Active business
+                </p>
+                <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  {dashboard.projectDisplayName ?? "Not set"}
+                </h1>
+                <p className="mt-1 truncate text-sm text-[var(--text-body)]">
+                  {dashboard.domainDisplayValue ?? dashboard.projectTargetDomain ?? "Not set"}
+                </p>
               </div>
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <IdentityMetaStat
+                label="Location / Market"
+                value={dashboard.projectLocationLabel ?? dashboard.projectMetro ?? "Not set"}
+              />
+              <IdentityMetaStat label="Scope" value={dashboard.pageScopeLabel} />
+              <IdentityMetaStat label="Snapshot" value={formatDate(dashboard.capturedAt)} />
+              <IdentityMetaStat
+                label="Category"
+                value={dashboard.projectCategory ?? "Not set"}
+              />
+            </div>
           </div>
+        </section>
 
-          <p className="mt-2 border-t border-white/18 pt-1.5 text-center font-serif text-base font-semibold leading-5 text-white/90 sm:text-[18px]">
-            What matters now, what to do next, and why it matters.
-          </p>
-        </div>
-      </section>
-
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6">
         <section
-          className="rounded-[32px] px-5 py-5 sm:px-7 sm:py-6"
+          className="rounded-[32px] border border-[var(--border)] px-5 py-5 shadow-sm sm:px-7 sm:py-6"
           style={{ backgroundColor: "var(--primary-soft)" }}
         >
-          <div className="grid gap-5 xl:grid-cols-[1.35fr_0.95fr]">
+          <div className="grid gap-5 xl:grid-cols-[1.45fr_0.9fr]">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
                 What to do now
               </p>
-              <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
+              <h2 className="mt-2 max-w-3xl text-[2rem] font-semibold tracking-tight text-[var(--text-strong)] sm:leading-tight">
                 {dashboard.dashboard.hero.headline}
-              </h1>
+              </h2>
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
                 {dashboard.dashboard.hero.supportLine}
               </p>
 
-              <div className="mt-3 overflow-hidden rounded-[20px] border border-white/55 bg-white/78 shadow-sm backdrop-blur">
-                <div className="grid sm:grid-cols-[1.45fr_0.7fr_0.8fr]">
+              <div className="mt-4 overflow-hidden rounded-[20px] border border-white/55 bg-white/82 shadow-sm backdrop-blur">
+                <div className="grid sm:grid-cols-[1.5fr_0.7fr_0.8fr]">
                   <div className="border-b border-[var(--border)] sm:border-b-0 sm:border-r sm:border-[var(--border)]">
                     <CompactStateStat
                       label="Start with"
@@ -716,27 +725,38 @@ export default function OwnerDashboardPage({ params }: Props) {
                 {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                This is the clearest next move for the owner right now. It should produce visible progress without forcing a deep technical drill-down.
+                This is the clearest next move for the owner right now. It should produce visible
+                progress without forcing a deep technical drill-down.
               </p>
 
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl bg-white/60 px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                     Why now
                   </p>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
                     {primaryStep?.reason ?? dashboard.dashboard.progress.nextLikelyImprovement}
                   </p>
                 </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                    Expected benefit
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                    {primaryStep
-                      ? `Owner or staff can move this forward. Typical effort: ${primaryStep.time}.`
-                      : dashboard.dashboard.progress.nextLikelyImprovement}
-                  </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-white/60 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Who should do it
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                      {primaryStep?.who ?? "Owner or staff"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-white/60 px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Typical effort
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                      {primaryStep?.time ?? "Not set"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -763,12 +783,12 @@ export default function OwnerDashboardPage({ params }: Props) {
                       </p>
                       <div className="mt-2 flex items-end gap-2">
                         <p
-                          className="text-4xl font-semibold leading-none tracking-tight"
+                          className="text-3xl font-semibold leading-none tracking-tight"
                           style={{ color: tone.solid }}
                         >
                           {marker.score}
                         </p>
-                        <p className="pb-1 text-sm font-medium text-[var(--text-muted)]">
+                        <p className="pb-0.5 text-sm font-medium text-[var(--text-muted)]">
                           / 100
                         </p>
                       </div>
@@ -817,7 +837,8 @@ export default function OwnerDashboardPage({ params }: Props) {
                 Follow these in order
               </h2>
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                This is the guided path we believe gives you the clearest next wins without forcing you to learn SEO or AI visibility jargon.
+                This is the guided path we believe gives you the clearest next wins without forcing
+                you to learn SEO or AI visibility jargon.
               </p>
             </div>
 
@@ -1012,7 +1033,8 @@ export default function OwnerDashboardPage({ params }: Props) {
               Drill deeper without losing the main story
             </h2>
             <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
-              These tabs let you inspect the supporting evidence behind the decision engine without turning the page into a traditional SEO dashboard.
+              These tabs let you inspect the supporting evidence behind the decision engine without
+              turning the page into a traditional SEO dashboard.
             </p>
           </div>
 
@@ -1055,18 +1077,24 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Current local rank footing
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This shows the ranking context the owner can understand: what keyword is active, what metro is being tracked, and whether the business is moving into a stronger position.
+                    This shows the ranking context the owner can understand: what keyword is active,
+                    what metro is being tracked, and whether the business is moving into a stronger
+                    position.
                   </p>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     <DetailStat
                       label="Latest rank"
-                      value={dashboard.dashboard.visibilitySummary.latestRank?.toString() ?? "Not set"}
+                      value={
+                        dashboard.dashboard.visibilitySummary.latestRank?.toString() ?? "Not set"
+                      }
                       helper="Most recent captured position."
                     />
                     <DetailStat
                       label="Best rank"
-                      value={dashboard.dashboard.visibilitySummary.bestRank?.toString() ?? "Not set"}
+                      value={
+                        dashboard.dashboard.visibilitySummary.bestRank?.toString() ?? "Not set"
+                      }
                       helper="Best observed position in current data."
                     />
                     <DetailStat
@@ -1140,7 +1168,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Machine-readiness signals
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the owner-facing evidence layer for AI visibility. It focuses on whether the business identity, category clarity, and review signals give machines enough confidence to understand the business.
+                    This is the owner-facing evidence layer for AI visibility. It focuses on
+                    whether the business identity, category clarity, and review signals give
+                    machines enough confidence to understand the business.
                   </p>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1220,7 +1250,8 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Website identity footing
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This section keeps the explanation owner-friendly: does the system have a clear website, domain, and brand identity to work with?
+                    This section keeps the explanation owner-friendly: does the system have a clear
+                    website, domain, and brand identity to work with?
                   </p>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -1298,14 +1329,14 @@ export default function OwnerDashboardPage({ params }: Props) {
             {detailTab === "outcomes" ? (
               <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--success)]">
-                    Outcomes
-                  </p>
+                  <p className="text-sm font-semibold text-[var(--success)]">Outcomes</p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
                     Business impact footing
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the early owner-facing business-outcomes layer. It shows whether customer-event and conversion context exists yet, without exposing internal scoring logic.
+                    This is the early owner-facing business-outcomes layer. It shows whether
+                    customer-event and conversion context exists yet, without exposing internal
+                    scoring logic.
                   </p>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -1316,7 +1347,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                     />
                     <DetailStat
                       label="Conversion rate"
-                      value={formatConversionRate(dashboard.dashboard.outcomesSummary.reviewConversionRate)}
+                      value={formatConversionRate(
+                        dashboard.dashboard.outcomesSummary.reviewConversionRate,
+                      )}
                       helper="Current review-to-customer conversion footing."
                     />
                   </div>
@@ -1385,7 +1418,8 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Why these actions are on the page
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the owner-readable evidence layer for the guided actions. It explains what is being asked, who should do it, and how much work it likely takes.
+                    This is the owner-readable evidence layer for the guided actions. It explains
+                    what is being asked, who should do it, and how much work it likely takes.
                   </p>
 
                   <div className="mt-5 space-y-4">
