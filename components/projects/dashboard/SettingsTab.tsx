@@ -36,9 +36,13 @@ type SettingsTabProps = {
   compRating: string;
   compReviews: string;
   competitors: CompetitorMetric[];
-  onSaveProjectReviewCapacity: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onSaveProjectReviewCapacity: (
+    e: React.FormEvent<HTMLFormElement>,
+  ) => Promise<void>;
   onSaveGbpProfile: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
-  onAddOrUpdateCompetitor: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onAddOrUpdateCompetitor: (
+    e: React.FormEvent<HTMLFormElement>,
+  ) => Promise<void>;
   onDeleteCompetitor: (id: string) => Promise<void>;
   setVolumePreset: React.Dispatch<React.SetStateAction<string>>;
   setShowAdvancedLabels: React.Dispatch<React.SetStateAction<boolean>>;
@@ -114,67 +118,75 @@ export function SettingsTab({
 }: SettingsTabProps) {
   return (
     <div className="grid gap-4">
-      <IdentityResolutionCard
-        siteUrl={siteUrl}
-        targetDomain={targetDomain}
-        targetBrandName={targetBrandName}
-        category={projectCategory}
-        metro={projectMetro}
-        radiusMiles={projectRadiusMiles}
-      />
+      <section aria-label="Project identity">
+        <IdentityResolutionCard
+          siteUrl={siteUrl}
+          targetDomain={targetDomain}
+          targetBrandName={targetBrandName}
+          category={projectCategory}
+          metro={projectMetro}
+          radiusMiles={projectRadiusMiles}
+        />
+      </section>
 
-      <ReviewCapacityCard
-        labelPlural={labelPlural}
-        preset={preset}
-        presetOptions={presetOptions}
-        volumePreset={volumePreset}
-        showAdvancedLabels={showAdvancedLabels}
-        eventLabelSingular={eventLabelSingular}
-        eventLabelPlural={eventLabelPlural}
-        monthlyEvents={monthlyEvents}
-        reviewConvRate={reviewConvRate}
-        onSaveProjectReviewCapacity={onSaveProjectReviewCapacity}
-        setVolumePreset={setVolumePreset}
-        setShowAdvancedLabels={setShowAdvancedLabels}
-        setEventLabelSingular={setEventLabelSingular}
-        setEventLabelPlural={setEventLabelPlural}
-        setMonthlyEvents={setMonthlyEvents}
-        setReviewConvRate={setReviewConvRate}
-      />
+      <section aria-label="Review capacity settings">
+        <ReviewCapacityCard
+          labelPlural={labelPlural}
+          preset={preset}
+          presetOptions={presetOptions}
+          volumePreset={volumePreset}
+          showAdvancedLabels={showAdvancedLabels}
+          eventLabelSingular={eventLabelSingular}
+          eventLabelPlural={eventLabelPlural}
+          monthlyEvents={monthlyEvents}
+          reviewConvRate={reviewConvRate}
+          onSaveProjectReviewCapacity={onSaveProjectReviewCapacity}
+          setVolumePreset={setVolumePreset}
+          setShowAdvancedLabels={setShowAdvancedLabels}
+          setEventLabelSingular={setEventLabelSingular}
+          setEventLabelPlural={setEventLabelPlural}
+          setMonthlyEvents={setMonthlyEvents}
+          setReviewConvRate={setReviewConvRate}
+        />
+      </section>
 
-      <GbpSnapshotCard
-        gbpName={gbpName}
-        primaryCategory={primaryCategory}
-        placeId={placeId}
-        gbpUrl={gbpUrl}
-        rating={rating}
-        totalReviews={totalReviews}
-        photosCount={photosCount}
-        onSaveGbpProfile={onSaveGbpProfile}
-        setGbpName={setGbpName}
-        setPrimaryCategory={setPrimaryCategory}
-        setPlaceId={setPlaceId}
-        setGbpUrl={setGbpUrl}
-        setRating={setRating}
-        setTotalReviews={setTotalReviews}
-        setPhotosCount={setPhotosCount}
-      />
+      <section aria-label="Google Business Profile snapshot">
+        <GbpSnapshotCard
+          gbpName={gbpName}
+          primaryCategory={primaryCategory}
+          placeId={placeId}
+          gbpUrl={gbpUrl}
+          rating={rating}
+          totalReviews={totalReviews}
+          photosCount={photosCount}
+          onSaveGbpProfile={onSaveGbpProfile}
+          setGbpName={setGbpName}
+          setPrimaryCategory={setPrimaryCategory}
+          setPlaceId={setPlaceId}
+          setGbpUrl={setGbpUrl}
+          setRating={setRating}
+          setTotalReviews={setTotalReviews}
+          setPhotosCount={setPhotosCount}
+        />
+      </section>
 
-      <CompetitorsCard
-        compDomain={compDomain}
-        compName={compName}
-        compSource={compSource}
-        compRating={compRating}
-        compReviews={compReviews}
-        competitors={competitors}
-        onAddOrUpdateCompetitor={onAddOrUpdateCompetitor}
-        onDeleteCompetitor={onDeleteCompetitor}
-        setCompDomain={setCompDomain}
-        setCompName={setCompName}
-        setCompSource={setCompSource}
-        setCompRating={setCompRating}
-        setCompReviews={setCompReviews}
-      />
+      <section aria-label="Competitor settings">
+        <CompetitorsCard
+          compDomain={compDomain}
+          compName={compName}
+          compSource={compSource}
+          compRating={compRating}
+          compReviews={compReviews}
+          competitors={competitors}
+          onAddOrUpdateCompetitor={onAddOrUpdateCompetitor}
+          onDeleteCompetitor={onDeleteCompetitor}
+          setCompDomain={setCompDomain}
+          setCompName={setCompName}
+          setCompSource={setCompSource}
+          setCompRating={setCompRating}
+          setCompReviews={setCompReviews}
+        />
+      </section>
     </div>
   );
 }

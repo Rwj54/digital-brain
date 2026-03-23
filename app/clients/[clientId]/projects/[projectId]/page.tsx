@@ -20,6 +20,33 @@ function formatDomain(siteUrl: string | null | undefined): string {
   }
 }
 
+function formatRadius(radiusMiles: number | null | undefined): string {
+  if (typeof radiusMiles !== "number" || !Number.isFinite(radiusMiles)) {
+    return "Not set";
+  }
+
+  return `${radiusMiles} mi`;
+}
+
+function ProjectMetaItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
 export default function ProjectDashboard() {
   const router = useRouter();
   const params = useParams<{ clientId: string; projectId: string }>();
@@ -32,10 +59,8 @@ export default function ProjectDashboard() {
   if (dashboard.loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-[28px] border border-[var(--border)] bg-white px-6 py-6 shadow-sm">
-            <p className="text-base text-[var(--text-body)]">Loading dashboard...</p>
-          </div>
+        <div className="mx-auto max-w-6xl">
+          <p className="text-base text-[var(--text-body)]">Loading dashboard...</p>
         </div>
       </main>
     );
@@ -44,7 +69,7 @@ export default function ProjectDashboard() {
   return (
     <>
       <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 pb-28 sm:px-6 sm:py-6 md:pb-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:pb-8">
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => router.push(`/clients/${clientId}`)}
@@ -60,81 +85,65 @@ export default function ProjectDashboard() {
             </button>
           </div>
 
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-7 sm:py-6">
-            <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
-                  Project workspace
-                </p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
-                  {dashboard.client ? dashboard.client.name : "Client"} — Project dashboard
-                </h1>
-
-                {dashboard.project ? (
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                    This is the working project view for{" "}
-                    <span className="font-semibold text-[var(--text-strong)]">
-                      {formatDomain(dashboard.project.site_url)}
-                    </span>
-                    . From here the user can review setup, inspect data, take action,
-                    and refine project settings.
+          <section className="border-b border-[var(--border)] pb-8">
+            <div className="grid gap-6">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start lg:gap-8">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+                    Project workspace
                   </p>
-                ) : (
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                    Review the current project, inspect the supporting data, and move
-                    into the next actions without falling back into a dead-end setup flow.
-                  </p>
-                )}
-              </div>
 
-              <div className="rounded-[28px] border border-[var(--border)] bg-[var(--primary-soft)] px-5 py-5 shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)]">
-                  Current project
-                </p>
+                  <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
+                    {dashboard.client ? dashboard.client.name : "Client"} — Project dashboard
+                  </h1>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-white/85 px-4 py-3 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      Domain
+                  {dashboard.project ? (
+                    <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                      This is the working project view for{" "}
+                      <span className="font-semibold text-[var(--text-strong)]">
+                        {formatDomain(dashboard.project.site_url)}
+                      </span>
+                      . Review setup, inspect data, take action, and refine project
+                      settings from one place.
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                      {formatDomain(dashboard.project?.site_url)}
+                  ) : (
+                    <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                      Review the current project, inspect the supporting data, and move
+                      into the next actions without falling back into a dead-end setup flow.
                     </p>
-                  </div>
+                  )}
+                </div>
 
-                  <div className="rounded-2xl bg-white/85 px-4 py-3 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      Category
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                      {dashboard.project?.category ?? "Not set"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white/85 px-4 py-3 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      Metro
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                      {dashboard.project?.metro ?? "Not set"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl bg-white/85 px-4 py-3 shadow-sm">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      Radius
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                      {dashboard.project?.radius_miles ?? "Not set"} mi
-                    </p>
+                <div className="lg:justify-self-end">
+                  <div className="inline-flex rounded-full bg-[var(--primary-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)] ring-1 ring-inset ring-[var(--border)]/60">
+                    Current project
                   </div>
                 </div>
               </div>
+
+              <dl className="grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                <ProjectMetaItem
+                  label="Domain"
+                  value={formatDomain(dashboard.project?.site_url)}
+                />
+                <ProjectMetaItem
+                  label="Category"
+                  value={dashboard.project?.category ?? "Not set"}
+                />
+                <ProjectMetaItem
+                  label="Metro"
+                  value={dashboard.project?.metro ?? "Not set"}
+                />
+                <ProjectMetaItem
+                  label="Radius"
+                  value={formatRadius(dashboard.project?.radius_miles)}
+                />
+              </dl>
             </div>
           </section>
 
           <section className="hidden md:block">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-6 border-b border-[var(--border)]">
               {dashboard.tabs.map((tabOption) => {
                 const active = dashboard.tab === tabOption.key;
 
@@ -143,10 +152,10 @@ export default function ProjectDashboard() {
                     key={tabOption.key}
                     type="button"
                     onClick={() => dashboard.setTab(tabOption.key)}
-                    className="rounded-full px-4 py-2 text-sm font-semibold transition"
+                    className="border-b-2 px-0 pb-3 text-sm font-semibold transition"
                     style={{
-                      backgroundColor: active ? "var(--brand-600)" : "var(--reference-soft)",
-                      color: active ? "#ffffff" : "var(--text-body)",
+                      borderColor: active ? "var(--brand-600)" : "transparent",
+                      color: active ? "var(--text-strong)" : "var(--text-body)",
                     }}
                   >
                     {tabOption.label}
@@ -157,12 +166,14 @@ export default function ProjectDashboard() {
           </section>
 
           {dashboard.status ? (
-            <section className="rounded-[24px] border border-[var(--warning)] bg-[var(--warning-soft)] px-5 py-4 shadow-sm">
-              <p className="text-sm font-medium text-[var(--warning)]">{dashboard.status}</p>
+            <section className="border-l-4 border-[var(--warning)] bg-[var(--warning-soft)] px-4 py-3">
+              <p className="text-sm font-medium text-[var(--warning)]">
+                {dashboard.status}
+              </p>
             </section>
           ) : null}
 
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6 sm:py-6">
+          <section className="grid gap-5">
             {dashboard.tab === "overview" && (
               <OverviewTab
                 gbp={dashboard.gbp}

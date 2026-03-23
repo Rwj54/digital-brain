@@ -10,7 +10,7 @@ type SetupChecklistCardProps = {
 function StepStatusPill({ ok }: { ok: boolean }) {
   return (
     <span
-      className="rounded-full px-2.5 py-1 text-xs font-semibold"
+      className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
       style={{
         backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
         color: ok ? "var(--success)" : "var(--warning)",
@@ -34,26 +34,26 @@ export function SetupChecklistCard({
       <button
         type="button"
         onClick={onGoToSettings}
-        className="w-full rounded-[24px] border px-4 py-4 text-left shadow-sm transition hover:translate-y-[-1px]"
-        style={{
-          borderColor: ok ? "rgba(21, 128, 61, 0.18)" : "var(--border)",
-          backgroundColor: ok ? "var(--success-soft)" : "var(--reference-soft)",
-        }}
+        className="w-full border-t border-[var(--border)] px-0 py-4 text-left transition hover:opacity-100"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--text-strong)]">{title}</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{desc}</p>
+            <p className="mt-2 max-w-xl text-sm leading-7 text-[var(--text-body)]">
+              {desc}
+            </p>
           </div>
 
-          <StepStatusPill ok={ok} />
+          <div className="shrink-0 pt-0.5">
+            <StepStatusPill ok={ok} />
+          </div>
         </div>
       </button>
     );
   }
 
   return (
-    <section className="rounded-[28px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+    <section className="grid gap-5 border-b border-[var(--border)] pb-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -68,12 +68,12 @@ export function SetupChecklistCard({
           </p>
         </div>
 
-        <div className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)]">
+        <div className="rounded-full bg-[var(--primary-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)] ring-1 ring-inset ring-[var(--border)]/60">
           {setupDoneCount}/3 done
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
+      <div>
         {renderSetupStep(
           hasGbp,
           "1) Add your GBP snapshot",

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatDomain } from "@/components/projects/dashboard/utils";
 import type {
   CompetitorMetric,
@@ -27,7 +28,7 @@ function StatusPill({
 }) {
   return (
     <span
-      className="rounded-full px-2.5 py-1 text-xs font-semibold"
+      className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
       style={{
         backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
         color: ok ? "var(--success)" : "var(--warning)",
@@ -38,21 +39,23 @@ function StatusPill({
   );
 }
 
-function SummaryCard({
+function SummaryColumn({
   eyebrow,
   title,
   subtitle,
   right,
+  toneClassName,
   children,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
-  right?: React.ReactNode;
-  children: React.ReactNode;
+  right?: ReactNode;
+  toneClassName: string;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+    <section className={`grid gap-4 rounded-[26px] px-5 py-5 sm:px-6 ${toneClassName}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -67,8 +70,25 @@ function SummaryCard({
         {right}
       </div>
 
-      <div className="mt-5">{children}</div>
+      <div>{children}</div>
     </section>
+  );
+}
+
+function MetricRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-[var(--border)]/80 py-3 first:border-t-0 first:pt-0 last:pb-0">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-[var(--text-strong)]">{value}</span>
+    </div>
   );
 }
 
@@ -87,14 +107,15 @@ export function OverviewSummaryCards({
   const hasTargetMath = gapReviews !== null;
 
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
-      <SummaryCard
+    <section className="grid gap-4 xl:grid-cols-3 xl:gap-5">
+      <SummaryColumn
         eyebrow="Snapshot"
         title="Your GBP"
         subtitle="Current saved profile snapshot used by the project."
         right={<StatusPill ok={hasGbp} okLabel="Saved" missingLabel="Missing" />}
+        toneClassName="bg-[var(--primary-soft)]"
       >
-        <div className="space-y-4">
+        <div className="grid gap-4">
           <div>
             <p className="text-lg font-semibold text-[var(--text-strong)]">
               {gbp?.gbp_name ?? "Not set"}
@@ -104,31 +125,10 @@ export function OverviewSummaryCards({
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                Rating
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                {gbp?.rating ?? "—"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                Reviews
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                {gbp?.total_reviews ?? "—"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                Photos
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                {gbp?.photos_count ?? "—"}
-              </p>
-            </div>
+          <div>
+            <MetricRow label="Rating" value={gbp?.rating ?? "—"} />
+            <MetricRow label="Reviews" value={gbp?.total_reviews ?? "—"} />
+            <MetricRow label="Photos" value={gbp?.photos_count ?? "—"} />
           </div>
 
           <p className="text-xs leading-6 text-[var(--text-muted)]">
@@ -138,9 +138,9 @@ export function OverviewSummaryCards({
               : "Not set"}
           </p>
         </div>
-      </SummaryCard>
+      </SummaryColumn>
 
-      <SummaryCard
+      <SummaryColumn
         eyebrow="Competitive baseline"
         title="Top competitor"
         subtitle="Highest-review competitor from the saved competitor set."
@@ -151,9 +151,10 @@ export function OverviewSummaryCards({
             missingLabel="Missing"
           />
         }
+        toneClassName="bg-zinc-50/90"
       >
         {topComp ? (
-          <div className="space-y-4">
+          <div className="grid gap-4">
             <div>
               <p className="text-lg font-semibold text-[var(--text-strong)]">
                 {topComp.competitor_name ?? "Not set"}
@@ -163,23 +164,9 @@ export function OverviewSummaryCards({
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Rating
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                  {topComp.rating ?? "—"}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Reviews
-                </p>
-                <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
-                  {topComp.total_reviews ?? "—"}
-                </p>
-              </div>
+            <div>
+              <MetricRow label="Rating" value={topComp.rating ?? "—"} />
+              <MetricRow label="Reviews" value={topComp.total_reviews ?? "—"} />
             </div>
 
             <p className="text-xs leading-6 text-[var(--text-muted)]">
@@ -188,13 +175,13 @@ export function OverviewSummaryCards({
             </p>
           </div>
         ) : (
-          <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4 text-sm leading-7 text-[var(--text-body)]">
+          <p className="text-sm leading-7 text-[var(--text-body)]">
             Add competitors in Settings to turn this into a real market comparison.
-          </div>
+          </p>
         )}
-      </SummaryCard>
+      </SummaryColumn>
 
-      <SummaryCard
+      <SummaryColumn
         eyebrow="Targeting"
         title="Review target — next 90 days"
         subtitle="Primary target is capacity-aware. Secondary target is the pure gap-closing ideal."
@@ -205,15 +192,16 @@ export function OverviewSummaryCards({
             missingLabel="Needs data"
           />
         }
+        toneClassName="bg-amber-50/80"
       >
         {!hasTargetMath ? (
-          <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4 text-sm leading-7 text-[var(--text-body)]">
+          <p className="text-sm leading-7 text-[var(--text-body)]">
             Add your review count and at least one competitor review count to calculate the next target.
-          </div>
+          </p>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-[24px] border border-[var(--border)] bg-[var(--primary-soft)] px-4 py-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+          <div className="grid gap-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                 Realistic target
               </p>
               <div className="mt-2 flex items-end gap-2">
@@ -225,27 +213,28 @@ export function OverviewSummaryCards({
                 </p>
               </div>
               <p className="mt-2 text-sm text-[var(--text-body)]">
-                About <span className="font-semibold text-[var(--text-strong)]">{perWeek ?? "—"}</span> per week
+                About{" "}
+                <span className="font-semibold text-[var(--text-strong)]">
+                  {perWeek ?? "—"}
+                </span>{" "}
+                per week
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4 text-sm leading-7 text-[var(--text-body)]">
-              <p>
-                <span className="font-semibold text-[var(--text-strong)]">Review gap:</span>{" "}
-                {gapReviews}
-              </p>
-              <p className="mt-1">
-                <span className="font-semibold text-[var(--text-strong)]">Gap-based ideal:</span>{" "}
-                {desiredTarget90d ?? "—"} / 90 days
-              </p>
-              <p className="mt-1">
-                <span className="font-semibold text-[var(--text-strong)]">Capacity limit:</span>{" "}
-                {maxReviews90d === null ? "Not set yet" : `${maxReviews90d} / 90 days`}
-              </p>
+            <div>
+              <MetricRow label="Review gap" value={gapReviews ?? "—"} />
+              <MetricRow
+                label="Gap-based ideal"
+                value={desiredTarget90d === null ? "—" : `${desiredTarget90d} / 90 days`}
+              />
+              <MetricRow
+                label="Capacity limit"
+                value={maxReviews90d === null ? "Not set yet" : `${maxReviews90d} / 90 days`}
+              />
             </div>
           </div>
         )}
-      </SummaryCard>
-    </div>
+      </SummaryColumn>
+    </section>
   );
 }
