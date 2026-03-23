@@ -1,10 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import { OwnerCard } from "@/components/owner/OwnerCard";
-import { OwnerPill } from "@/components/owner/OwnerPill";
-import { OwnerStatCard } from "@/components/owner/OwnerStatCard";
+import { useEffect, useMemo, useState } from "react";
 
 type OwnerPriority = {
   title: string;
@@ -43,14 +39,41 @@ type OwnerTask = {
   completed_at: string | null;
 };
 
+type OwnerHealthMarker = {
+  label: "Visibility" | "Trust" | "Clarity" | "Activity";
+  score: number;
+  statusLabel: string;
+  explanation: string;
+  nextActionHint: string;
+};
+
 type OwnerDashboardResponse = {
   ok: boolean;
   projectId: string;
   projectDisplayName: string | null;
   projectCategory: string | null;
   projectMetro: string | null;
+  projectSiteUrl: string | null;
+  projectTargetDomain: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
   capturedAt: string;
   dashboard: {
+    hero: {
+      headline: string;
+      supportLine: string;
+      primaryActionText: string;
+    };
+    healthMarkers: OwnerHealthMarker[];
+    guidance: {
+      helpingNow: string[];
+      googleStillWants: string[];
+    };
+    progress: {
+      nextLikelyImprovement: string;
+      lastUpdated: string;
+    };
     topPriorities: OwnerPriority[];
     summary: {
       priorityCount: number;
@@ -119,16 +142,304 @@ type Props = {
   }>;
 };
 
+type RenderStep =
+  | {
+      key: string;
+      kind: "task";
+      index: number;
+      title: string;
+      reason: string;
+      who: string;
+      time: string;
+      status: string;
+      task: OwnerTask;
+    }
+  | {
+      key: string;
+      kind: "priority";
+      index: number;
+      title: string;
+      reason: string;
+      who: string;
+      time: string;
+      status: string;
+    };
+
+type Tone = {
+  solid: string;
+  soft: string;
+};
+
+type DetailTab = "visibility" | "ai" | "website" | "outcomes" | "tasks";
+
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
 function formatWho(value: string): string {
-  return value.replaceAll("_", " ");
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function formatStatus(value: string): string {
-  return value === "completed" ? "Completed" : "Open";
+  if (value === "completed") {
+    return "Completed";
+  }
+
+  if (value === "recommended") {
+    return "Recommended";
+  }
+
+  return "Open";
+}
+
+function formatDate(value: string | null): string {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatCount(value: number | null): string {
+  if (value === null) {
+    return "Not set";
+  }
+
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatRating(value: number | null): string {
+  if (value === null) {
+    return "Not set";
+  }
+
+  return `${value.toFixed(1)} / 5`;
+}
+
+function formatConversionRate(value: number | null): string {
+  if (value === null) {
+    return "Not set";
+  }
+
+  const percent = value <= 1 ? value * 100 : value;
+  return `${Math.round(percent)}%`;
+}
+
+function getHealthTone(label: OwnerHealthMarker["label"]): Tone {
+  if (label === "Visibility") {
+    return {
+      solid: "var(--brand-600)",
+      soft: "var(--brand-100)",
+    };
+  }
+
+  if (label === "Trust") {
+    return {
+      solid: "var(--accent-blue-600)",
+      soft: "var(--accent-blue-100)",
+    };
+  }
+
+  if (label === "Clarity") {
+    return {
+      solid: "var(--accent-mint-600)",
+      soft: "var(--accent-mint-100)",
+    };
+  }
+
+  return {
+    solid: "var(--success)",
+    soft: "var(--success-soft)",
+  };
+}
+
+function getScoreStatusTone(score: number): Tone {
+  if (score >= 80) {
+    return {
+      solid: "var(--success)",
+      soft: "var(--success-soft)",
+    };
+  }
+
+  if (score >= 65) {
+    return {
+      solid: "var(--brand-600)",
+      soft: "var(--brand-100)",
+    };
+  }
+
+  if (score >= 45) {
+    return {
+      solid: "var(--warning)",
+      soft: "var(--warning-soft)",
+    };
+  }
+
+  return {
+    solid: "var(--danger)",
+    soft: "var(--danger-soft)",
+  };
+}
+
+function getStepTone(status: string): Tone {
+  if (status === "completed") {
+    return {
+      solid: "var(--success)",
+      soft: "var(--success-soft)",
+    };
+  }
+
+  if (status === "recommended") {
+    return {
+      solid: "var(--accent-blue-600)",
+      soft: "var(--accent-blue-100)",
+    };
+  }
+
+  return {
+    solid: "var(--brand-600)",
+    soft: "var(--brand-100)",
+  };
+}
+
+function getSummaryTone(kind: "visibility" | "ai" | "website" | "outcomes"): Tone {
+  if (kind === "visibility") {
+    return {
+      solid: "var(--brand-600)",
+      soft: "var(--brand-100)",
+    };
+  }
+
+  if (kind === "ai") {
+    return {
+      solid: "var(--accent-mint-600)",
+      soft: "var(--accent-mint-100)",
+    };
+  }
+
+  if (kind === "website") {
+    return {
+      solid: "var(--accent-blue-600)",
+      soft: "var(--accent-blue-100)",
+    };
+  }
+
+  return {
+    solid: "var(--success)",
+    soft: "var(--success-soft)",
+  };
+}
+
+function getStepNumberTone(index: number): Tone {
+  if (index === 1) {
+    return {
+      solid: "var(--brand-700)",
+      soft: "var(--brand-700)",
+    };
+  }
+
+  return {
+    solid: "var(--reference)",
+    soft: "var(--reference-soft)",
+  };
+}
+
+
+function DetailStat({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p>
+    </div>
+  );
+}
+
+function CompactStateStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div className="px-4 py-3 sm:px-5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 text-base font-semibold leading-6" style={{ color: accent }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function TabButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full px-4 py-2 text-sm font-semibold transition"
+      style={{
+        backgroundColor: active ? "var(--brand-600)" : "var(--reference-soft)",
+        color: active ? "#ffffff" : "var(--text-body)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function DetailBullet({
+  text,
+  color,
+}: {
+  text: string;
+  color: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span>{text}</span>
+    </li>
+  );
 }
 
 export default function OwnerDashboardPage({ params }: Props) {
@@ -138,6 +449,7 @@ export default function OwnerDashboardPage({ params }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
+  const [detailTab, setDetailTab] = useState<DetailTab>("visibility");
 
   useEffect(() => {
     async function init() {
@@ -219,11 +531,56 @@ export default function OwnerDashboardPage({ params }: Props) {
     }
   }
 
+  const steps = useMemo<RenderStep[]>(() => {
+    if (!dashboard || !tasksData) {
+      return [];
+    }
+
+    if (tasksData.tasks.length > 0) {
+      return [...tasksData.tasks]
+        .sort((a, b) => {
+          const aStatus = a.status === "open" ? 0 : 1;
+          const bStatus = b.status === "open" ? 0 : 1;
+
+          if (aStatus !== bStatus) {
+            return aStatus - bStatus;
+          }
+
+          return a.sort_order - b.sort_order;
+        })
+        .slice(0, 3)
+        .map((task, index) => ({
+          key: task.id,
+          kind: "task" as const,
+          index: index + 1,
+          title: task.title,
+          reason: task.plain_language_reason ?? "No explanation available.",
+          who: task.who_should_do_it ? formatWho(task.who_should_do_it) : "Not set",
+          time: task.time_to_complete_estimate ?? "Not set",
+          status: task.status,
+          task,
+        }));
+    }
+
+    return dashboard.dashboard.topPriorities.slice(0, 3).map((priority, index) => ({
+      key: `${priority.sort_order}-${priority.title}`,
+      kind: "priority" as const,
+      index: index + 1,
+      title: priority.title,
+      reason: priority.plain_language_reason,
+      who: formatWho(priority.who_should_do_it),
+      time: priority.time_to_complete_estimate,
+      status: "recommended",
+    }));
+  }, [dashboard, tasksData]);
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-base text-slate-700">Loading owner dashboard...</p>
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-[28px] border border-[var(--border)] bg-white px-6 py-6 shadow-sm">
+            <p className="text-base text-[var(--text-body)]">Loading owner dashboard...</p>
+          </div>
         </div>
       </main>
     );
@@ -231,363 +588,887 @@ export default function OwnerDashboardPage({ params }: Props) {
 
   if (error || !dashboard || !tasksData) {
     return (
-      <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-base text-red-700">{error || "Failed to load owner dashboard."}</p>
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="rounded-[28px] border border-[var(--danger)] bg-[var(--danger-soft)] px-6 py-6 shadow-sm">
+            <p className="text-base font-medium text-[var(--danger)]">
+              {error || "Failed to load owner dashboard."}
+            </p>
+          </div>
         </div>
       </main>
     );
   }
 
-  const openTasks = tasksData.tasks.filter((task) => task.status === "open");
-  const completedTasks = tasksData.tasks.filter((task) => task.status === "completed");
+  const primaryStep = steps[0];
+  const visibilityTone = getSummaryTone("visibility");
+  const aiTone = getSummaryTone("ai");
+  const websiteTone = getSummaryTone("website");
+  const outcomesTone = getSummaryTone("outcomes");
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <OwnerCard className="p-6">
-          <div className="space-y-3">
-            <OwnerPill label="Owner Dashboard" />
+    <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
+      <section
+        className="w-full"
+        style={{
+          background:
+            "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 58%, #1798bb 100%)",
+        }}
+      >
+        <div className="mx-auto max-w-7xl px-4 py-1.5 sm:px-6 sm:py-2">
+          <div className="grid gap-3 lg:grid-cols-[110px_1fr] lg:items-start">
+            <div className="mt-[18px] flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] border border-white/20 bg-white/10 text-sm font-semibold text-white shadow-sm backdrop-blur-sm">
+              Logo
+            </div>
 
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+            <div className="justify-self-center self-end w-full max-w-4xl lg:pl-[100px]">
+              <div className="grid gap-x-16 gap-y-1 sm:grid-cols-2">
+                <div className="space-y-1 text-white/92">
+                  <p className="text-sm leading-5">
+                    <span className="font-semibold text-white">Business:</span>{" "}
+                    {dashboard.projectDisplayName ?? "Not set"}
+                  </p>
+                  <p className="text-sm leading-5">
+                    <span className="font-semibold text-white">Domain:</span>{" "}
+                    {dashboard.domainDisplayValue ?? "Not set"}
+                  </p>
+                  <p className="text-sm leading-5">
+                    <span className="font-semibold text-white">Location / Market:</span>{" "}
+                    {dashboard.projectLocationLabel ?? dashboard.projectMetro ?? "Not set"}
+                  </p>
+                </div>
+
+                <div className="space-y-1 text-white/92">
+                  <p className="text-sm leading-5">
+                    <span className="font-semibold text-white">Scope:</span>{" "}
+                    {dashboard.pageScopeLabel}
+                  </p>
+                  <p className="text-sm leading-5">
+                    <span className="font-semibold text-white">Snapshot:</span>{" "}
+                    {formatDate(dashboard.capturedAt)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-2 border-t border-white/18 pt-1.5 text-center font-serif text-base font-semibold leading-5 text-white/90 sm:text-[18px]">
+            What matters now, what to do next, and why it matters.
+          </p>
+        </div>
+      </section>
+
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-6">
+        <section
+          className="rounded-[32px] px-5 py-5 sm:px-7 sm:py-6"
+          style={{ backgroundColor: "var(--primary-soft)" }}
+        >
+          <div className="grid gap-5 xl:grid-cols-[1.35fr_0.95fr]">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
                 What to do now
+              </p>
+              <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
+                {dashboard.dashboard.hero.headline}
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-700">
-                Clear priorities, guided next actions, and the current signals shaping your local
-                visibility.
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                {dashboard.dashboard.hero.supportLine}
+              </p>
+
+              <div className="mt-3 overflow-hidden rounded-[20px] border border-white/55 bg-white/78 shadow-sm backdrop-blur">
+                <div className="grid sm:grid-cols-[1.45fr_0.7fr_0.8fr]">
+                  <div className="border-b border-[var(--border)] sm:border-b-0 sm:border-r sm:border-[var(--border)]">
+                    <CompactStateStat
+                      label="Start with"
+                      value={primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+                      accent="var(--brand-700)"
+                    />
+                  </div>
+                  <div className="border-b border-[var(--border)] sm:border-b-0 sm:border-r sm:border-[var(--border)]">
+                    <CompactStateStat
+                      label="Open tasks"
+                      value={String(tasksData.summary.openTasks)}
+                      accent="var(--brand-600)"
+                    />
+                  </div>
+                  <div>
+                    <CompactStateStat
+                      label="Completion rate"
+                      value={formatPercent(dashboard.dashboard.summary.completedTaskRate)}
+                      accent="var(--success)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-[28px] border px-5 py-5 shadow-sm"
+              style={{
+                backgroundColor: "var(--success-soft)",
+                borderColor: "rgba(21, 128, 61, 0.16)",
+              }}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--success)]">
+                Primary next action
+              </p>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                This is the clearest next move for the owner right now. It should produce visible progress without forcing a deep technical drill-down.
+              </p>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Why now
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                    {primaryStep?.reason ?? dashboard.dashboard.progress.nextLikelyImprovement}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Expected benefit
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                    {primaryStep
+                      ? `Owner or staff can move this forward. Typical effort: ${primaryStep.time}.`
+                      : dashboard.dashboard.progress.nextLikelyImprovement}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {dashboard.dashboard.healthMarkers.map((marker) => {
+              const tone = getHealthTone(marker.label);
+              const statusTone = getScoreStatusTone(marker.score);
+
+              return (
+                <article
+                  key={marker.label}
+                  className="rounded-[24px] border px-4 py-4 shadow-sm"
+                  style={{
+                    backgroundColor: tone.soft,
+                    borderColor: "rgba(15, 23, 42, 0.06)",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-body)]">
+                        {marker.label}
+                      </p>
+                      <div className="mt-2 flex items-end gap-2">
+                        <p
+                          className="text-4xl font-semibold leading-none tracking-tight"
+                          style={{ color: tone.solid }}
+                        >
+                          {marker.score}
+                        </p>
+                        <p className="pb-1 text-sm font-medium text-[var(--text-muted)]">
+                          / 100
+                        </p>
+                      </div>
+                    </div>
+
+                    <span
+                      className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style={{
+                        backgroundColor: statusTone.soft,
+                        color: statusTone.solid,
+                      }}
+                    >
+                      {marker.statusLabel}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 h-2 rounded-full bg-white/70">
+                    <div
+                      className="h-2 rounded-full"
+                      style={{
+                        width: `${marker.score}%`,
+                        backgroundColor: tone.solid,
+                      }}
+                    />
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-[var(--text-body)]">
+                    {marker.explanation}
+                  </p>
+                  <p className="mt-2 text-xs font-medium text-[var(--text-muted)]">
+                    {marker.nextActionHint}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="grid gap-8 xl:grid-cols-[1.35fr_0.85fr]">
+          <section>
+            <div className="border-b border-[var(--border)] pb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Your next 3 steps
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+                Follow these in order
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                This is the guided path we believe gives you the clearest next wins without forcing you to learn SEO or AI visibility jargon.
               </p>
             </div>
 
-            <div className="grid gap-3 pt-2 md:grid-cols-2">
-              <OwnerCard className="border-sky-200 bg-sky-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-800">
-                  Business
-                </p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">
-                  {dashboard.projectDisplayName ?? "Not set"}
-                </p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {dashboard.projectCategory ?? "Category not set"}
-                </p>
-                <p className="text-sm text-slate-700">{dashboard.projectMetro ?? "Metro not set"}</p>
-              </OwnerCard>
+            <div className="mt-4">
+              {steps.map((step, index) => {
+                const tone = getStepTone(step.status);
+                const numberTone = getStepNumberTone(step.index);
+                const isTask = step.kind === "task";
+                const isSaving = isTask && savingTaskId === step.task.id;
+                const isCompleted = step.status === "completed";
+                const isLast = index === steps.length - 1;
 
-              <OwnerCard className="bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Snapshot date
-                </p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">{dashboard.capturedAt}</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  This view keeps the next best action clear and owner-friendly.
-                </p>
-              </OwnerCard>
+                return (
+                  <article
+                    key={step.key}
+                    className={`grid gap-4 py-6 md:grid-cols-[72px_1fr_auto] md:items-start ${
+                      isLast ? "" : "border-b border-[var(--border)]"
+                    }`}
+                  >
+                    <div className="flex items-center md:justify-center">
+                      <div
+                        className="flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-semibold"
+                        style={{
+                          backgroundColor: numberTone.soft,
+                          color: step.index === 1 ? "#ffffff" : numberTone.solid,
+                        }}
+                      >
+                        {step.index}
+                      </div>
+                    </div>
+
+                    <div className="max-w-2xl">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-[var(--text-strong)]">
+                          {step.title}
+                        </h3>
+                        <span
+                          className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                          style={{
+                            backgroundColor: tone.soft,
+                            color: tone.solid,
+                          }}
+                        >
+                          {formatStatus(step.status)}
+                        </span>
+                      </div>
+
+                      <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                        {step.reason}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)]">
+                          Who: {step.who}
+                        </span>
+                        <span className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)]">
+                          Time: {step.time}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="md:min-w-[154px]">
+                      {isTask ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleTask(step.task)}
+                          disabled={isSaving}
+                          className="inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
+                          style={{
+                            backgroundColor: isCompleted
+                              ? "var(--reference)"
+                              : "var(--brand-600)",
+                          }}
+                        >
+                          {isSaving
+                            ? "Saving..."
+                            : isCompleted
+                              ? "Reopen task"
+                              : "Mark complete"}
+                        </button>
+                      ) : (
+                        <div className="rounded-2xl bg-[var(--accent-blue-100)] px-4 py-3 text-center text-sm font-semibold text-[var(--accent-blue-600)]">
+                          Suggested next action
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+
+              {steps.length === 0 ? (
+                <div className="rounded-[24px] bg-[var(--reference-soft)] px-5 py-5 text-sm text-[var(--text-body)]">
+                  No task or priority steps are available yet.
+                </div>
+              ) : null}
             </div>
-          </div>
-        </OwnerCard>
+          </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <OwnerStatCard
-            label="Open tasks"
-            value={<p className="text-3xl font-semibold text-slate-950">{dashboard.dashboard.summary.openTasks}</p>}
-          />
-          <OwnerStatCard
-            label="Completed tasks"
-            value={<p className="text-3xl font-semibold text-slate-950">{dashboard.dashboard.summary.completedTasks}</p>}
-          />
-          <OwnerStatCard
-            label="Completion rate"
-            value={<p className="text-3xl font-semibold text-slate-950">{formatPercent(dashboard.dashboard.summary.completedTaskRate)}</p>}
-          />
-          <OwnerStatCard
-            label="Visibility"
-            accent
-            value={<p className="text-xl font-semibold text-slate-950">{dashboard.dashboard.visibilitySummary.visibilityLabel}</p>}
-          />
-        </section>
+          <aside className="space-y-8">
+            <section>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                What Google wants next
+              </p>
 
-        <OwnerCard className="p-6">
-          <div className="mb-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Top 3 priorities</h2>
-            <p className="mt-1 text-sm text-slate-700">Focus on these first before anything else.</p>
-          </div>
+              <div className="mt-4 grid gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--brand-700)]">Helping now</p>
+                  <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                    {dashboard.dashboard.guidance.helpingNow.map((item) => (
+                      <li key={item} className="flex gap-3">
+                        <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--brand-600)]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-          <div className="space-y-4">
-            {dashboard.dashboard.topPriorities.map((priority) => (
-              <OwnerCard
-                key={`${priority.sort_order}-${priority.title}`}
-                className="p-5"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <OwnerPill label={`Priority ${priority.sort_order}`} />
-                    <h3 className="text-xl font-semibold text-slate-950">{priority.title}</h3>
-                    <p className="text-base leading-7 text-slate-700">
-                      {priority.plain_language_reason}
+                <div className="border-t border-[var(--border)] pt-4">
+                  <p className="text-sm font-semibold text-[var(--text-strong)]">
+                    Google still wants
+                  </p>
+                  <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                    {dashboard.dashboard.guidance.googleStillWants.map((item) => (
+                      <li key={item} className="flex gap-3">
+                        <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--warning)]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Progress and proof
+              </p>
+
+              <div className="mt-4">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-4xl font-semibold tracking-tight text-[var(--text-strong)]">
+                      {formatPercent(dashboard.dashboard.summary.completedTaskRate)}
+                    </p>
+                    <p className="mt-2 text-sm text-[var(--text-body)]">
+                      completion rate across current owner tasks
                     </p>
                   </div>
-
-                  <OwnerCard className="bg-slate-50 p-4 md:min-w-[240px]">
-                    <div className="grid gap-2 text-sm text-slate-700">
-                      <p>
-                        <span className="font-semibold text-slate-950">Who should do it:</span>{" "}
-                        {formatWho(priority.who_should_do_it)}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-950">Difficulty:</span>{" "}
-                        {priority.difficulty}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-950">Time:</span>{" "}
-                        {priority.time_to_complete_estimate}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-950">Confidence:</span>{" "}
-                        {formatPercent(priority.confidence_level)}
-                      </p>
-                    </div>
-                  </OwnerCard>
+                  <span
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      backgroundColor: "var(--success-soft)",
+                      color: "var(--success)",
+                    }}
+                  >
+                    {tasksData.summary.completedTasks} completed
+                  </span>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <OwnerCard className="bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-950">Why now</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-700">{priority.why_now}</p>
-                  </OwnerCard>
-
-                  <OwnerCard className="bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-950">Expected benefit</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-700">
-                      {priority.expected_benefit}
-                    </p>
-                  </OwnerCard>
+                <div className="mt-4 h-3 rounded-full bg-[var(--reference-soft)]">
+                  <div
+                    className="h-3 rounded-full bg-[var(--success)]"
+                    style={{
+                      width: formatPercent(dashboard.dashboard.summary.completedTaskRate),
+                    }}
+                  />
                 </div>
-              </OwnerCard>
-            ))}
-          </div>
-        </OwnerCard>
 
-        <OwnerCard className="p-6">
-          <div className="mb-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Current tasks</h2>
-            <p className="mt-1 text-sm text-slate-700">
-              These are the saved tasks for this project right now.
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <DetailStat
+                    label="Open now"
+                    value={String(tasksData.summary.openTasks)}
+                    helper="These are the actions still waiting on completion."
+                  />
+                  <DetailStat
+                    label="Current priorities"
+                    value={String(dashboard.dashboard.summary.priorityCount)}
+                    helper="This is the number of active recommendations in the latest snapshot."
+                  />
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+
+        <section className="border-t border-[var(--border)] pt-6">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Details
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Drill deeper without losing the main story
+            </h2>
+            <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
+              These tabs let you inspect the supporting evidence behind the decision engine without turning the page into a traditional SEO dashboard.
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <h3 className="mb-3 text-lg font-semibold text-slate-950">Open tasks</h3>
-              <div className="space-y-4">
-                {openTasks.length === 0 ? (
-                  <OwnerCard className="bg-slate-50 p-5">
-                    <p className="text-sm text-slate-700">No open tasks right now.</p>
-                  </OwnerCard>
-                ) : (
-                  openTasks.map((task) => (
-                    <OwnerCard
-                      key={task.id}
-                      className="p-5"
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-2">
-                          <OwnerPill label={`Task ${task.sort_order}`} />
-                          <h3 className="text-xl font-semibold text-slate-950">{task.title}</h3>
-                          <p className="text-base leading-7 text-slate-700">
-                            {task.plain_language_reason ?? "No explanation available."}
-                          </p>
-                        </div>
-
-                        <OwnerCard className="bg-slate-50 p-4 md:min-w-[240px]">
-                          <div className="grid gap-2 text-sm text-slate-700">
-                            <p>
-                              <span className="font-semibold text-slate-950">Status:</span>{" "}
-                              {formatStatus(task.status)}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Who should do it:</span>{" "}
-                              {task.who_should_do_it ? formatWho(task.who_should_do_it) : "Not set"}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Difficulty:</span>{" "}
-                              {task.difficulty ?? "Not set"}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Time:</span>{" "}
-                              {task.time_to_complete_estimate ?? "Not set"}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => void toggleTask(task)}
-                              disabled={savingTaskId === task.id}
-                              className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {savingTaskId === task.id ? "Saving..." : "Mark complete"}
-                            </button>
-                          </div>
-                        </OwnerCard>
-                      </div>
-                    </OwnerCard>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-3 text-lg font-semibold text-slate-950">Completed tasks</h3>
-              <div className="space-y-4">
-                {completedTasks.length === 0 ? (
-                  <OwnerCard className="bg-slate-50 p-5">
-                    <p className="text-sm text-slate-700">No completed tasks yet.</p>
-                  </OwnerCard>
-                ) : (
-                  completedTasks.map((task) => (
-                    <OwnerCard
-                      key={task.id}
-                      className="bg-slate-50 p-5"
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-2">
-                          <OwnerPill label={`Task ${task.sort_order}`} tone="neutral" />
-                          <h3 className="text-xl font-semibold text-slate-950">{task.title}</h3>
-                          <p className="text-base leading-7 text-slate-700">
-                            {task.plain_language_reason ?? "No explanation available."}
-                          </p>
-                        </div>
-
-                        <OwnerCard className="p-4 md:min-w-[240px]">
-                          <div className="grid gap-2 text-sm text-slate-700">
-                            <p>
-                              <span className="font-semibold text-slate-950">Status:</span>{" "}
-                              {formatStatus(task.status)}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Who should do it:</span>{" "}
-                              {task.who_should_do_it ? formatWho(task.who_should_do_it) : "Not set"}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Difficulty:</span>{" "}
-                              {task.difficulty ?? "Not set"}
-                            </p>
-                            <p>
-                              <span className="font-semibold text-slate-950">Time:</span>{" "}
-                              {task.time_to_complete_estimate ?? "Not set"}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => void toggleTask(task)}
-                              disabled={savingTaskId === task.id}
-                              className="mt-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {savingTaskId === task.id ? "Saving..." : "Mark as open"}
-                            </button>
-                          </div>
-                        </OwnerCard>
-                      </div>
-                    </OwnerCard>
-                  ))
-                )}
-              </div>
-            </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <TabButton
+              label="Visibility details"
+              active={detailTab === "visibility"}
+              onClick={() => setDetailTab("visibility")}
+            />
+            <TabButton
+              label="AI visibility"
+              active={detailTab === "ai"}
+              onClick={() => setDetailTab("ai")}
+            />
+            <TabButton
+              label="Website trust"
+              active={detailTab === "website"}
+              onClick={() => setDetailTab("website")}
+            />
+            <TabButton
+              label="Outcomes"
+              active={detailTab === "outcomes"}
+              onClick={() => setDetailTab("outcomes")}
+            />
+            <TabButton
+              label="Task evidence"
+              active={detailTab === "tasks"}
+              onClick={() => setDetailTab("tasks")}
+            />
           </div>
-        </OwnerCard>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <OwnerCard className="p-6">
-            <h2 className="text-xl font-semibold text-slate-950">Visibility summary</h2>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-              <p>
-                <span className="font-semibold text-slate-950">Keyword:</span>{" "}
-                {dashboard.dashboard.visibilitySummary.keyword ?? "Not set"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Metro:</span>{" "}
-                {dashboard.dashboard.visibilitySummary.metro ?? "Not set"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Latest rank:</span>{" "}
-                {dashboard.dashboard.visibilitySummary.latestRank ?? "No data"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Best rank:</span>{" "}
-                {dashboard.dashboard.visibilitySummary.bestRank ?? "No data"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Status:</span>{" "}
-                {dashboard.dashboard.visibilitySummary.visibilityLabel}
-              </p>
-            </div>
-          </OwnerCard>
+          <div className="mt-6 rounded-[30px] bg-white px-5 py-6 shadow-sm ring-1 ring-[var(--border)] sm:px-6 sm:py-7">
+            {detailTab === "visibility" ? (
+              <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--brand-700)]">
+                    Visibility details
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Current local rank footing
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This shows the ranking context the owner can understand: what keyword is active, what metro is being tracked, and whether the business is moving into a stronger position.
+                  </p>
 
-          <OwnerCard className="p-6">
-            <h2 className="text-xl font-semibold text-slate-950">AI summary</h2>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-              <p>
-                <span className="font-semibold text-slate-950">Business name:</span>{" "}
-                {dashboard.dashboard.aiSummary.gbpName ?? "Not available"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Primary category:</span>{" "}
-                {dashboard.dashboard.aiSummary.primaryCategory ?? "Not available"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Reviews:</span>{" "}
-                {dashboard.dashboard.aiSummary.totalReviews ?? "No data"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Rating:</span>{" "}
-                {dashboard.dashboard.aiSummary.rating ?? "No data"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Readiness:</span>{" "}
-                {dashboard.dashboard.aiSummary.aiReadinessLabel}
-              </p>
-            </div>
-          </OwnerCard>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <DetailStat
+                      label="Latest rank"
+                      value={dashboard.dashboard.visibilitySummary.latestRank?.toString() ?? "Not set"}
+                      helper="Most recent captured position."
+                    />
+                    <DetailStat
+                      label="Best rank"
+                      value={dashboard.dashboard.visibilitySummary.bestRank?.toString() ?? "Not set"}
+                      helper="Best observed position in current data."
+                    />
+                    <DetailStat
+                      label="Last captured"
+                      value={formatDate(dashboard.dashboard.visibilitySummary.latestCapturedAt)}
+                      helper="Most recent time this visibility snapshot was refreshed."
+                    />
+                  </div>
+                </div>
 
-          <OwnerCard className="p-6">
-            <h2 className="text-xl font-semibold text-slate-950">Website summary</h2>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-              <p>
-                <span className="font-semibold text-slate-950">Site URL:</span>{" "}
-                {dashboard.dashboard.websiteSummary.siteUrl ?? "Not available"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Target domain:</span>{" "}
-                {dashboard.dashboard.websiteSummary.targetDomain ?? "Not available"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Brand name:</span>{" "}
-                {dashboard.dashboard.websiteSummary.targetBrandName ?? "Not available"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Status:</span>{" "}
-                {dashboard.dashboard.websiteSummary.websiteReadinessLabel}
-              </p>
-            </div>
-          </OwnerCard>
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Keyword
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.visibilitySummary.keyword ?? "Not set"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Metro
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.visibilitySummary.metro ?? "Not set"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-2xl px-4 py-4"
+                    style={{
+                      backgroundColor: visibilityTone.soft,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Plain-English read
+                    </p>
+                    <p className="mt-2 text-sm leading-7" style={{ color: visibilityTone.solid }}>
+                      {dashboard.dashboard.visibilitySummary.visibilityLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      <DetailBullet
+                        text="Visibility is tied to one active keyword and one metro context."
+                        color="var(--brand-600)"
+                      />
+                      <DetailBullet
+                        text="The latest rank is the clearest near-term signal for owner-facing progress."
+                        color="var(--accent-blue-600)"
+                      />
+                      <DetailBullet
+                        text="Best rank helps show whether the current effort is capable of breaking through."
+                        color="var(--success)"
+                      />
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
-          <OwnerCard className="p-6">
-            <h2 className="text-xl font-semibold text-slate-950">Outcomes summary</h2>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-              <p>
-                <span className="font-semibold text-slate-950">Monthly events:</span>{" "}
-                {dashboard.dashboard.outcomesSummary.monthlyCustomerEvents ?? "Not set"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Review conversion rate:</span>{" "}
-                {dashboard.dashboard.outcomesSummary.reviewConversionRate ?? "Not set"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Label:</span>{" "}
-                {dashboard.dashboard.outcomesSummary.eventLabelPlural ?? "Not set"}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-950">Status:</span>{" "}
-                {dashboard.dashboard.outcomesSummary.outcomesReadinessLabel}
-              </p>
-            </div>
-          </OwnerCard>
+            {detailTab === "ai" ? (
+              <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--accent-mint-600)]">
+                    AI visibility
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Machine-readiness signals
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the owner-facing evidence layer for AI visibility. It focuses on whether the business identity, category clarity, and review signals give machines enough confidence to understand the business.
+                  </p>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <DetailStat
+                      label="Review count"
+                      value={formatCount(dashboard.dashboard.aiSummary.totalReviews)}
+                      helper="Reviews help with trust and machine understanding."
+                    />
+                    <DetailStat
+                      label="Rating"
+                      value={formatRating(dashboard.dashboard.aiSummary.rating)}
+                      helper="Average rating across visible review signals."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      GBP name
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.aiSummary.gbpName ?? "Not set"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Primary category
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.aiSummary.primaryCategory ?? "Not set"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-2xl px-4 py-4"
+                    style={{
+                      backgroundColor: aiTone.soft,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Plain-English read
+                    </p>
+                    <p className="mt-2 text-sm leading-7" style={{ color: aiTone.solid }}>
+                      {dashboard.dashboard.aiSummary.aiReadinessLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      <DetailBullet
+                        text={`Business name present: ${dashboard.dashboard.aiSummary.hasBusinessName ? "yes" : "no"}.`}
+                        color="var(--accent-mint-600)"
+                      />
+                      <DetailBullet
+                        text={`Primary category present: ${dashboard.dashboard.aiSummary.hasPrimaryCategory ? "yes" : "no"}.`}
+                        color="var(--accent-blue-600)"
+                      />
+                      <DetailBullet
+                        text={`Review signals present: ${dashboard.dashboard.aiSummary.hasReviewSignals ? "yes" : "no"}.`}
+                        color="var(--success)"
+                      />
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {detailTab === "website" ? (
+              <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--accent-blue-600)]">
+                    Website trust
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Website identity footing
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This section keeps the explanation owner-friendly: does the system have a clear website, domain, and brand identity to work with?
+                  </p>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <DetailStat
+                      label="Site URL"
+                      value={dashboard.dashboard.websiteSummary.hasSiteUrl ? "Yes" : "No"}
+                      helper="Whether a website URL is present."
+                    />
+                    <DetailStat
+                      label="Target domain"
+                      value={dashboard.dashboard.websiteSummary.hasTargetDomain ? "Yes" : "No"}
+                      helper="Whether a domain anchor exists."
+                    />
+                    <DetailStat
+                      label="Brand name"
+                      value={dashboard.dashboard.websiteSummary.hasBrandName ? "Yes" : "No"}
+                      helper="Whether brand identity is explicitly set."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Site URL
+                    </p>
+                    <p className="mt-2 break-all text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.websiteSummary.siteUrl ?? "Not set"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Target domain
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.websiteSummary.targetDomain ?? "Not set"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-2xl px-4 py-4"
+                    style={{
+                      backgroundColor: websiteTone.soft,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Plain-English read
+                    </p>
+                    <p className="mt-2 text-sm leading-7" style={{ color: websiteTone.solid }}>
+                      {dashboard.dashboard.websiteSummary.websiteReadinessLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      <DetailBullet
+                        text="A clear domain and brand anchor reduces identity confusion."
+                        color="var(--accent-blue-600)"
+                      />
+                      <DetailBullet
+                        text="Missing website identity details can weaken trust signals."
+                        color="var(--warning)"
+                      />
+                      <DetailBullet
+                        text="This section supports both Google visibility and broader machine understanding."
+                        color="var(--brand-600)"
+                      />
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {detailTab === "outcomes" ? (
+              <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--success)]">
+                    Outcomes
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Business impact footing
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the early owner-facing business-outcomes layer. It shows whether customer-event and conversion context exists yet, without exposing internal scoring logic.
+                  </p>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <DetailStat
+                      label="Monthly events"
+                      value={formatCount(dashboard.dashboard.outcomesSummary.monthlyCustomerEvents)}
+                      helper="How many tracked customer events are connected."
+                    />
+                    <DetailStat
+                      label="Conversion rate"
+                      value={formatConversionRate(dashboard.dashboard.outcomesSummary.reviewConversionRate)}
+                      helper="Current review-to-customer conversion footing."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Singular label
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.outcomesSummary.eventLabelSingular ?? "Not set"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Plural label
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.outcomesSummary.eventLabelPlural ?? "Not set"}
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-2xl px-4 py-4"
+                    style={{
+                      backgroundColor: outcomesTone.soft,
+                    }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Plain-English read
+                    </p>
+                    <p className="mt-2 text-sm leading-7" style={{ color: outcomesTone.solid }}>
+                      {dashboard.dashboard.outcomesSummary.outcomesReadinessLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      <DetailBullet
+                        text="This is the beginning of the business-results layer, not the full outcome engine."
+                        color="var(--success)"
+                      />
+                      <DetailBullet
+                        text="Once event and conversion data deepen, this section becomes much more valuable."
+                        color="var(--brand-600)"
+                      />
+                      <DetailBullet
+                        text="Right now this helps owners see whether visibility work is being tied to real outcomes."
+                        color="var(--accent-blue-600)"
+                      />
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {detailTab === "tasks" ? (
+              <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+                <div>
+                  <p className="text-sm font-semibold text-[var(--brand-700)]">
+                    Task evidence
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Why these actions are on the page
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the owner-readable evidence layer for the guided actions. It explains what is being asked, who should do it, and how much work it likely takes.
+                  </p>
+
+                  <div className="mt-5 space-y-4">
+                    {steps.map((step) => {
+                      const tone = getStepTone(step.status);
+
+                      return (
+                        <div
+                          key={`detail-${step.key}`}
+                          className="rounded-2xl border border-[var(--border)] px-4 py-4"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-[var(--text-strong)]">
+                              {step.title}
+                            </p>
+                            <span
+                              className="rounded-full px-2.5 py-1 text-xs font-semibold"
+                              style={{
+                                backgroundColor: tone.soft,
+                                color: tone.solid,
+                              }}
+                            >
+                              {formatStatus(step.status)}
+                            </span>
+                          </div>
+
+                          <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                            {step.reason}
+                          </p>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)]">
+                              Who: {step.who}
+                            </span>
+                            <span className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-medium text-[var(--text-body)]">
+                              Time: {step.time}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <DetailStat
+                    label="Open tasks"
+                    value={String(tasksData.summary.openTasks)}
+                    helper="Tasks still waiting for completion."
+                  />
+                  <DetailStat
+                    label="Completed tasks"
+                    value={String(tasksData.summary.completedTasks)}
+                    helper="Tasks already marked complete."
+                  />
+                  <DetailStat
+                    label="Snapshot priorities"
+                    value={String(dashboard.dashboard.summary.priorityCount)}
+                    helper="Owner snapshot recommendations currently available."
+                  />
+                  <div className="rounded-2xl bg-[var(--reference-soft)] px-4 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      <DetailBullet
+                        text="These are simplified owner actions, not a raw issue dump."
+                        color="var(--brand-600)"
+                      />
+                      <DetailBullet
+                        text="Completion tracking helps prove momentum and reinforce confidence."
+                        color="var(--success)"
+                      />
+                      <DetailBullet
+                        text="The decision engine stays in the background while the owner sees only the next useful move."
+                        color="var(--accent-blue-600)"
+                      />
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </section>
       </div>
     </main>
