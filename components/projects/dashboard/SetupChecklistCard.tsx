@@ -7,13 +7,18 @@ type SetupChecklistCardProps = {
   onGoToSettings: () => void;
 };
 
-function StepStatusPill({ ok }: { ok: boolean }) {
+function StepStatus({
+  ok,
+}: {
+  ok: boolean;
+}) {
   return (
     <span
-      className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      className="border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
       style={{
-        backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
+        borderColor: ok ? "var(--success)" : "var(--warning)",
         color: ok ? "var(--success)" : "var(--warning)",
+        backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
       }}
     >
       {ok ? "Done" : "Next"}
@@ -36,7 +41,7 @@ export function SetupChecklistCard({
         onClick={onGoToSettings}
         className="w-full border-t border-[var(--border)] px-0 py-4 text-left transition hover:opacity-100"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_72px] md:items-start">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[var(--text-strong)]">{title}</p>
             <p className="mt-2 max-w-xl text-sm leading-7 text-[var(--text-body)]">
@@ -44,8 +49,8 @@ export function SetupChecklistCard({
             </p>
           </div>
 
-          <div className="shrink-0 pt-0.5">
-            <StepStatusPill ok={ok} />
+          <div className="md:justify-self-end">
+            <StepStatus ok={ok} />
           </div>
         </div>
       </button>
@@ -53,8 +58,8 @@ export function SetupChecklistCard({
   }
 
   return (
-    <section className="grid gap-5 border-b border-[var(--border)] pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="border border-[var(--border)] bg-white px-5 py-5 sm:px-6">
+      <div className="grid gap-4 border-b border-[var(--border)] pb-5 lg:grid-cols-[minmax(0,1fr)_120px] lg:items-start">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
             Setup checklist
@@ -68,12 +73,17 @@ export function SetupChecklistCard({
           </p>
         </div>
 
-        <div className="rounded-full bg-[var(--primary-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)] ring-1 ring-inset ring-[var(--border)]/60">
-          {setupDoneCount}/3 done
+        <div className="border-l border-[var(--border)] pl-4 lg:justify-self-end">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            Progress
+          </div>
+          <div className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+            {setupDoneCount}/3 complete
+          </div>
         </div>
       </div>
 
-      <div>
+      <div className="pt-1">
         {renderSetupStep(
           hasGbp,
           "1) Add your GBP snapshot",

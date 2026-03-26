@@ -1,33 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-import AuthoritySummaryCard from "@/components/authority/AuthoritySummaryCard";
-import ProjectInsightsNav from "@/components/projects/ProjectInsightsNav";
-import AuthorityTrendCard from "@/components/authority/AuthorityTrendCard";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 
-type AuthorityInputs = Record<string, unknown>;
+type PageProps = {
+  params: Promise<{
+    projectId: string;
+  }>;
+};
 
-type AuthorityRow = {
+type OwnerDashboardResponse = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  projectDisplayName: string | null;
+  projectCategory: string | null;
+  projectMetro: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
+  capturedAt: string;
+};
+
+type AuthorityHistoryRow = {
   project_id: string;
   captured_at: string;
-  version: string;
-  authority_score: number;
-  authority_tier: string;
-  competitive_strength: number;
-  structural_optimization: number;
-  momentum_score: number;
-  momentum_label: string;
-  inputs: AuthorityInputs;
+  version: string | null;
+  authority_score: number | null;
+  authority_tier: string | null;
+  competitive_strength: number | null;
+  structural_optimization: number | null;
+  momentum_score: number | null;
+  momentum_label: string | null;
   created_at: string;
+};
+
+type AuthorityHistoryResponse = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  limit: number;
+  rows: AuthorityHistoryRow[];
 };
 
 type ActionItem = {
   title: string;
   detail: string;
-  priority: "high" | "medium" | "low";
-  category: "reviews" | "photos" | "posts" | "categories" | "citations" | "general";
+  priority: "high" | "medium" | "low" | string;
+  category: "reviews" | "photos" | "posts" | "categories" | "citations" | "general" | string;
 };
 
 type ActionsSuccessResponse = {
@@ -40,8 +60,6 @@ type ActionsSuccessResponse = {
   authorityTier?: string | null;
   momentumScore?: number | null;
   momentumLabel?: string | null;
-  profile?: Record<string, unknown>;
-  market?: Record<string, unknown>;
 };
 
 type ActionsErrorResponse = {
@@ -51,263 +69,709 @@ type ActionsErrorResponse = {
 
 type ActionsResponse = ActionsSuccessResponse | ActionsErrorResponse;
 
-function formatJson(value: unknown) {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Not set";
   }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
 
-function priorityClasses(priority: ActionItem["priority"]) {
+function formatScore(value: number | null) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  return value.toFixed(1);
+}
+
+function formatTier(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return value;
+}
+
+function formatMomentumLabel(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return value;
+}
+
+function formatPriority(priority: string) {
+  if (!priority) {
+    return "Unknown";
+  }
+
+  return priority.charAt(0).toUpperCase() + priority.slice(1);
+}
+
+function categoryLabel(category: string) {
+  if (category === "reviews") return "Reviews";
+  if (category === "photos") return "Photos";
+  if (category === "posts") return "Posts";
+  if (category === "categories") return "Categories";
+  if (category === "citations") return "Citations";
+  if (category === "general") return "General";
+  return category;
+}
+
+function getPriorityTone(priority: string) {
   if (priority === "high") {
-    return "border-red-200 bg-red-50 text-red-700";
+    return {
+      tone: "var(--danger)",
+      bg: "var(--danger-soft)",
+      border: "var(--danger)",
+    };
   }
+
   if (priority === "medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return {
+      tone: "var(--warning)",
+      bg: "var(--warning-soft)",
+      border: "var(--warning)",
+    };
   }
-  return "border-gray-200 bg-gray-50 text-gray-700";
+
+  return {
+    tone: "var(--text-body)",
+    bg: "var(--reference-soft)",
+    border: "var(--border-strong)",
+  };
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
+function buildAuthorityRead(row: AuthorityHistoryRow | null) {
+  if (!row || row.authority_score === null) {
+    return {
+      headline: "Get your first authority checkpoint",
+      reason:
+        "Digital Brain does not yet have enough authority data to show how strong this business looks in the local market.",
+    };
   }
-  return fallback;
+
+  if (row.authority_score >= 80) {
+    return {
+      headline: "Protect a strong authority position",
+      reason:
+        "This project is already showing strong authority signals. The main goal is to keep momentum up and defend the current position.",
+    };
+  }
+
+  if (row.authority_score >= 60) {
+    return {
+      headline: "Strengthen the next layer of authority signals",
+      reason:
+        "This project has a workable authority base, but it still has room to improve against stronger local competitors.",
+    };
+  }
+
+  if (row.authority_score >= 40) {
+    return {
+      headline: "Improve core trust and competitive footing",
+      reason:
+        "Authority is present but still weak enough to hold the project back. The next wins should focus on trust, completeness, and market strength.",
+    };
+  }
+
+  return {
+    headline: "Build a stronger authority foundation",
+    reason:
+      "This project still needs more trust, completeness, and competitive strength before it can become reliably strong in the market.",
+  };
 }
 
-export default function ProjectAuthorityPage() {
-  const params = useParams<{ projectId: string }>();
-  const projectId = params.projectId;
-  const router = useRouter();
+function buildAuthorityTrend(rows: AuthorityHistoryRow[]) {
+  if (rows.length < 2) {
+    return "Only one authority checkpoint is available so far.";
+  }
 
-  const [authed, setAuthed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string | null>(null);
+  const latest = rows[0];
+  const previous = rows[1];
 
-  const [row, setRow] = useState<AuthorityRow | null>(null);
+  if (
+    latest.authority_score !== null &&
+    previous.authority_score !== null &&
+    latest.authority_score > previous.authority_score
+  ) {
+    return `Authority is improving. Score moved from ${previous.authority_score.toFixed(1)} to ${latest.authority_score.toFixed(1)}.`;
+  }
+
+  if (
+    latest.authority_score !== null &&
+    previous.authority_score !== null &&
+    latest.authority_score < previous.authority_score
+  ) {
+    return `Authority slipped. Score moved from ${previous.authority_score.toFixed(1)} to ${latest.authority_score.toFixed(1)}.`;
+  }
+
+  return "Authority is steady compared with the previous checkpoint.";
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+    </div>
+  );
+}
+
+function MetricStripItem({
+  label,
+  value,
+  bg,
+  tone,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  tone: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ backgroundColor: bg }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: tone }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function InlineTag({
+  children,
+  tone,
+  bg,
+  border,
+}: {
+  children: ReactNode;
+  tone?: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: tone ?? "var(--text-body)",
+        backgroundColor: bg ?? "transparent",
+        borderColor: border ?? "var(--border)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
+      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+    </div>
+  );
+}
+
+export default function ProjectAuthorityPage({ params }: PageProps) {
+  const [projectId, setProjectId] = useState("");
+  const [dashboardContext, setDashboardContext] = useState<OwnerDashboardResponse | null>(null);
+  const [historyRows, setHistoryRows] = useState<AuthorityHistoryRow[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [actionsVersion, setActionsVersion] = useState<string | null>(null);
   const [actionsCapturedAt, setActionsCapturedAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function requireAuth() {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      router.replace("/login");
-      return false;
-    }
-    return true;
-  }
+  const latestRow = historyRows[0] ?? null;
+  const authorityRead = useMemo(() => buildAuthorityRead(latestRow), [latestRow]);
+  const authorityTrend = useMemo(() => buildAuthorityTrend(historyRows), [historyRows]);
 
-  async function loadLatestAuthority() {
-    const { data, error } = await supabase
-      .from("project_authority_scores")
-      .select(
-        "project_id,captured_at,version,authority_score,authority_tier,competitive_strength,structural_optimization,momentum_score,momentum_label,inputs,created_at"
-      )
-      .eq("project_id", projectId)
-      .order("captured_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1);
+  const groupedActions = useMemo(() => {
+    return {
+      high: actions.filter((item) => item.priority === "high"),
+      medium: actions.filter((item) => item.priority === "medium"),
+      low: actions.filter((item) => item.priority !== "high" && item.priority !== "medium"),
+    };
+  }, [actions]);
 
-    if (error) {
-      throw new Error(error.message);
-    }
+  async function loadPageData(resolvedProjectId: string) {
+    const [dashboardResponse, historyResponse, actionsResponse] = await Promise.all([
+      fetch(`/api/projects/${resolvedProjectId}/owner-dashboard`, {
+        cache: "no-store",
+      }),
+      fetch(`/api/projects/${resolvedProjectId}/authority-history?limit=12`, {
+        cache: "no-store",
+      }),
+      fetch(`/api/projects/${resolvedProjectId}/actions`, {
+        cache: "no-store",
+      }),
+    ]);
 
-    const first = Array.isArray(data) && data.length > 0 ? (data[0] as AuthorityRow) : null;
-    setRow(first);
-  }
+    const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
+    const historyJson = (await historyResponse.json()) as AuthorityHistoryResponse;
+    const actionsJson = (await actionsResponse.json()) as ActionsResponse;
 
-  async function loadActions() {
-    const res = await fetch(`/api/projects/${projectId}/actions`, {
-      method: "GET",
-      headers: { "content-type": "application/json" },
-      cache: "no-store",
-    });
-
-    const json: ActionsResponse = await res.json();
-
-    if (!res.ok || !json.ok) {
-      throw new Error(json.ok ? "Failed to load actions" : json.error);
+    if (!dashboardResponse.ok || !dashboardJson.ok) {
+      throw new Error(dashboardJson.error ?? "Failed to load owner dashboard context.");
     }
 
-    setActions(Array.isArray(json.actions) ? json.actions : []);
-    setActionsVersion(json.version ?? null);
-    setActionsCapturedAt(json.capturedAt ?? null);
+    if (!historyResponse.ok || !historyJson.ok) {
+      throw new Error(historyJson.error ?? "Failed to load authority history.");
+    }
+
+    if (!actionsResponse.ok || !actionsJson.ok) {
+      throw new Error(actionsJson.ok ? "Failed to load actions." : actionsJson.error);
+    }
+
+    setDashboardContext(dashboardJson);
+    setHistoryRows(Array.isArray(historyJson.rows) ? historyJson.rows : []);
+    setActions(Array.isArray(actionsJson.actions) ? actionsJson.actions : []);
+    setActionsVersion(actionsJson.version ?? null);
+    setActionsCapturedAt(actionsJson.capturedAt ?? null);
   }
 
   useEffect(() => {
-    void (async () => {
-      setLoading(true);
-      setStatus(null);
+    let isMounted = true;
 
-      const ok = await requireAuth();
-      if (!ok) {
-        setLoading(false);
-        return;
-      }
-
-      setAuthed(true);
-
+    async function loadPage() {
       try {
-        await loadLatestAuthority();
-        await loadActions();
-      } catch (error: unknown) {
-        setStatus(getErrorMessage(error, "Failed to load authority"));
+        setLoading(true);
+        setError(null);
+
+        const resolvedParams = await params;
+        const resolvedProjectId = resolvedParams.projectId;
+
+        if (!resolvedProjectId) {
+          throw new Error("Missing projectId.");
+        }
+
+        if (!isMounted) {
+          return;
+        }
+
+        setProjectId(resolvedProjectId);
+        await loadPageData(resolvedProjectId);
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+
+        setError(err instanceof Error ? err.message : "Failed to load authority page.");
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    }
+
+    void loadPage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params]);
+
+  async function refreshPage() {
+    if (!projectId) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      setError(null);
+      await loadPageData(projectId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh authority page.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (loading) {
-    return <div className="p-4 text-sm text-gray-500">Loading…</div>;
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">Loading authority page...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="sticky top-0 z-20 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-start justify-between gap-3 px-4 py-3 md:px-6">
-          <div className="min-w-0">
-            <div className="text-xs text-gray-500">Digital Brain</div>
-            <h1 className="truncate text-lg font-semibold md:text-xl">Authority</h1>
-            <div className="mt-0.5 truncate text-xs text-gray-500">Project: {projectId}</div>
-          </div>
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>Authority center</SectionLabel>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <ProjectInsightsNav projectId={projectId} />
-
-            <button
-              onClick={async () => {
-                setStatus("Refreshing…");
-                try {
-                  await loadLatestAuthority();
-                  await loadActions();
-                  setStatus(null);
-                } catch (error: unknown) {
-                  setStatus(getErrorMessage(error, "Refresh failed"));
-                }
-              }}
-              className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-              type="button"
-              disabled={!authed}
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {status ? (
-        <div className="mx-auto mt-3 max-w-7xl px-4 md:px-6">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            {status}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mx-auto mt-4 max-w-7xl space-y-4 px-4 pb-10 md:px-6">
-        <AuthoritySummaryCard projectId={projectId} />
-
-        <AuthorityTrendCard projectId={projectId} />
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
-              <div className="text-sm font-semibold">Recommended next actions</div>
-              <div className="mt-1 text-xs text-gray-500">
-                Action Engine v0 recommendations based on the latest authority inputs.
-              </div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+                See how strong this business looks in the local market.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                This page brings authority score, market footing, and recommended next actions into
+                the locked visual system without changing the underlying authority engine.
+              </p>
             </div>
 
-            <div className="text-right text-xs text-gray-500">
-              <div>Version: {actionsVersion ?? "v0"}</div>
-              <div className="mt-1">Captured: {actionsCapturedAt ?? "—"}</div>
+            <div className="xl:pl-8">
+              <SectionLabel>Current authority read</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {authorityRead.headline}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {authorityRead.reason}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag tone="var(--brand-600)" bg="var(--brand-100)" border="var(--brand-600)">
+                  {formatTier(latestRow?.authority_tier ?? null)}
+                </InlineTag>
+                <InlineTag>
+                  Momentum: {formatMomentumLabel(latestRow?.momentum_label ?? null)}
+                </InlineTag>
+                <InlineTag>
+                  Score: {formatScore(latestRow?.authority_score ?? null)}
+                </InlineTag>
+              </div>
             </div>
           </div>
 
-          {!actions.length ? (
-            <div className="mt-3 text-sm text-gray-500">No actions available yet.</div>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {actions.map((action, index) => (
-                <div
-                  key={`${action.category}-${action.title}-${index}`}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-3"
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Business"
+              value={dashboardContext?.projectDisplayName ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Domain"
+              value={dashboardContext?.domainDisplayValue ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Location / Market"
+              value={
+                dashboardContext?.projectLocationLabel ??
+                dashboardContext?.projectMetro ??
+                "Not set"
+              }
+            />
+            <HeaderMeta
+              label="Scope"
+              value={dashboardContext?.pageScopeLabel ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(latestRow?.captured_at ?? dashboardContext?.capturedAt ?? null)}
+            />
+          </div>
+        </section>
+
+        {error ? (
+          <section className="border-b border-[var(--danger)] py-5">
+            <p className="text-sm font-medium text-[var(--danger)]">{error}</p>
+          </section>
+        ) : null}
+
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>Authority markers</SectionLabel>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricStripItem
+              label="Authority score"
+              value={formatScore(latestRow?.authority_score ?? null)}
+              bg="var(--brand-100)"
+              tone="var(--brand-700)"
+            />
+            <MetricStripItem
+              label="Competitive strength"
+              value={formatScore(latestRow?.competitive_strength ?? null)}
+              bg="var(--accent-blue-100)"
+              tone="var(--accent-blue-600)"
+            />
+            <MetricStripItem
+              label="Structural optimization"
+              value={formatScore(latestRow?.structural_optimization ?? null)}
+              bg="var(--accent-mint-100)"
+              tone="var(--accent-mint-600)"
+            />
+            <MetricStripItem
+              label="Momentum score"
+              value={formatScore(latestRow?.momentum_score ?? null)}
+              bg="var(--success-soft)"
+              tone="var(--success)"
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
+          <section>
+            <SectionLabel>Recommended next actions</SectionLabel>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Start with the strongest next moves
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+              This is the design-treatment pass, so the goal is clarity and structure first. The
+              deeper wording pass can happen later without redesigning the page again.
+            </p>
+
+            <div className="mt-6">
+              {[
+                {
+                  key: "high",
+                  label: "High priority",
+                  helper: "Immediate actions with the strongest strategic weight.",
+                  items: groupedActions.high,
+                },
+                {
+                  key: "medium",
+                  label: "Medium priority",
+                  helper: "Important follow-through actions that strengthen authority.",
+                  items: groupedActions.medium,
+                },
+                {
+                  key: "low",
+                  label: "Lower priority",
+                  helper: "Useful follow-up work after the larger gaps are addressed.",
+                  items: groupedActions.low,
+                },
+              ]
+                .filter((group) => group.items.length > 0)
+                .map((group, groupIndex) => (
+                  <div
+                    key={group.key}
+                    className={`py-6 ${groupIndex === 0 ? "" : "border-t border-[var(--border)]"}`}
+                  >
+                    <p className="text-lg font-semibold text-[var(--text-strong)]">{group.label}</p>
+                    <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                      {group.helper}
+                    </p>
+
+                    <div className="mt-5">
+                      {group.items.map((action, index) => {
+                        const priorityTone = getPriorityTone(action.priority);
+
+                        return (
+                          <article
+                            key={`${group.key}-${index}-${action.title}`}
+                            className={`grid gap-4 py-5 md:grid-cols-[1fr_auto] md:items-start ${
+                              index === group.items.length - 1
+                                ? ""
+                                : "border-b border-[var(--border)]"
+                            }`}
+                          >
+                            <div className="max-w-3xl">
+                              <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                                {action.title}
+                              </p>
+                              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                                {action.detail}
+                              </p>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <InlineTag
+                                  tone={priorityTone.tone}
+                                  bg={priorityTone.bg}
+                                  border={priorityTone.border}
+                                >
+                                  {formatPriority(action.priority)}
+                                </InlineTag>
+                                <InlineTag>{categoryLabel(action.category)}</InlineTag>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+              {actions.length === 0 ? (
+                <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
+                  No authority-driven actions are available yet for this project.
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Authority navigation</SectionLabel>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/projects/${projectId}/owner`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold">{action.title}</div>
-                      <div className="mt-1 text-sm text-gray-600">{action.detail}</div>
-                    </div>
+                  Back to owner page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/actions`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View actions page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/rank`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View rank page
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshPage();
+                  }}
+                  disabled={refreshing}
+                  className="px-4 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    backgroundColor: "var(--text-strong)",
+                    border: "1px solid var(--text-strong)",
+                  }}
+                >
+                  {refreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
+            </div>
+          </section>
 
+          <aside className="space-y-8">
+            <section>
+              <SectionLabel>Recent authority checkpoints</SectionLabel>
+
+              <div className="mt-4">
+                {historyRows.length === 0 ? (
+                  <p className="text-sm leading-7 text-[var(--text-body)]">
+                    No authority checkpoints are available yet for this project.
+                  </p>
+                ) : (
+                  historyRows.slice(0, 6).map((row, index) => (
                     <div
-                      className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium uppercase ${priorityClasses(
-                        action.priority
-                      )}`}
+                      key={`${row.captured_at}-${index}`}
+                      className={`border-t border-[var(--border)] py-4 ${
+                        index === 0 ? "border-t-0 pt-0" : ""
+                      }`}
                     >
-                      {action.priority}
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                        {formatDate(row.captured_at)}
+                      </p>
+                      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                        Score: {formatScore(row.authority_score)}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
+                        Tier: {formatTier(row.authority_tier)} • Momentum:{" "}
+                        {formatMomentumLabel(row.momentum_label)}
+                      </p>
                     </div>
-                  </div>
+                  ))
+                )}
+              </div>
+            </section>
 
-                  <div className="mt-3 text-[11px] uppercase tracking-wide text-gray-500">
-                    Category: {action.category}
-                  </div>
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>What this means</SectionLabel>
+
+              <div className="mt-4">
+                <DetailRow
+                  label="Authority read"
+                  value={authorityRead.headline}
+                  helper="This is the plain-language read for the latest authority snapshot."
+                />
+                <DetailRow
+                  label="Trend line"
+                  value={authorityTrend}
+                  helper="This compares the latest authority checkpoint to the one before it."
+                />
+                <DetailRow
+                  label="Action snapshot"
+                  value={actionsVersion ?? "Not set"}
+                  helper="This is the current stored action engine version tied to the authority page."
+                />
+                <DetailRow
+                  label="Actions captured"
+                  value={formatDate(actionsCapturedAt)}
+                  helper="This is when the current recommended actions were captured."
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Progress and proof</SectionLabel>
+
+              <div className="mt-4">
+                <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  {historyRows.length}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  authority checkpoints currently available for this project
+                </p>
+
+                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                  <HeaderMeta
+                    label="Latest tier"
+                    value={formatTier(latestRow?.authority_tier ?? null)}
+                  />
+                  <HeaderMeta
+                    label="Momentum"
+                    value={formatMomentumLabel(latestRow?.momentum_label ?? null)}
+                  />
+                  <HeaderMeta
+                    label="Stored actions"
+                    value={String(actions.length)}
+                  />
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="text-sm font-semibold">Authority details</div>
-          <div className="mt-1 text-xs text-gray-500">
-            Read-only inspection for validating the nightly engine.
-          </div>
-
-          {!row ? (
-            <div className="mt-3 text-sm text-gray-500">No authority row found yet.</div>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">Captured</div>
-                <div className="mt-1 text-sm font-semibold">{row.captured_at}</div>
-                <div className="mt-1 text-xs text-gray-500">Version: {row.version}</div>
               </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">Tier</div>
-                <div className="mt-1 text-sm font-semibold">{row.authority_tier}</div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Score: {Number(row.authority_score).toFixed(1)}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">Competitive Strength</div>
-                <div className="mt-1 text-sm font-semibold">
-                  {Number(row.competitive_strength).toFixed(1)}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">Structural Optimization</div>
-                <div className="mt-1 text-sm font-semibold">
-                  {Number(row.structural_optimization).toFixed(1)}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:col-span-2">
-                <div className="text-xs text-gray-500">Inputs JSON</div>
-                <pre className="mt-2 max-h-[420px] overflow-auto rounded-lg border border-gray-200 bg-white p-3 text-[11px] text-gray-800">
-                  {formatJson(row.inputs)}
-                </pre>
-              </div>
-            </div>
-          )}
-        </div>
+            </section>
+          </aside>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

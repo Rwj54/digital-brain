@@ -17,7 +17,7 @@ type OverviewSummaryCardsProps = {
   perWeek: number | null;
 };
 
-function StatusPill({
+function StatusTag({
   ok,
   okLabel,
   missingLabel,
@@ -28,10 +28,11 @@ function StatusPill({
 }) {
   return (
     <span
-      className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+      className="border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
       style={{
-        backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
+        borderColor: ok ? "var(--success)" : "var(--warning)",
         color: ok ? "var(--success)" : "var(--warning)",
+        backgroundColor: ok ? "var(--success-soft)" : "var(--warning-soft)",
       }}
     >
       {ok ? okLabel : missingLabel}
@@ -44,33 +45,48 @@ function SummaryColumn({
   title,
   subtitle,
   right,
-  toneClassName,
+  headerClassName,
+  headerStyle,
+  bodyClassName,
+  bodyStyle,
   children,
 }: {
   eyebrow: string;
   title: string;
   subtitle: string;
   right?: ReactNode;
-  toneClassName: string;
+  headerClassName: string;
+  headerStyle?: React.CSSProperties;
+  bodyClassName: string;
+  bodyStyle?: React.CSSProperties;
   children: ReactNode;
 }) {
   return (
-    <section className={`grid gap-4 rounded-[26px] px-5 py-5 sm:px-6 ${toneClassName}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {eyebrow}
-          </p>
-          <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
-            {title}
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{subtitle}</p>
-        </div>
+    <section className="border border-[var(--border)]">
+      <div
+        className={`border-b px-5 py-4 sm:px-6 ${headerClassName}`}
+        style={headerStyle}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[inherit] opacity-80">
+              {eyebrow}
+            </p>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-[inherit]">
+              {title}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-[inherit] opacity-90">
+              {subtitle}
+            </p>
+          </div>
 
-        {right}
+          {right}
+        </div>
       </div>
 
-      <div>{children}</div>
+      <div className={`px-5 py-5 sm:px-6 ${bodyClassName}`} style={bodyStyle}>
+        {children}
+      </div>
     </section>
   );
 }
@@ -87,7 +103,9 @@ function MetricRow({
       <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </span>
-      <span className="text-sm font-semibold text-[var(--text-strong)]">{value}</span>
+      <span className="text-sm font-semibold text-[var(--text-strong)]">
+        {value}
+      </span>
     </div>
   );
 }
@@ -112,8 +130,9 @@ export function OverviewSummaryCards({
         eyebrow="Snapshot"
         title="Your GBP"
         subtitle="Current saved profile snapshot used by the project."
-        right={<StatusPill ok={hasGbp} okLabel="Saved" missingLabel="Missing" />}
-        toneClassName="bg-[var(--primary-soft)]"
+        right={<StatusTag ok={hasGbp} okLabel="Saved" missingLabel="Missing" />}
+        headerClassName="border-emerald-500 bg-emerald-200 text-emerald-950"
+        bodyClassName="bg-emerald-100/80"
       >
         <div className="grid gap-4">
           <div>
@@ -145,13 +164,20 @@ export function OverviewSummaryCards({
         title="Top competitor"
         subtitle="Highest-review competitor from the saved competitor set."
         right={
-          <StatusPill
+          <StatusTag
             ok={hasCompetitors}
             okLabel="Saved"
             missingLabel="Missing"
           />
         }
-        toneClassName="bg-zinc-50/90"
+        headerClassName="text-white"
+        headerStyle={{
+          borderColor: "rgba(255,255,255,0.18)",
+          background:
+            "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 62%, #1798bb 100%)",
+        }}
+        bodyClassName=""
+        bodyStyle={{ backgroundColor: "rgba(235, 248, 250, 0.96)" }}
       >
         {topComp ? (
           <div className="grid gap-4">
@@ -186,17 +212,19 @@ export function OverviewSummaryCards({
         title="Review target — next 90 days"
         subtitle="Primary target is capacity-aware. Secondary target is the pure gap-closing ideal."
         right={
-          <StatusPill
+          <StatusTag
             ok={hasGbp && hasCompetitors}
             okLabel="Ready"
             missingLabel="Needs data"
           />
         }
-        toneClassName="bg-amber-50/80"
+        headerClassName="border-amber-500 bg-amber-200 text-amber-950"
+        bodyClassName="bg-amber-100/80"
       >
         {!hasTargetMath ? (
           <p className="text-sm leading-7 text-[var(--text-body)]">
-            Add your review count and at least one competitor review count to calculate the next target.
+            Add your review count and at least one competitor review count to
+            calculate the next target.
           </p>
         ) : (
           <div className="grid gap-4">
@@ -225,11 +253,15 @@ export function OverviewSummaryCards({
               <MetricRow label="Review gap" value={gapReviews ?? "—"} />
               <MetricRow
                 label="Gap-based ideal"
-                value={desiredTarget90d === null ? "—" : `${desiredTarget90d} / 90 days`}
+                value={
+                  desiredTarget90d === null ? "—" : `${desiredTarget90d} / 90 days`
+                }
               />
               <MetricRow
                 label="Capacity limit"
-                value={maxReviews90d === null ? "Not set yet" : `${maxReviews90d} / 90 days`}
+                value={
+                  maxReviews90d === null ? "Not set yet" : `${maxReviews90d} / 90 days`
+                }
               />
             </div>
           </div>

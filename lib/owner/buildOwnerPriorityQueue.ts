@@ -285,7 +285,7 @@ export async function persistOwnerPriorities(
   );
 
   const taskRows = priorities.map((priority) => ({
-    id: existingByTitle.get(priority.title),
+    id: existingByTitle.get(priority.title) ?? crypto.randomUUID(),
     project_id: projectId,
     priority_snapshot_id: snapshotId,
     title: priority.title,

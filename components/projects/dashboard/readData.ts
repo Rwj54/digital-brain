@@ -33,21 +33,130 @@ export type DashboardLoadResult = DashboardLoadSuccess | DashboardLoadFailure;
 type RawProjectRow = Project;
 type RawClientRow = Client;
 type RawGbpRow = GbpProfile;
-type RawCompetitorRow = CompetitorMetric;
+
+type RawCompetitorRow = Omit<
+  CompetitorMetric,
+  "number_of_keywords_found" | "top_keywords"
+>;
+
+type RawRankMarketResultRow = {
+  keyword: string | null;
+  position: number | null;
+  result_domain: string | null;
+  result_place_id: string | null;
+  captured_at: string;
+};
 
 export async function requireDashboardAuth() {
   const { data } = await supabase.auth.getSession();
   return !!data.session;
 }
 
-function getFirstRow<T>(
-  rows: T[] | null | undefined
-): T | null {
+function getFirstRow<T>(rows: T[] | null | undefined): T | null {
   if (!Array.isArray(rows) || rows.length === 0) {
     return null;
   }
 
   return rows[0];
+}
+
+function normalizeDomain(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(
+      trimmed.includes("://") ? trimmed : `https://${trimmed}`
+    );
+
+    return parsed.hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    const cleaned = trimmed
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0]
+      .trim();
+
+    return cleaned || null;
+  }
+}
+
+function addKeywordCoverageToCompetitors(
+  competitors: RawCompetitorRow[],
+  marketRows: RawRankMarketResultRow[]
+): CompetitorMetric[] {
+  return competitors.map((competitor) => {
+    const competitorDomain = normalizeDomain(competitor.competitor_domain);
+    const competitorPlaceId =
+      typeof competitor.place_id === "string" && competitor.place_id.trim()
+        ? competitor.place_id.trim()
+        : null;
+
+    const keywordBestPosition = new Map<string, number>();
+
+    for (const row of marketRows) {
+      const keyword =
+        typeof row.keyword === "string" ? row.keyword.trim() : "";
+
+      if (!keyword) {
+        continue;
+      }
+
+      const rowDomain = normalizeDomain(row.result_domain);
+      const rowPlaceId =
+        typeof row.result_place_id === "string" && row.result_place_id.trim()
+          ? row.result_place_id.trim()
+          : null;
+
+      const domainMatches =
+        competitorDomain !== null &&
+        rowDomain !== null &&
+        competitorDomain === rowDomain;
+
+      const placeIdMatches =
+        competitorPlaceId !== null &&
+        rowPlaceId !== null &&
+        competitorPlaceId === rowPlaceId;
+
+      if (!domainMatches && !placeIdMatches) {
+        continue;
+      }
+
+      const position =
+        typeof row.position === "number" && Number.isFinite(row.position)
+          ? row.position
+          : Number.MAX_SAFE_INTEGER;
+
+      const existing = keywordBestPosition.get(keyword);
+
+      if (existing === undefined || position < existing) {
+        keywordBestPosition.set(keyword, position);
+      }
+    }
+
+    const orderedKeywords = Array.from(keywordBestPosition.entries())
+      .sort((a, b) => {
+        if (a[1] !== b[1]) {
+          return a[1] - b[1];
+        }
+
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([keyword]) => keyword);
+
+    return {
+      ...competitor,
+      number_of_keywords_found: orderedKeywords.length,
+      top_keywords: orderedKeywords.slice(0, 3),
+    };
+  });
 }
 
 export async function loadProjectDashboardData({
@@ -157,12 +266,55 @@ export async function loadProjectDashboardData({
     return { ok: false, error: competitorError.message };
   }
 
+  const rawCompetitors = (competitorData ?? []) as RawCompetitorRow[];
+
+  let competitors: CompetitorMetric[] = rawCompetitors.map((competitor) => ({
+    ...competitor,
+    number_of_keywords_found: 0,
+    top_keywords: [],
+  }));
+
+  const { data: latestMarketRows, error: latestMarketError } = await supabase
+    .from("gbp_rank_market_results")
+    .select("captured_at")
+    .eq("project_id", projectId)
+    .order("captured_at", { ascending: false })
+    .limit(1);
+
+  if (latestMarketError) {
+    return { ok: false, error: latestMarketError.message };
+  }
+
+  const latestCapturedAt =
+    latestMarketRows &&
+    latestMarketRows[0] &&
+    typeof latestMarketRows[0].captured_at === "string"
+      ? latestMarketRows[0].captured_at
+      : null;
+
+  if (latestCapturedAt) {
+    const { data: marketRows, error: marketError } = await supabase
+      .from("gbp_rank_market_results")
+      .select("keyword, position, result_domain, result_place_id, captured_at")
+      .eq("project_id", projectId)
+      .eq("captured_at", latestCapturedAt);
+
+    if (marketError) {
+      return { ok: false, error: marketError.message };
+    }
+
+    competitors = addKeywordCoverageToCompetitors(
+      rawCompetitors,
+      (marketRows ?? []) as RawRankMarketResultRow[]
+    );
+  }
+
   return {
     ok: true,
     client,
     project,
     gbp,
-    competitors: (competitorData ?? []) as RawCompetitorRow[],
+    competitors,
     formState: {
       volumePreset,
       showAdvancedLabels,
@@ -186,6 +338,11 @@ export async function loadProjectDashboardData({
         gbp?.photos_count !== null && gbp?.photos_count !== undefined
           ? String(gbp.photos_count)
           : "",
+      compDomain: "",
+      compName: "",
+      compSource: "manual",
+      compRating: "",
+      compReviews: "",
     },
   };
 }

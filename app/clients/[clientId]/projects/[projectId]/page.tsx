@@ -36,7 +36,7 @@ function ProjectMetaItem({
   value: string;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 border-t border-[var(--border)] pt-3">
       <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
         {label}
       </dt>
@@ -70,7 +70,7 @@ export default function ProjectDashboard() {
     <>
       <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 pb-28 sm:px-6 sm:py-8 md:pb-8">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4 border-b border-[var(--border)] pb-4">
             <button
               onClick={() => router.push(`/clients/${clientId}`)}
               className="text-sm font-semibold text-[var(--text-body)] underline underline-offset-4 opacity-90 hover:opacity-100"
@@ -90,7 +90,7 @@ export default function ProjectDashboard() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start lg:gap-8">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
-                    Project workspace
+                    Current project
                   </p>
 
                   <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
@@ -114,14 +114,17 @@ export default function ProjectDashboard() {
                   )}
                 </div>
 
-                <div className="lg:justify-self-end">
-                  <div className="inline-flex rounded-full bg-[var(--primary-soft)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)] ring-1 ring-inset ring-[var(--border)]/60">
-                    Current project
+                <div className="border-l border-[var(--border)] pl-5 lg:justify-self-end">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                    Workspace
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+                    Live project surface
                   </div>
                 </div>
               </div>
 
-              <dl className="grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+              <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <ProjectMetaItem
                   label="Domain"
                   value={formatDomain(dashboard.project?.site_url)}
@@ -143,7 +146,7 @@ export default function ProjectDashboard() {
           </section>
 
           <section className="hidden md:block">
-            <div className="flex flex-wrap gap-6 border-b border-[var(--border)]">
+            <div className="flex flex-wrap gap-8 border-b border-[var(--border)]">
               {dashboard.tabs.map((tabOption) => {
                 const active = dashboard.tab === tabOption.key;
 

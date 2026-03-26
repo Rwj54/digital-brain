@@ -16,6 +16,11 @@ export type DashboardFormStateValues = {
   rating: string;
   totalReviews: string;
   photosCount: string;
+  compDomain: string;
+  compName: string;
+  compSource: string;
+  compRating: string;
+  compReviews: string;
 };
 
 export function useProjectDashboardFormState() {
@@ -55,6 +60,12 @@ export function useProjectDashboardFormState() {
     setRating(values.rating);
     setTotalReviews(values.totalReviews);
     setPhotosCount(values.photosCount);
+
+    setCompDomain(values.compDomain);
+    setCompName(values.compName);
+    setCompSource(values.compSource);
+    setCompRating(values.compRating);
+    setCompReviews(values.compReviews);
   }, []);
 
   const resetCompetitorForm = useCallback(() => {

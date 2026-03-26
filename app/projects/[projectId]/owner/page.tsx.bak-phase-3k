@@ -1,0 +1,728 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type OwnerPriority = {
+  title: string;
+  plain_language_reason: string;
+  why_now: string;
+  expected_benefit: string;
+  who_should_do_it: string;
+  difficulty: string;
+  time_to_complete_estimate: string;
+  proof_of_completion: string;
+  confidence_level: number;
+  source: string;
+  sort_order: number;
+  task_type: string;
+  task_data: Record<string, unknown>;
+};
+
+type OwnerTask = {
+  id: string;
+  project_id: string;
+  priority_snapshot_id: string | null;
+  title: string;
+  plain_language_reason: string | null;
+  why_now: string | null;
+  expected_benefit: string | null;
+  who_should_do_it: string | null;
+  difficulty: string | null;
+  time_to_complete_estimate: string | null;
+  proof_of_completion: string | null;
+  confidence_level: number | null;
+  status: string;
+  sort_order: number;
+  task_type: string | null;
+  task_data: Record<string, unknown>;
+  created_at: string;
+  completed_at: string | null;
+};
+
+type OwnerHealthMarker = {
+  label: "Visibility" | "Trust" | "Clarity" | "Activity";
+  score: number;
+  statusLabel: string;
+  explanation: string;
+  nextActionHint: string;
+};
+
+type OwnerDashboardResponse = {
+  ok: boolean;
+  projectId: string;
+  projectDisplayName: string | null;
+  projectCategory: string | null;
+  projectMetro: string | null;
+  projectSiteUrl: string | null;
+  projectTargetDomain: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
+  capturedAt: string;
+  dashboard: {
+    hero: {
+      headline: string;
+      supportLine: string;
+      primaryActionText: string;
+    };
+    healthMarkers: OwnerHealthMarker[];
+    guidance: {
+      helpingNow: string[];
+      googleStillWants: string[];
+    };
+    progress: {
+      nextLikelyImprovement: string;
+      lastUpdated: string;
+    };
+    topPriorities: OwnerPriority[];
+    summary: {
+      priorityCount: number;
+      hasPriorities: boolean;
+      totalTasks: number;
+      openTasks: number;
+      completedTasks: number;
+      completedTaskRate: number;
+    };
+    visibilitySummary: {
+      hasActiveKeyword: boolean;
+      keyword: string | null;
+      metro: string | null;
+      latestRank: number | null;
+      bestRank: number | null;
+      latestCapturedAt: string | null;
+      visibilityLabel: string;
+    };
+    aiSummary: {
+      gbpName: string | null;
+      primaryCategory: string | null;
+      totalReviews: number | null;
+      rating: number | null;
+      hasBusinessName: boolean;
+      hasPrimaryCategory: boolean;
+      hasReviewSignals: boolean;
+      aiReadinessLabel: string;
+    };
+    websiteSummary: {
+      siteUrl: string | null;
+      targetDomain: string | null;
+      targetBrandName: string | null;
+      hasSiteUrl: boolean;
+      hasTargetDomain: boolean;
+      hasBrandName: boolean;
+      websiteReadinessLabel: string;
+    };
+    outcomesSummary: {
+      monthlyCustomerEvents: number | null;
+      reviewConversionRate: number | null;
+      eventLabelSingular: string | null;
+      eventLabelPlural: string | null;
+      hasMonthlyEvents: boolean;
+      hasConversionRate: boolean;
+      outcomesReadinessLabel: string;
+    };
+  };
+};
+
+type OwnerTasksResponse = {
+  ok: boolean;
+  projectId: string;
+  statusFilter: string;
+  count: number;
+  summary: {
+    totalTasks: number;
+    openTasks: number;
+    completedTasks: number;
+  };
+  tasks: OwnerTask[];
+};
+
+type Props = {
+  params: Promise<{
+    projectId: string;
+  }>;
+};
+
+type RenderStep =
+  | {
+      key: string;
+      kind: "task";
+      index: number;
+      title: string;
+      reason: string;
+      who: string;
+      time: string;
+      status: string;
+      task: OwnerTask;
+    }
+  | {
+      key: string;
+      kind: "priority";
+      index: number;
+      title: string;
+      reason: string;
+      who: string;
+      time: string;
+      status: string;
+    };
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatWho(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function formatStatus(value: string): string {
+  if (value === "completed") {
+    return "Completed";
+  }
+
+  if (value === "recommended") {
+    return "Recommended";
+  }
+
+  return "Open";
+}
+
+function getScoreBarClass(score: number): string {
+  if (score >= 80) {
+    return "bg-sky-700";
+  }
+
+  if (score >= 65) {
+    return "bg-sky-500";
+  }
+
+  if (score >= 45) {
+    return "bg-amber-500";
+  }
+
+  return "bg-rose-500";
+}
+
+function getScoreToneClass(score: number): string {
+  if (score >= 80) {
+    return "bg-sky-50 text-sky-800";
+  }
+
+  if (score >= 65) {
+    return "bg-sky-50 text-sky-700";
+  }
+
+  if (score >= 45) {
+    return "bg-amber-50 text-amber-700";
+  }
+
+  return "bg-rose-50 text-rose-700";
+}
+
+function getStepNumberClass(index: number): string {
+  if (index === 1) {
+    return "bg-sky-700 text-white";
+  }
+
+  return "bg-slate-100 text-slate-700";
+}
+
+export default function OwnerDashboardPage({ params }: Props) {
+  const [projectId, setProjectId] = useState<string>("");
+  const [dashboard, setDashboard] = useState<OwnerDashboardResponse | null>(null);
+  const [tasksData, setTasksData] = useState<OwnerTasksResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    async function init() {
+      const resolved = await params;
+      setProjectId(resolved.projectId);
+    }
+
+    void init();
+  }, [params]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [dashboardResponse, tasksResponse] = await Promise.all([
+          fetch(`/api/projects/${projectId}/owner-dashboard`, { cache: "no-store" }),
+          fetch(`/api/projects/${projectId}/owner-tasks`, { cache: "no-store" }),
+        ]);
+
+        if (!dashboardResponse.ok || !tasksResponse.ok) {
+          throw new Error("Failed to load owner dashboard.");
+        }
+
+        const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
+        const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+
+        setDashboard(dashboardJson);
+        setTasksData(tasksJson);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load owner dashboard.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void load();
+  }, [projectId]);
+
+  async function toggleTask(task: OwnerTask) {
+    try {
+      setSavingTaskId(task.id);
+
+      const nextStatus = task.status === "completed" ? "open" : "completed";
+
+      const response = await fetch(`/api/projects/${projectId}/owner-tasks/${task.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task.");
+      }
+
+      const [dashboardResponse, tasksResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}/owner-dashboard`, { cache: "no-store" }),
+        fetch(`/api/projects/${projectId}/owner-tasks`, { cache: "no-store" }),
+      ]);
+
+      if (!dashboardResponse.ok || !tasksResponse.ok) {
+        throw new Error("Failed to refresh owner dashboard.");
+      }
+
+      const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
+      const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+
+      setDashboard(dashboardJson);
+      setTasksData(tasksJson);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update task.");
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  const steps = useMemo<RenderStep[]>(() => {
+    if (!dashboard || !tasksData) {
+      return [];
+    }
+
+    if (tasksData.tasks.length > 0) {
+      return [...tasksData.tasks]
+        .sort((a, b) => {
+          const aStatus = a.status === "open" ? 0 : 1;
+          const bStatus = b.status === "open" ? 0 : 1;
+
+          if (aStatus !== bStatus) {
+            return aStatus - bStatus;
+          }
+
+          return a.sort_order - b.sort_order;
+        })
+        .slice(0, 3)
+        .map((task, index) => ({
+          key: task.id,
+          kind: "task",
+          index: index + 1,
+          title: task.title,
+          reason: task.plain_language_reason ?? "No explanation available.",
+          who: task.who_should_do_it ? formatWho(task.who_should_do_it) : "Not set",
+          time: task.time_to_complete_estimate ?? "Not set",
+          status: task.status,
+          task,
+        }));
+    }
+
+    return dashboard.dashboard.topPriorities.slice(0, 3).map((priority, index) => ({
+      key: `${priority.sort_order}-${priority.title}`,
+      kind: "priority",
+      index: index + 1,
+      title: priority.title,
+      reason: priority.plain_language_reason,
+      who: formatWho(priority.who_should_do_it),
+      time: priority.time_to_complete_estimate,
+      status: "recommended",
+    }));
+  }, [dashboard, tasksData]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-base text-slate-700">Loading owner dashboard...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !dashboard || !tasksData) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
+        <div className="mx-auto max-w-6xl">
+          <p className="text-base text-red-700">{error || "Failed to load owner dashboard."}</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Business
+              </p>
+              <p className="text-sm font-semibold text-slate-950">
+                {dashboard.projectDisplayName ?? "Not set"}
+              </p>
+            </div>
+
+            <div className="hidden h-8 w-px bg-slate-200 md:block" />
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Domain
+              </p>
+              <p className="text-sm font-semibold text-slate-950">
+                {dashboard.domainDisplayValue ?? "Not set"}
+              </p>
+            </div>
+
+            <div className="hidden h-8 w-px bg-slate-200 md:block" />
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Location
+              </p>
+              <p className="text-sm font-semibold text-slate-950">
+                {dashboard.projectLocationLabel ?? dashboard.projectMetro ?? "Not set"}
+              </p>
+            </div>
+
+            <div className="hidden h-8 w-px bg-slate-200 md:block" />
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Snapshot
+              </p>
+              <p className="text-sm font-semibold text-slate-950">{dashboard.capturedAt}</p>
+            </div>
+
+            <div className="hidden h-8 w-px bg-slate-200 md:block" />
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Scope
+              </p>
+              <p className="text-sm font-semibold text-slate-950">{dashboard.pageScopeLabel}</p>
+            </div>
+          </div>
+        </div>
+
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-6">
+            <div className="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-800">
+              Owner dashboard
+            </div>
+
+            <div className="mt-4 max-w-4xl space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+                {dashboard.dashboard.hero.headline}
+              </h1>
+              <p className="text-base leading-7 text-slate-700">
+                {dashboard.dashboard.hero.supportLine}
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-800">
+                  Next best step
+                </p>
+                <p className="mt-1 text-base font-semibold text-slate-950">
+                  {dashboard.dashboard.hero.primaryActionText}
+                </p>
+              </div>
+
+              <a
+                href="#next-steps"
+                className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100"
+              >
+                Go to next steps
+              </a>
+            </div>
+          </div>
+
+          <div className="px-6 py-6">
+            <div className="grid gap-8 lg:grid-cols-[1.35fr_0.95fr]">
+              <div>
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-950">Where this business stands today</h2>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Four owner-facing markers that summarize what Google is seeing right now.
+                  </p>
+                </div>
+
+                <div className="divide-y divide-slate-200">
+                  {dashboard.dashboard.healthMarkers.map((marker) => (
+                    <div key={marker.label} className="py-5 first:pt-0 last:pb-0">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-base font-semibold text-slate-950">{marker.label}</h3>
+                            <span
+                              className={[
+                                "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+                                getScoreToneClass(marker.score),
+                              ].join(" ")}
+                            >
+                              {marker.statusLabel}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-6 text-slate-700">{marker.explanation}</p>
+                        </div>
+
+                        <div className="w-full max-w-xs">
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className={["h-full rounded-full", getScoreBarClass(marker.score)].join(" ")}
+                                style={{ width: `${marker.score}%` }}
+                              />
+                            </div>
+                            <span className="w-10 text-right text-sm font-semibold text-slate-950">
+                              {marker.score}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-slate-600">
+                            <span className="font-semibold text-slate-950">Next:</span>{" "}
+                            {marker.nextActionHint}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 pt-8 lg:border-t-0 lg:border-l lg:pl-8 lg:pt-0">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-slate-950">What Google wants next</h2>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Plain-language guidance based on the current signals for this exact business and location.
+                  </p>
+                </div>
+
+                <div className="grid gap-6">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">What’s helping you now</p>
+                    <ul className="mt-3 space-y-3">
+                      {dashboard.dashboard.guidance.helpingNow.map((item) => (
+                        <li key={item} className="flex gap-3 text-sm leading-6 text-slate-700">
+                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-600" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">What Google still wants</p>
+                    <ul className="mt-3 space-y-3">
+                      {dashboard.dashboard.guidance.googleStillWants.map((item) => (
+                        <li key={item} className="flex gap-3 text-sm leading-6 text-slate-700">
+                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="next-steps"
+          className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="border-b border-slate-200 px-6 py-5">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Your next 3 steps</h2>
+            <p className="mt-1 text-sm text-slate-700">
+              Focus on these actions first to improve this exact business and location.
+            </p>
+          </div>
+
+          <div className="divide-y divide-slate-200">
+            {steps.map((step) => (
+              <div
+                key={step.key}
+                className="px-6 py-6"
+              >
+                <div className="grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-start">
+                  <div
+                    className={[
+                      "flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold",
+                      getStepNumberClass(step.index),
+                    ].join(" ")}
+                  >
+                    {step.index}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-xl font-semibold text-slate-950">{step.title}</h3>
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {formatStatus(step.status)}
+                      </span>
+                    </div>
+
+                    <p className="max-w-3xl text-base leading-7 text-slate-700">{step.reason}</p>
+                  </div>
+
+                  <div className="grid gap-2 text-sm text-slate-700 lg:min-w-[230px]">
+                    <p>
+                      <span className="font-semibold text-slate-950">Who:</span> {step.who}
+                    </p>
+                    <p>
+                      <span className="font-semibold text-slate-950">Time:</span> {step.time}
+                    </p>
+
+                    {step.kind === "task" ? (
+                      <button
+                        type="button"
+                        onClick={() => void toggleTask(step.task)}
+                        disabled={savingTaskId === step.task.id}
+                        className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {savingTaskId === step.task.id
+                          ? "Saving..."
+                          : step.task.status === "completed"
+                            ? "Mark as open"
+                            : "Mark complete"}
+                      </button>
+                    ) : (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        Priority recommendation
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {steps.length === 0 ? (
+              <div className="px-6 py-6">
+                <p className="text-sm text-slate-700">No next steps are available yet.</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="grid border-b border-slate-200 md:grid-cols-4">
+            <div className="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Open tasks
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                {dashboard.dashboard.summary.openTasks}
+              </p>
+            </div>
+
+            <div className="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Completed
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                {dashboard.dashboard.summary.completedTasks}
+              </p>
+            </div>
+
+            <div className="border-b border-slate-200 px-5 py-4 md:border-b-0 md:border-r">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Completion rate
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                {formatPercent(dashboard.dashboard.summary.completedTaskRate)}
+              </p>
+            </div>
+
+            <div className="px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Likely next gain
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {dashboard.dashboard.progress.nextLikelyImprovement}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2">
+            <div className="border-b border-slate-200 px-6 py-5 md:border-b-0 md:border-r">
+              <h3 className="text-lg font-semibold text-slate-950">Visibility details</h3>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+                <p>
+                  <span className="font-semibold text-slate-950">Keyword:</span>{" "}
+                  {dashboard.dashboard.visibilitySummary.keyword ?? "Not set"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Location:</span>{" "}
+                  {dashboard.dashboard.visibilitySummary.metro ?? "Not set"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Latest rank:</span>{" "}
+                  {dashboard.dashboard.visibilitySummary.latestRank ?? "No data"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Best rank:</span>{" "}
+                  {dashboard.dashboard.visibilitySummary.bestRank ?? "No data"}
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <h3 className="text-lg font-semibold text-slate-950">Profile and website details</h3>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+                <p>
+                  <span className="font-semibold text-slate-950">Business name:</span>{" "}
+                  {dashboard.dashboard.aiSummary.gbpName ?? "Not available"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Primary category:</span>{" "}
+                  {dashboard.dashboard.aiSummary.primaryCategory ?? "Not available"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Reviews:</span>{" "}
+                  {dashboard.dashboard.aiSummary.totalReviews ?? "No data"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Domain:</span>{" "}
+                  {dashboard.domainDisplayValue ?? "Not available"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-950">Full site URL:</span>{" "}
+                  {dashboard.projectSiteUrl ?? "Not available"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

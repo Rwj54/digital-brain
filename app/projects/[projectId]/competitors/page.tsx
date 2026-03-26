@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -154,13 +154,120 @@ function formatWhen(iso: string | null) {
   return d.toLocaleString();
 }
 
+function formatDate(iso: string | null) {
+  if (!iso) return "Not set";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
+}
+
 function shortName(s: string | null) {
   if (!s) return "—";
-  return s.length > 42 ? s.slice(0, 41) + "…" : s;
+  return s.length > 42 ? `${s.slice(0, 41)}…` : s;
 }
 
 function getDisplayName(c: CompetitorMetric) {
   return c.name?.trim() || c.competitor_name?.trim() || "—";
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+    </div>
+  );
+}
+
+function MetricStripItem({
+  label,
+  value,
+  bg,
+  tone,
+  helper,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  tone: string;
+  helper?: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ backgroundColor: bg }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: tone }}>
+        {value}
+      </p>
+      {helper ? <p className="mt-2 text-xs text-[var(--text-body)]">{helper}</p> : null}
+    </div>
+  );
+}
+
+function InlineTag({
+  children,
+  tone,
+  bg,
+  border,
+}: {
+  children: ReactNode;
+  tone?: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: tone ?? "var(--text-body)",
+        backgroundColor: bg ?? "transparent",
+        borderColor: border ?? "var(--border)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
+      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+    </div>
+  );
 }
 
 export default function CompetitorsPage() {
@@ -172,7 +279,6 @@ export default function CompetitorsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [competitors, setCompetitors] = useState<CompetitorMetric[]>([]);
   const [snapshotsForThreshold, setSnapshotsForThreshold] = useState<CompetitorSnapshot[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -292,7 +398,7 @@ export default function CompetitorsPage() {
   }
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       setLoading(true);
       const ok = await requireAuth();
       if (!ok) {
@@ -332,271 +438,362 @@ export default function CompetitorsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-sm text-neutral-600">Loading competitor intelligence…</p>
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">Loading competitor page...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-500">
-              Digital Brain
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-950 dark:text-white">
-              Competitor Intelligence
-            </h1>
-            <p className="mt-2 text-sm text-neutral-800 dark:text-neutral-400">
-              {project?.primary_category ?? "Category"} • {project?.target_metro ?? "Metro"} •{" "}
-              {project?.target_radius_miles ?? "—"} mi
-            </p>
-          </div>
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>Competitor center</SectionLabel>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/projects/${projectId}/authority`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              Back to Authority
-            </Link>
-            <Link
-              href={`/projects/${projectId}/rank`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              View Rank Intelligence
-            </Link>
-            <Link
-              href={`/projects/${projectId}/actions`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              View Growth Actions
-            </Link>
-            <button
-              onClick={runDiscovery}
-              disabled={running || !authed || !project}
-              className="rounded-xl bg-neutral-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
-              type="button"
-            >
-              {running ? "Running…" : "Run discovery"}
-            </button>
-          </div>
-        </div>
-
-        {status ? (
-          <div className="rounded-2xl border border-neutral-300 bg-white p-4 text-sm text-neutral-800 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-300">
-            {status}
-          </div>
-        ) : null}
-
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-            <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-              Competitors Found
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-neutral-950 dark:text-white">
-              {competitors.length}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-            <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-              Top 3 Median Reviews
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-neutral-950 dark:text-white">
-              {thresholdReviews || "—"}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-            <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-              Market Growth (90d)
-            </p>
-            <p className="mt-3 text-3xl font-semibold text-neutral-950 dark:text-white">
-              {velocity.marketGrowth90d}
-            </p>
-            <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-400">
-              {velocity.confidenceLabel}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-            <p className="text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-              Benchmark Updated
-            </p>
-            <p className="mt-3 text-sm font-semibold text-neutral-950 dark:text-white">
-              {benchmarkUpdatedAt ? formatWhen(benchmarkUpdatedAt) : "—"}
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div className="flex items-start justify-between gap-4">
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
-              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-                Market Velocity
-              </h2>
-              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-                Benchmark competitor review growth based on snapshot history.
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+                See who is setting the current market benchmark.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                This page keeps competitor intelligence readable during the design-treatment pass.
+                It shows the benchmark group, review-growth pace, and the discovered competitor set
+                without pulling the page back into the older dashboard style.
               </p>
             </div>
-            <div className="text-right text-xs text-neutral-700 dark:text-neutral-500">
-              <p>{velocity.confidenceLabel}</p>
+
+            <div className="xl:pl-8">
+              <SectionLabel>Current competitor read</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {thresholdCompetitor
+                  ? `${shortName(getDisplayName(thresholdCompetitor))} is the current benchmark competitor.`
+                  : "No benchmark competitor is available yet."}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {thresholdCompetitor
+                  ? "The benchmark competitor is the current review reference point used to estimate the market growth pace."
+                  : "Run competitor discovery to capture the local benchmark group for this project."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag tone="var(--brand-600)" bg="var(--brand-100)" border="var(--brand-600)">
+                  {project?.primary_category ?? "Category not set"}
+                </InlineTag>
+                <InlineTag>{project?.target_metro ?? "Metro not set"}</InlineTag>
+                <InlineTag>
+                  Radius: {project?.target_radius_miles ?? "—"} mi
+                </InlineTag>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950">
-            {velocity.kind === "observed" ? (
-              <div className="space-y-2 text-sm text-neutral-800 dark:text-neutral-300">
-                <p>
-                  Market growth is currently estimated at{" "}
-                  <span className="font-semibold">{velocity.marketGrowth90d}</span> reviews per 90
-                  days.
-                </p>
-                <p>
-                  Observed from a change of{" "}
-                  <span className="font-semibold">+{velocity.observedDeltaReviews}</span> reviews
-                  across <span className="font-semibold">{velocity.observedDays}</span> days for the
-                  current benchmark competitor.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2 text-sm text-neutral-800 dark:text-neutral-300">
-                <p>
-                  Market growth is currently estimated at{" "}
-                  <span className="font-semibold">{velocity.marketGrowth90d}</span> reviews per 90
-                  days.
-                </p>
-                <p>{velocity.note}</p>
-              </div>
-            )}
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Category"
+              value={project?.primary_category ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Market"
+              value={project?.target_metro ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Radius"
+              value={project?.target_radius_miles != null ? `${project.target_radius_miles} miles` : "Not set"}
+            />
+            <HeaderMeta
+              label="Benchmark updated"
+              value={benchmarkUpdatedAt ? formatDate(benchmarkUpdatedAt) : "Not set"}
+            />
+            <HeaderMeta
+              label="Auth status"
+              value={authed ? "Authenticated" : "Not authenticated"}
+            />
           </div>
         </section>
 
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-              Top 3 Benchmark Competitors
-            </h2>
-            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-              These competitors define the current review benchmark for this market.
-            </p>
-          </div>
+        {status ? (
+          <section className="border-b border-[var(--border)] py-5">
+            <p className="text-sm text-[var(--text-body)]">{status}</p>
+          </section>
+        ) : null}
 
-          {top3.length === 0 ? (
-            <div className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">
-              No competitors found yet.
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {top3.map((c, idx) => (
-                <div
-                  key={c.competitor_domain}
-                  className="rounded-xl border border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-800 dark:bg-neutral-950"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-neutral-950 dark:text-white">
-                        {idx + 1}. {shortName(getDisplayName(c))}
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>Competitor markers</SectionLabel>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricStripItem
+              label="Competitors found"
+              value={String(competitors.length)}
+              bg="var(--reference-soft)"
+              tone="var(--text-strong)"
+            />
+            <MetricStripItem
+              label="Top 3 median reviews"
+              value={thresholdReviews ? String(thresholdReviews) : "—"}
+              bg="var(--brand-100)"
+              tone="var(--brand-700)"
+            />
+            <MetricStripItem
+              label="Market growth (90d)"
+              value={String(velocity.marketGrowth90d)}
+              bg="var(--accent-blue-100)"
+              tone="var(--accent-blue-600)"
+              helper={velocity.confidenceLabel}
+            />
+            <MetricStripItem
+              label="Benchmark snapshots"
+              value={String(snapshotsForThreshold.length)}
+              bg="var(--accent-mint-100)"
+              tone="var(--accent-mint-600)"
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
+          <section>
+            <SectionLabel>Benchmark competitors</SectionLabel>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Start with the current benchmark group
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+              These competitors define the current review benchmark for this market. This is the
+              design-treatment pass, so the goal here is clean scanning and working structure first.
+            </p>
+
+            <div className="mt-6">
+              {top3.length === 0 ? (
+                <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
+                  No competitors found yet. Run discovery to capture the local market set.
+                </div>
+              ) : (
+                top3.map((c, idx) => (
+                  <article
+                    key={c.competitor_domain}
+                    className={`grid gap-4 py-6 md:grid-cols-[56px_1fr_auto] md:items-start ${
+                      idx === top3.length - 1 ? "" : "border-b border-[var(--border)]"
+                    }`}
+                  >
+                    <div className="flex items-center md:justify-center">
+                      <div
+                        className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
+                        style={{
+                          backgroundColor:
+                            idx === 0 ? "var(--brand-700)" : "var(--reference-soft)",
+                          color: idx === 0 ? "#ffffff" : "var(--text-strong)",
+                        }}
+                      >
+                        {idx + 1}
+                      </div>
+                    </div>
+
+                    <div className="max-w-3xl">
+                      <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                        {shortName(getDisplayName(c))}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
+                      <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
                         {c.place_id ?? c.competitor_domain}
                       </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <InlineTag>Reviews: {c.total_reviews ?? 0}</InlineTag>
+                        <InlineTag>Rating: {c.rating ?? "—"}</InlineTag>
+                        {top3.length === 3 && idx === 1 ? (
+                          <InlineTag
+                            tone="var(--accent-blue-600)"
+                            bg="var(--accent-blue-100)"
+                            border="var(--accent-blue-600)"
+                          >
+                            Median benchmark
+                          </InlineTag>
+                        ) : null}
+                      </div>
                     </div>
 
-                    {top3.length === 3 && idx === 1 ? (
-                      <span className="rounded-full border border-neutral-300 bg-white px-2 py-1 text-[11px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
-                        Median benchmark
-                      </span>
-                    ) : null}
-                  </div>
+                    <div className="text-sm text-[var(--text-body)] md:text-right">
+                      Last seen: {formatWhen(c.last_seen_at)}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-500">Reviews</p>
-                      <p className="font-semibold text-neutral-950 dark:text-white">
-                        {c.total_reviews ?? 0}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-500">Rating</p>
-                      <p className="font-semibold text-neutral-950 dark:text-white">
-                        {c.rating ?? "—"}
-                      </p>
-                    </div>
-                  </div>
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>All discovered competitors</SectionLabel>
+
+              {competitors.length === 0 ? (
+                <p className="mt-4 text-sm leading-7 text-[var(--text-body)]">
+                  No competitors found yet. Click run discovery to populate this page.
+                </p>
+              ) : (
+                <div className="mt-4 overflow-x-auto border border-[var(--border)]">
+                  <table className="min-w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--surface-alt)] text-[var(--text-body)]">
+                        <th className="px-3 py-3 font-medium">Competitor</th>
+                        <th className="px-3 py-3 font-medium">Reviews</th>
+                        <th className="px-3 py-3 font-medium">Rating</th>
+                        <th className="px-3 py-3 font-medium">Domain</th>
+                        <th className="px-3 py-3 font-medium">Last seen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {competitors.map((c) => (
+                        <tr
+                          key={c.competitor_domain}
+                          className="border-b border-[var(--border)] last:border-b-0"
+                        >
+                          <td className="px-3 py-3">
+                            <div>
+                              <p className="font-medium text-[var(--text-strong)]">
+                                {getDisplayName(c)}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                                {c.place_id ?? c.competitor_domain}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 font-medium text-[var(--text-strong)]">
+                            {c.total_reviews ?? 0}
+                          </td>
+                          <td className="px-3 py-3 text-[var(--text-body)]">
+                            {c.rating ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-[var(--text-body)]">
+                            {c.competitor_domain?.startsWith("place_id:")
+                              ? "—"
+                              : c.competitor_domain ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-[var(--text-body)]">
+                            {c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </section>
+          </section>
 
-        <section className="rounded-2xl border border-neutral-300 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-              All Discovered Competitors
-            </h2>
-            <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-              Sorted by total reviews.
-            </p>
-          </div>
+          <aside className="space-y-8">
+            <section>
+              <SectionLabel>Market velocity</SectionLabel>
 
-          {competitors.length === 0 ? (
-            <div className="mt-6 text-sm text-neutral-600 dark:text-neutral-400">
-              No competitors found yet. Click <span className="font-medium">Run discovery</span>.
-            </div>
-          ) : (
-            <div className="mt-6 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-neutral-800 dark:text-neutral-500">
-                  <tr className="border-b border-neutral-300 dark:border-neutral-800">
-                    <th className="px-3 py-3 font-medium">Competitor</th>
-                    <th className="px-3 py-3 font-medium">Reviews</th>
-                    <th className="px-3 py-3 font-medium">Rating</th>
-                    <th className="px-3 py-3 font-medium">Domain</th>
-                    <th className="px-3 py-3 font-medium">Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {competitors.map((c) => (
-                    <tr
-                      key={c.competitor_domain}
-                      className="border-b border-neutral-200 dark:border-neutral-900"
-                    >
-                      <td className="px-3 py-3">
-                        <div>
-                          <p className="font-medium text-neutral-950 dark:text-neutral-200">
-                            {getDisplayName(c)}
-                          </p>
-                          <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
-                            {c.place_id ?? c.competitor_domain}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 font-medium text-neutral-950 dark:text-neutral-200">
-                        {c.total_reviews ?? 0}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {c.rating ?? "—"}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {c.competitor_domain?.startsWith("place_id:")
-                          ? "—"
-                          : c.competitor_domain ?? "—"}
-                      </td>
-                      <td className="px-3 py-3 text-neutral-800 dark:text-neutral-400">
-                        {c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+              <div className="mt-4">
+                <DetailRow
+                  label="Growth pace"
+                  value={`${velocity.marketGrowth90d} reviews per 90 days`}
+                  helper="This is the current benchmark estimate used to describe review growth in the local market."
+                />
+                <DetailRow
+                  label="Confidence"
+                  value={velocity.confidenceLabel}
+                  helper={
+                    velocity.kind === "observed"
+                      ? `Observed from +${velocity.observedDeltaReviews} reviews across ${velocity.observedDays} days.`
+                      : velocity.note
+                  }
+                />
+                <DetailRow
+                  label="Benchmark competitor"
+                  value={
+                    thresholdCompetitor
+                      ? shortName(getDisplayName(thresholdCompetitor))
+                      : "Not set"
+                  }
+                  helper="This is the competitor currently used as the benchmark reference."
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Navigation</SectionLabel>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/projects/${projectId}/owner`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  Back to owner page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/authority`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View authority page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/rank`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View rank page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/actions`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View actions page
+                </Link>
+                <button
+                  onClick={() => {
+                    void runDiscovery();
+                  }}
+                  disabled={running || !authed || !project}
+                  className="px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    backgroundColor: "var(--text-strong)",
+                    border: "1px solid var(--text-strong)",
+                  }}
+                  type="button"
+                >
+                  {running ? "Running..." : "Run discovery"}
+                </button>
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Progress and proof</SectionLabel>
+
+              <div className="mt-4">
+                <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  {competitors.length}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  discovered competitors currently available for this project
+                </p>
+
+                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                  <HeaderMeta
+                    label="Top 3 median"
+                    value={thresholdReviews ? String(thresholdReviews) : "Not set"}
+                  />
+                  <HeaderMeta
+                    label="Benchmark updated"
+                    value={benchmarkUpdatedAt ? formatDate(benchmarkUpdatedAt) : "Not set"}
+                  />
+                  <HeaderMeta
+                    label="Snapshot rows"
+                    value={String(snapshotsForThreshold.length)}
+                  />
+                </div>
+              </div>
+            </section>
+          </aside>
         </section>
       </div>
     </main>

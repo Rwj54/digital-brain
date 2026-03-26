@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 type PageProps = {
@@ -32,17 +32,18 @@ type ProjectActionsResponse = {
   actionsRow: ProjectActionsRow | null;
 };
 
-function priorityClasses(priority: string) {
-  if (priority === "high") {
-    return "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
-  }
-
-  if (priority === "medium") {
-    return "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200";
-  }
-
-  return "border-neutral-300 bg-neutral-50 text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300";
-}
+type OwnerDashboardResponse = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  projectDisplayName: string | null;
+  projectCategory: string | null;
+  projectMetro: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
+  capturedAt: string;
+};
 
 function categoryLabel(category: string) {
   if (category === "reviews") return "Reviews";
@@ -57,9 +58,177 @@ function formatPriority(priority: string) {
   return priority.charAt(0).toUpperCase() + priority.slice(1);
 }
 
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function getPriorityTone(priority: string) {
+  if (priority === "high") {
+    return {
+      tone: "var(--danger)",
+      bg: "var(--danger-soft)",
+      border: "var(--danger)",
+    };
+  }
+
+  if (priority === "medium") {
+    return {
+      tone: "var(--warning)",
+      bg: "var(--warning-soft)",
+      border: "var(--warning)",
+    };
+  }
+
+  return {
+    tone: "var(--text-body)",
+    bg: "var(--reference-soft)",
+    border: "var(--border-strong)",
+  };
+}
+
+function getCategoryTone(category: string) {
+  if (category === "reviews") {
+    return {
+      tone: "var(--success)",
+      bg: "var(--success-soft)",
+      border: "var(--success)",
+    };
+  }
+
+  if (category === "competition") {
+    return {
+      tone: "var(--accent-blue-600)",
+      bg: "var(--accent-blue-100)",
+      border: "var(--accent-blue-600)",
+    };
+  }
+
+  if (category === "rank") {
+    return {
+      tone: "var(--brand-600)",
+      bg: "var(--brand-100)",
+      border: "var(--brand-600)",
+    };
+  }
+
+  return {
+    tone: "var(--text-body)",
+    bg: "var(--reference-soft)",
+    border: "var(--border-strong)",
+  };
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+    </div>
+  );
+}
+
+function MetricStripItem({
+  label,
+  value,
+  bg,
+  tone,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  tone: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ backgroundColor: bg }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: tone }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function InlineTag({
+  children,
+  tone,
+  bg,
+  border,
+}: {
+  children: ReactNode;
+  tone?: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: tone ?? "var(--text-body)",
+        backgroundColor: bg ?? "transparent",
+        borderColor: border ?? "var(--border)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
+      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+    </div>
+  );
+}
+
 export default function ActionsPage({ params }: PageProps) {
   const [projectId, setProjectId] = useState("");
   const [actionsRow, setActionsRow] = useState<ProjectActionsRow | null>(null);
+  const [dashboardContext, setDashboardContext] = useState<OwnerDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,21 +253,32 @@ export default function ActionsPage({ params }: PageProps) {
 
         setProjectId(resolvedProjectId);
 
-        const response = await fetch(`/api/projects/${resolvedProjectId}/actions`, {
-          cache: "no-store",
-        });
+        const [actionsResponse, dashboardResponse] = await Promise.all([
+          fetch(`/api/projects/${resolvedProjectId}/actions`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${resolvedProjectId}/owner-dashboard`, {
+            cache: "no-store",
+          }),
+        ]);
 
-        const json = (await response.json()) as ProjectActionsResponse;
+        const actionsJson = (await actionsResponse.json()) as ProjectActionsResponse;
+        const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
 
-        if (!response.ok || !json.ok) {
-          throw new Error(json.error ?? "Failed to load project actions.");
+        if (!actionsResponse.ok || !actionsJson.ok) {
+          throw new Error(actionsJson.error ?? "Failed to load project actions.");
+        }
+
+        if (!dashboardResponse.ok || !dashboardJson.ok) {
+          throw new Error(dashboardJson.error ?? "Failed to load owner dashboard context.");
         }
 
         if (!isMounted) {
           return;
         }
 
-        setActionsRow(json.actionsRow);
+        setActionsRow(actionsJson.actionsRow);
+        setDashboardContext(dashboardJson);
       } catch (err) {
         if (!isMounted) {
           return;
@@ -131,200 +311,334 @@ export default function ActionsPage({ params }: PageProps) {
     };
   }, [actions]);
 
+  const totalActions = actions.length;
+  const highCount = groupedActions.high.length;
+  const mediumCount = groupedActions.medium.length;
+  const lowCount = groupedActions.low.length;
+  const leadAction = actions[0] ?? null;
+
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-sm text-neutral-700 dark:text-neutral-400">
-            Loading action intelligence…
-          </p>
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">Loading actions page...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-500">
-              Digital Brain
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-950 dark:text-white">
-              Growth Actions
-            </h1>
-            <p className="mt-2 text-sm text-neutral-800 dark:text-neutral-400">
-              Recommended next actions generated from authority, rank, and competitive
-              pressure signals.
-            </p>
-            <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
-              Latest capture: {actionsRow?.captured_at ?? "—"} • Version:{" "}
-              {actionsRow?.version ?? "—"}
-            </p>
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>Action center</SectionLabel>
+
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+                See the next actions Digital Brain wants you to take.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                This page organizes the current stored growth actions into a clear working order so
+                you can see what matters most right now without digging through raw system output.
+              </p>
+            </div>
+
+            <div className="xl:pl-8">
+              <SectionLabel>Current action read</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {leadAction?.title ?? "No actions available yet"}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {leadAction?.detail ??
+                  "This project does not yet have stored action guidance. Once actions are generated, they will appear here in clear working order."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {leadAction ? (
+                  <>
+                    <InlineTag
+                      tone={getPriorityTone(leadAction.priority).tone}
+                      bg={getPriorityTone(leadAction.priority).bg}
+                      border={getPriorityTone(leadAction.priority).border}
+                    >
+                      {formatPriority(leadAction.priority)}
+                    </InlineTag>
+                    <InlineTag
+                      tone={getCategoryTone(leadAction.category).tone}
+                      bg={getCategoryTone(leadAction.category).bg}
+                      border={getCategoryTone(leadAction.category).border}
+                    >
+                      {categoryLabel(leadAction.category)}
+                    </InlineTag>
+                  </>
+                ) : (
+                  <InlineTag>No stored actions</InlineTag>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/projects/${projectId}/authority`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              Back to Authority
-            </Link>
-            <Link
-              href={`/projects/${projectId}/rank`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              View Rank Intelligence
-            </Link>
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Business"
+              value={dashboardContext?.projectDisplayName ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Domain"
+              value={dashboardContext?.domainDisplayValue ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Location / Market"
+              value={
+                dashboardContext?.projectLocationLabel ??
+                dashboardContext?.projectMetro ??
+                "Not set"
+              }
+            />
+            <HeaderMeta
+              label="Scope"
+              value={dashboardContext?.pageScopeLabel ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(actionsRow?.captured_at ?? dashboardContext?.capturedAt ?? null)}
+            />
           </div>
-        </div>
+        </section>
 
         {error ? (
-          <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-            {error}
-          </div>
+          <section className="border-b border-[var(--danger)] py-5">
+            <p className="text-sm font-medium text-[var(--danger)]">{error}</p>
+          </section>
         ) : null}
 
         {!error && actions.length === 0 ? (
-          <div className="rounded-2xl border border-neutral-300 bg-white p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">
-            No stored growth actions found for this project yet.
-          </div>
-        ) : null}
-
-        {groupedActions.high.length > 0 ? (
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-                High Priority
-              </h2>
-              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-                Immediate actions with the strongest strategic impact.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {groupedActions.high.map((action, index) => (
-                <div
-                  key={`high-${index}-${action.title}`}
-                  className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-neutral-950 dark:text-white">
-                        {action.title}
-                      </h3>
-                      <p className="text-sm leading-6 text-neutral-800 dark:text-neutral-300">
-                        {action.detail}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${priorityClasses(
-                        action.priority
-                      )}`}
-                    >
-                      {formatPriority(action.priority)}
-                    </div>
-                  </div>
-
-                  <p className="mt-3 text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-                    {categoryLabel(action.category)}
-                  </p>
-                </div>
-              ))}
-            </div>
+          <section className="border-b border-[var(--border)] py-6">
+            <SectionLabel>No action set yet</SectionLabel>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
+              No stored growth actions were found for this project yet. This page will become more
+              useful after the next successful action-generation cycle.
+            </p>
           </section>
         ) : null}
 
-        {groupedActions.medium.length > 0 ? (
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-                Medium Priority
-              </h2>
-              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-                Important actions that strengthen visibility and competitiveness.
-              </p>
-            </div>
+        {actions.length > 0 ? (
+          <>
+            <section className="border-b border-[var(--border)] py-6">
+              <SectionLabel>Action markers</SectionLabel>
 
-            <div className="space-y-4">
-              {groupedActions.medium.map((action, index) => (
-                <div
-                  key={`medium-${index}-${action.title}`}
-                  className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-neutral-950 dark:text-white">
-                        {action.title}
-                      </h3>
-                      <p className="text-sm leading-6 text-neutral-800 dark:text-neutral-300">
-                        {action.detail}
-                      </p>
-                    </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricStripItem
+                  label="Total actions"
+                  value={String(totalActions)}
+                  bg="var(--reference-soft)"
+                  tone="var(--text-strong)"
+                />
+                <MetricStripItem
+                  label="High priority"
+                  value={String(highCount)}
+                  bg="var(--danger-soft)"
+                  tone="var(--danger)"
+                />
+                <MetricStripItem
+                  label="Medium priority"
+                  value={String(mediumCount)}
+                  bg="var(--warning-soft)"
+                  tone="var(--warning)"
+                />
+                <MetricStripItem
+                  label="Lower priority"
+                  value={String(lowCount)}
+                  bg="var(--brand-100)"
+                  tone="var(--brand-700)"
+                />
+              </div>
+            </section>
 
-                    <div
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${priorityClasses(
-                        action.priority
-                      )}`}
+            <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
+              <section>
+                <SectionLabel>Working order</SectionLabel>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  Start with these actions
+                </h2>
+                <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                  Actions are grouped by priority so the page stays easy to scan. The goal here is
+                  visual clarity first. We can return later for deeper wording and content
+                  refinement.
+                </p>
+
+                <div className="mt-6">
+                  {[
+                    {
+                      key: "high",
+                      label: "High priority",
+                      helper: "Immediate actions with the strongest strategic weight.",
+                      items: groupedActions.high,
+                    },
+                    {
+                      key: "medium",
+                      label: "Medium priority",
+                      helper: "Important follow-through actions that strengthen visibility.",
+                      items: groupedActions.medium,
+                    },
+                    {
+                      key: "low",
+                      label: "Lower priority",
+                      helper: "Useful follow-up work once the bigger gaps are being handled.",
+                      items: groupedActions.low,
+                    },
+                  ]
+                    .filter((group) => group.items.length > 0)
+                    .map((group, groupIndex) => (
+                      <div
+                        key={group.key}
+                        className={`py-6 ${
+                          groupIndex === 0 ? "" : "border-t border-[var(--border)]"
+                        }`}
+                      >
+                        <p className="text-lg font-semibold text-[var(--text-strong)]">
+                          {group.label}
+                        </p>
+                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                          {group.helper}
+                        </p>
+
+                        <div className="mt-5">
+                          {group.items.map((action, index) => {
+                            const priorityTone = getPriorityTone(action.priority);
+                            const categoryTone = getCategoryTone(action.category);
+
+                            return (
+                              <article
+                                key={`${group.key}-${index}-${action.title}`}
+                                className={`grid gap-4 py-5 md:grid-cols-[1fr_auto] md:items-start ${
+                                  index === group.items.length - 1
+                                    ? ""
+                                    : "border-b border-[var(--border)]"
+                                }`}
+                              >
+                                <div className="max-w-3xl">
+                                  <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                                    {action.title}
+                                  </p>
+                                  <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                                    {action.detail}
+                                  </p>
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    <InlineTag
+                                      tone={priorityTone.tone}
+                                      bg={priorityTone.bg}
+                                      border={priorityTone.border}
+                                    >
+                                      {formatPriority(action.priority)}
+                                    </InlineTag>
+                                    <InlineTag
+                                      tone={categoryTone.tone}
+                                      bg={categoryTone.bg}
+                                      border={categoryTone.border}
+                                    >
+                                      {categoryLabel(action.category)}
+                                    </InlineTag>
+                                  </div>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </section>
+
+              <aside className="space-y-8">
+                <section>
+                  <SectionLabel>Navigation</SectionLabel>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href={`/projects/${projectId}/owner`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
                     >
-                      {formatPriority(action.priority)}
+                      Back to owner page
+                    </Link>
+                    <Link
+                      href={`/projects/${projectId}/rank`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      View rank page
+                    </Link>
+                    <Link
+                      href={`/projects/${projectId}/authority`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      View authority page
+                    </Link>
+                  </div>
+                </section>
+
+                <section className="border-t border-[var(--border)] pt-6">
+                  <SectionLabel>What this means</SectionLabel>
+
+                  <div className="mt-4">
+                    <DetailRow
+                      label="Latest capture"
+                      value={formatDate(actionsRow?.captured_at ?? null)}
+                      helper="This is the most recent action snapshot currently stored."
+                    />
+                    <DetailRow
+                      label="Version"
+                      value={actionsRow?.version ?? "Not set"}
+                      helper="This is the stored version label attached to the current action set."
+                    />
+                    <DetailRow
+                      label="Primary action"
+                      value={leadAction?.title ?? "Not set"}
+                      helper="This is the first stored action currently shown on the page."
+                    />
+                  </div>
+                </section>
+
+                <section className="border-t border-[var(--border)] pt-6">
+                  <SectionLabel>Progress and proof</SectionLabel>
+
+                  <div className="mt-4">
+                    <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                      {totalActions}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      stored actions currently available for this project
+                    </p>
+
+                    <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                      <HeaderMeta
+                        label="High priority"
+                        value={String(highCount)}
+                      />
+                      <HeaderMeta
+                        label="Medium priority"
+                        value={String(mediumCount)}
+                      />
+                      <HeaderMeta
+                        label="Lower priority"
+                        value={String(lowCount)}
+                      />
                     </div>
                   </div>
-
-                  <p className="mt-3 text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-                    {categoryLabel(action.category)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {groupedActions.low.length > 0 ? (
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-neutral-950 dark:text-white">
-                Lower Priority
-              </h2>
-              <p className="mt-1 text-sm text-neutral-700 dark:text-neutral-400">
-                Useful follow-up actions once high-priority gaps are being addressed.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {groupedActions.low.map((action, index) => (
-                <div
-                  key={`low-${index}-${action.title}`}
-                  className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70"
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-neutral-950 dark:text-white">
-                        {action.title}
-                      </h3>
-                      <p className="text-sm leading-6 text-neutral-800 dark:text-neutral-300">
-                        {action.detail}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${priorityClasses(
-                        action.priority
-                      )}`}
-                    >
-                      {formatPriority(action.priority)}
-                    </div>
-                  </div>
-
-                  <p className="mt-3 text-xs uppercase tracking-wide text-neutral-700 dark:text-neutral-500">
-                    {categoryLabel(action.category)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
+                </section>
+              </aside>
+            </section>
+          </>
         ) : null}
       </div>
     </main>

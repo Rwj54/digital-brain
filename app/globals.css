@@ -1,34 +1,38 @@
 @import "tailwindcss";
 :root {
-    --background: #f8fbfc;
-    --foreground: #0f172a;
-    --app-bg: #f8fbfc;
+    --background: #f8fbfe;
+    --foreground: #132235;
+    --app-bg: #eef4f8;
     --surface: #ffffff;
-    --surface-alt: #edf7fa;
-    --primary-soft: #eef8fb;
-    --border: #b9d2da;
-    --text-strong: #0f172a;
-    --text-body: #475569;
-    --text-muted: #64748b;
-    --brand-700: #0a5d73;
-    --brand-600: #0f7c98;
-    --brand-100: #cfeff5;
-    --brand-50: #ebf8fb;
+    --surface-alt: #f5f8fb;
+    --surface-raised: #ffffff;
+    --primary-soft: #e6f3fb;
+    --border: #c4d2dc;
+    --border-strong: #9fb2c1;
+    --text-strong: #132235;
+    --text-body: #44596f;
+    --text-muted: #62758a;
+    --brand-700: #0d5c75;
+    --brand-600: #167e9f;
+    --brand-100: #d8eef8;
+    --brand-50: #eff8fd;
     --accent-blue-600: #2563eb;
     --accent-blue-100: #dbeafe;
-    --accent-mint-600: #14b8a6;
-    --accent-mint-100: #ccfbf1;
-    --competitor-600: #7c3aed;
-    --competitor-100: #ede9fe;
+    --accent-mint-600: #0f9f8d;
+    --accent-mint-100: #d2f5ee;
+    --competitor-600: #b45309;
+    --competitor-100: #fef3c7;
     --success: #15803d;
     --success-soft: #dcfce7;
-    --warning: #c2410c;
-    --warning-soft: #ffedd5;
+    --warning: #b45309;
+    --warning-soft: #fef3c7;
     --danger: #dc2626;
     --danger-soft: #fee2e2;
     --reference: #94a3b8;
     --reference-soft: #f1f5f9;
-    --focus-ring: rgba(15, 124, 152, 0.28);
+    --focus-ring: rgba(22, 126, 159, 0.24);
+    --shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.06);
+    --shadow-card: 0 8px 20px rgba(15, 23, 42, 0.05);
 }
 
 @theme inline {
@@ -43,17 +47,19 @@
 }
 
 html {
+    min-height: 100%;
     background: var(--app-bg);
 }
 
 body {
+    min-height: 100%;
     margin: 0;
-    background: var(--app-bg);
     color: var(--text-body);
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background: radial-gradient(circle at top left, rgba(22, 126, 159, 0.08), transparent 32%), radial-gradient(circle at top right, rgba(37, 99, 235, 0.05), transparent 24%), linear-gradient(180deg, #f9fcfe 0%, #eef4f8 100%);
 }
 
 ::selection {
@@ -66,6 +72,37 @@ input,
 textarea,
 select {
     font: inherit;
+}
+
+input,
+textarea,
+select {
+    color: var(--text-strong);
+    caret-color: var(--text-strong);
+    background-color: var(--surface);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: #77879a;
+}
+
+button {
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease, transform 140ms ease;
+}
+
+button:disabled {
+    transform: none;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--border);
 }
 
 button:focus-visible,

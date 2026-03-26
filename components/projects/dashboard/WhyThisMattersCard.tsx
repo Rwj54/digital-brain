@@ -16,8 +16,8 @@ export function WhyThisMattersCard({
   gapReviews,
 }: WhyThisMattersCardProps) {
   return (
-    <section className="grid gap-5 border-t border-[var(--border)] pt-8">
-      <div>
+    <section className="border border-[var(--border)] bg-white px-5 py-5 sm:px-6">
+      <div className="border-b border-[var(--border)] pb-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
           Why this matters
         </p>
@@ -27,7 +27,7 @@ export function WhyThisMattersCard({
       </div>
 
       {!hasCapacity ? (
-        <div className="grid gap-5">
+        <div className="grid gap-5 pt-5">
           <p className="max-w-3xl text-sm leading-7 text-[var(--text-body)]">
             Digital Brain shows two targets because there is a difference between
             what would close the gap fastest and what your business can realistically
@@ -64,7 +64,7 @@ export function WhyThisMattersCard({
           </div>
         </div>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-5 pt-5">
           <p className="max-w-3xl text-sm leading-7 text-[var(--text-body)]">
             You told us the business averages{" "}
             <span className="font-semibold text-[var(--text-strong)]">

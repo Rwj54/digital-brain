@@ -46,6 +46,8 @@ export type CompetitorMetric = {
   total_reviews: number | null;
   last_seen_at: string;
   created_at: string;
+  number_of_keywords_found: number;
+  top_keywords: string[];
 };
 
 export type TabKey = "overview" | "data" | "actions" | "settings";

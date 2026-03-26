@@ -23,11 +23,11 @@ function MobileBottomNavItem({
     >
       <span
         className={[
-          "h-1.5 w-10 rounded-full transition-colors",
+          "h-px w-10 transition-colors",
           active ? "bg-zinc-900 dark:bg-white" : "bg-transparent",
         ].join(" ")}
       />
-      <span className="text-[12px] font-extrabold">{label}</span>
+      <span className="text-[12px] font-semibold tracking-[0.01em]">{label}</span>
     </button>
   );
 }
