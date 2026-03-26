@@ -44,6 +44,14 @@ type AuthorityChartApiResponse =
   | AuthorityChartApiError
   | null;
 
+type ProjectContext = {
+  projectDisplayName: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
+  capturedAt: string;
+};
+
 function formatJson(value: unknown) {
   try {
     return JSON.stringify(value, null, 2);
@@ -108,11 +116,58 @@ function normalizeChartPoint(point: unknown): AuthorityChartPoint | null {
   };
 }
 
+function normalizeProjectContext(value: unknown): ProjectContext | null {
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true) return null;
+
+  return {
+    projectDisplayName:
+      typeof record.projectDisplayName === "string"
+        ? record.projectDisplayName
+        : null,
+    domainDisplayValue:
+      typeof record.domainDisplayValue === "string"
+        ? record.domainDisplayValue
+        : null,
+    projectLocationLabel:
+      typeof record.projectLocationLabel === "string"
+        ? record.projectLocationLabel
+        : null,
+    pageScopeLabel:
+      typeof record.pageScopeLabel === "string"
+        ? record.pageScopeLabel
+        : "Momentum view",
+    capturedAt:
+      typeof record.capturedAt === "string" ? record.capturedAt : "",
+  };
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
       {children}
     </p>
+  );
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -195,6 +250,7 @@ export default function ProjectMomentumPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [row, setRow] = useState<AuthorityRow | null>(null);
+  const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
 
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendStatus, setTrendStatus] = useState<string | null>(null);
@@ -276,6 +332,27 @@ export default function ProjectMomentumPage() {
     }
   }
 
+  async function loadProjectContext() {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/owner-dashboard`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setProjectContext(null);
+        return;
+      }
+
+      setProjectContext(normalizeProjectContext(json));
+    } catch {
+      setProjectContext(null);
+    }
+  }
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -289,8 +366,11 @@ export default function ProjectMomentumPage() {
       }
 
       try {
-        await loadLatestAuthority();
-        await loadAuthorityTrend();
+        await Promise.all([
+          loadLatestAuthority(),
+          loadAuthorityTrend(),
+          loadProjectContext(),
+        ]);
       } catch (e: unknown) {
         setStatus(e instanceof Error ? e.message : "Failed to load momentum page.");
       } finally {
@@ -372,6 +452,12 @@ export default function ProjectMomentumPage() {
     };
   }, [trendDeduped]);
 
+  const businessValue = projectContext?.projectDisplayName ?? "Project";
+  const domainValue = projectContext?.domainDisplayValue ?? "Not set";
+  const locationValue = projectContext?.projectLocationLabel ?? "Not set";
+  const scopeValue = projectContext?.pageScopeLabel ?? "Momentum view";
+  const snapshotValue = formatDate(row?.captured_at ?? projectContext?.capturedAt ?? null);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
@@ -441,8 +527,11 @@ export default function ProjectMomentumPage() {
                     setTrendStatus(null);
 
                     try {
-                      await loadLatestAuthority();
-                      await loadAuthorityTrend();
+                      await Promise.all([
+                        loadLatestAuthority(),
+                        loadAuthorityTrend(),
+                        loadProjectContext(),
+                      ]);
                       setStatus("Momentum data refreshed.");
                     } catch (e: unknown) {
                       setStatus(e instanceof Error ? e.message : "Refresh failed.");
@@ -461,13 +550,21 @@ export default function ProjectMomentumPage() {
 
               <div className="mt-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Project
+                  Project ID
                 </p>
                 <p className="mt-1 text-sm font-medium text-[var(--text-strong)]">
                   {projectId}
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta label="Business" value={businessValue} />
+            <HeaderMeta label="Domain" value={domainValue} />
+            <HeaderMeta label="Location / Market" value={locationValue} />
+            <HeaderMeta label="Scope" value={scopeValue} />
+            <HeaderMeta label="Snapshot" value={snapshotValue} />
           </div>
 
           {status ? (
