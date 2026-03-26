@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -54,11 +54,7 @@ function formatJson(value: unknown) {
 
 function asNumber(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (
-    typeof v === "string" &&
-    v.trim() !== "" &&
-    Number.isFinite(Number(v))
-  ) {
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
     return Number(v);
   }
   return null;
@@ -112,7 +108,40 @@ function normalizeChartPoint(point: unknown): AuthorityChartPoint | null {
   };
 }
 
-function StatTile({
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function InlineTag({
+  children,
+  solid = "var(--text-body)",
+  soft = "transparent",
+  border = "var(--border)",
+}: {
+  children: ReactNode;
+  solid?: string;
+  soft?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: solid,
+        backgroundColor: soft,
+        borderColor: border,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SummaryStat({
   label,
   value,
   helper,
@@ -122,16 +151,38 @@ function StatTile({
   helper: string;
 }) {
   return (
-    <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-      <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-neutral-700 dark:text-neutral-400">
-        {helper}
+      <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
       </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p>
+      ) : null}
     </div>
   );
 }
@@ -258,7 +309,7 @@ export default function ProjectMomentumPage() {
       return null;
     }
 
-    const entries = Object.entries(rawComponents).map(([k, v]) => [k, v] as const);
+    const entries = Object.entries(rawComponents).map(([key, value]) => [key, value] as const);
     entries.sort((a, b) => a[0].localeCompare(b[0]));
     return entries;
   }, [row]);
@@ -316,7 +367,6 @@ export default function ProjectMomentumPage() {
       minM,
       maxM,
       latest,
-      prev,
       deltaA,
       deltaM,
     };
@@ -324,165 +374,215 @@ export default function ProjectMomentumPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-sm text-neutral-700 dark:text-neutral-400">
-            Loading momentum intelligence…
-          </p>
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">Loading momentum page...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-6 py-10 text-neutral-950 dark:bg-neutral-950 dark:text-white">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-neutral-700 dark:text-neutral-500">
-              Digital Brain
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-950 dark:text-white">
-              Momentum Intelligence
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-800 dark:text-neutral-400">
-              This page shows whether the business is gaining traction or losing
-              ground over time. Momentum is a leading signal that helps explain
-              whether authority work is starting to turn into visible forward
-              movement.
-            </p>
-            <p className="mt-1 text-xs text-neutral-700 dark:text-neutral-500">
-              Project: {projectId}
-            </p>
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>Momentum intelligence</SectionLabel>
+
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3rem] sm:leading-[1.04]">
+                Is the business starting to move?
+              </h1>
+
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                Momentum helps show whether authority work is beginning to translate
+                into visible forward progress. It is a leading signal, not a vanity
+                score, and it helps separate real movement from noisy market shifts.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {row ? (
+                  <>
+                    <InlineTag
+                      solid="var(--brand-700)"
+                      soft="var(--brand-100)"
+                      border="var(--brand-600)"
+                    >
+                      {row.momentum_label}
+                    </InlineTag>
+                    <InlineTag
+                      solid="var(--accent-blue-600)"
+                      soft="var(--accent-blue-100)"
+                      border="var(--accent-blue-600)"
+                    >
+                      Authority {fmt1(row.authority_score)}
+                    </InlineTag>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="xl:pl-8">
+              <SectionLabel>Actions</SectionLabel>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href={`/projects/${projectId}/authority`}
+                  className="border px-4 py-2 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  Back to Authority
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setStatus("Refreshing momentum data…");
+                    setTrendStatus(null);
+
+                    try {
+                      await loadLatestAuthority();
+                      await loadAuthorityTrend();
+                      setStatus("Momentum data refreshed.");
+                    } catch (e: unknown) {
+                      setStatus(e instanceof Error ? e.message : "Refresh failed.");
+                    }
+                  }}
+                  disabled={trendLoading}
+                  className="border px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{
+                    backgroundColor: "var(--text-strong)",
+                    borderColor: "var(--text-strong)",
+                  }}
+                >
+                  {trendLoading ? "Refreshing…" : "Refresh Momentum"}
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Project
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--text-strong)]">
+                  {projectId}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href={`/projects/${projectId}/authority`}
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-900"
-            >
-              Back to Authority
-            </Link>
+          {status ? (
+            <div className="mt-6 border-t border-[var(--border)] pt-4 text-sm text-[var(--text-body)]">
+              {status}
+            </div>
+          ) : null}
 
-            <button
-              type="button"
-              onClick={async () => {
-                setStatus("Refreshing momentum data…");
-                setTrendStatus(null);
+          {trendStatus ? (
+            <div className="mt-4 border-t-2 border-[var(--danger)] pt-4 text-sm text-[var(--danger)]">
+              {trendStatus}
+            </div>
+          ) : null}
 
-                try {
-                  await loadLatestAuthority();
-                  await loadAuthorityTrend();
-                  setStatus("Momentum data refreshed.");
-                } catch (e: unknown) {
-                  setStatus(e instanceof Error ? e.message : "Refresh failed.");
-                }
-              }}
-              disabled={trendLoading}
-              className="rounded-xl bg-neutral-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
-            >
-              {trendLoading ? "Refreshing…" : "Refresh Momentum"}
-            </button>
-          </div>
-        </div>
-
-        {status ? (
-          <div className="rounded-2xl border border-neutral-300 bg-white p-4 text-sm text-neutral-800 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-300">
-            {status}
-          </div>
-        ) : null}
-
-        {trendStatus ? (
-          <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-            {trendStatus}
-          </div>
-        ) : null}
-
-        {!row ? (
-          <div className="rounded-2xl border border-neutral-300 bg-white p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">
-            No momentum row found yet. This page will populate after the next
-            scoring run.
-          </div>
-        ) : (
-          <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatTile
+          {!row ? (
+            <div className="mt-6 border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
+              No momentum row found yet. This page will populate after the next
+              scoring run.
+            </div>
+          ) : (
+            <div className="mt-6 grid gap-5 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryStat
                 label="Momentum score"
                 value={fmt1(row.momentum_score)}
                 helper={`Current label: ${row.momentum_label}`}
               />
-              <StatTile
+              <SummaryStat
                 label="Authority score"
                 value={fmt1(row.authority_score)}
                 helper={`Current tier: ${row.authority_tier}`}
               />
-              <StatTile
+              <SummaryStat
                 label="Captured"
                 value={formatDate(row.captured_at)}
                 helper={`Version: ${row.version}`}
               />
-              <StatTile
+              <SummaryStat
                 label="History points"
                 value={String(trendDeduped.length)}
                 helper="Same-day duplicates are automatically deduped."
               />
-            </section>
+            </div>
+          )}
+        </section>
 
-            <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
-              <section className="space-y-5">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                    Current footing
-                  </p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">
-                    What the latest momentum record says
-                  </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-neutral-700 dark:text-neutral-400">
-                    These are the current inputs behind the momentum signal. The
-                    goal is to show whether authority is improving, whether gaps
-                    are shrinking, and how much market pressure still exists.
-                  </p>
-                </div>
+        {row ? (
+          <>
+            <section className="grid gap-10 border-b border-[var(--border)] py-8 xl:grid-cols-[1.08fr_0.92fr]">
+              <section>
+                <SectionLabel>Current footing</SectionLabel>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  What the latest momentum record says
+                </h2>
+                <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                  These are the inputs behind the current momentum reading. The
+                  purpose is to show whether authority is improving, whether the
+                  gap is narrowing, and how much outside market pressure is still
+                  pushing back.
+                </p>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <StatTile
-                    label="Execution"
-                    value={execution == null ? "—" : execution.toFixed(3)}
-                    helper="How strongly recent work appears to be carrying through."
-                  />
-                  <StatTile
-                    label="Authority delta"
-                    value={authorityDelta == null ? "—" : authorityDelta.toFixed(1)}
-                    helper="Change in authority compared with the prior footing."
-                  />
-                  <StatTile
-                    label="Gap shrink"
-                    value={gapShrinkRatio == null ? "—" : gapShrinkRatio.toFixed(3)}
-                    helper="Whether the business is closing distance against the market."
-                  />
-                  <StatTile
-                    label="Market pressure"
-                    value={marketPressure == null ? "—" : marketPressure.toFixed(3)}
-                    helper="How much outside competitive movement is still pushing back."
-                  />
+                <div className="mt-6 grid gap-8 sm:grid-cols-2">
+                  <div>
+                    <DetailRow
+                      label="Momentum score"
+                      value={fmt1(row.momentum_score)}
+                      helper={`Label: ${row.momentum_label}`}
+                    />
+                    <DetailRow
+                      label="Authority score"
+                      value={fmt1(row.authority_score)}
+                      helper={`Tier: ${row.authority_tier}`}
+                    />
+                    <DetailRow
+                      label="Captured"
+                      value={formatDate(row.captured_at)}
+                      helper={`Version: ${row.version}`}
+                    />
+                  </div>
+
+                  <div>
+                    <DetailRow
+                      label="Execution"
+                      value={execution == null ? "—" : execution.toFixed(3)}
+                      helper="How strongly recent work appears to be carrying through."
+                    />
+                    <DetailRow
+                      label="Authority delta"
+                      value={authorityDelta == null ? "—" : authorityDelta.toFixed(1)}
+                      helper="Change in authority compared with the prior footing."
+                    />
+                    <DetailRow
+                      label="Gap shrink"
+                      value={gapShrinkRatio == null ? "—" : gapShrinkRatio.toFixed(3)}
+                      helper="Whether the business is closing distance against the market."
+                    />
+                    <DetailRow
+                      label="Market pressure"
+                      value={marketPressure == null ? "—" : marketPressure.toFixed(3)}
+                      helper="How much outside competitive movement is still pushing back."
+                    />
+                  </div>
                 </div>
 
                 {components ? (
-                  <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                    <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                      Raw momentum components
-                    </p>
+                  <div className="mt-8 border-t border-[var(--border)] pt-5">
+                    <SectionLabel>Raw momentum components</SectionLabel>
 
-                    <div className="mt-4 divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <div className="mt-4 divide-y divide-[var(--border)]">
                       {components.map(([key, value]) => (
                         <div
                           key={key}
                           className="flex items-center justify-between gap-4 py-3 text-sm"
                         >
-                          <span className="text-neutral-700 dark:text-neutral-400">
-                            {key}
-                          </span>
-                          <span className="font-medium text-neutral-950 dark:text-white">
+                          <span className="text-[var(--text-body)]">{key}</span>
+                          <span className="font-medium text-[var(--text-strong)]">
                             {String(value)}
                           </span>
                         </div>
@@ -492,40 +592,49 @@ export default function ProjectMomentumPage() {
                 ) : null}
               </section>
 
-              <aside className="space-y-5">
-                <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                  <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                    Plain-English read
-                  </p>
-                  <h3 className="mt-3 text-xl font-semibold tracking-tight text-neutral-950 dark:text-white">
+              <aside>
+                <SectionLabel>Plain-English read</SectionLabel>
+
+                <div
+                  className="mt-4 border-l-4 pl-4"
+                  style={{ borderColor: "var(--brand-600)" }}
+                >
+                  <h3 className="text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
                     {row.momentum_label}
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-neutral-700 dark:text-neutral-400">
+                  <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
                     Momentum is the “are we actually starting to move?” signal.
                     It does not replace authority. It helps show whether the work
                     is beginning to translate into real forward progress.
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                  <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                    What this page is for
-                  </p>
+                <div className="mt-8 border-t border-[var(--border)] pt-5">
+                  <SectionLabel>What this page is for</SectionLabel>
 
-                  <ul className="mt-4 space-y-3 text-sm leading-7 text-neutral-700 dark:text-neutral-400">
+                  <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                     <li className="flex gap-3">
-                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-900 dark:bg-white" />
+                      <span
+                        className="mt-2 h-2.5 w-2.5 shrink-0"
+                        style={{ backgroundColor: "var(--brand-600)" }}
+                      />
                       <span>Shows whether traction is improving over time.</span>
                     </li>
                     <li className="flex gap-3">
-                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-900 dark:bg-white" />
+                      <span
+                        className="mt-2 h-2.5 w-2.5 shrink-0"
+                        style={{ backgroundColor: "var(--accent-blue-600)" }}
+                      />
                       <span>
                         Helps explain whether authority gains are starting to turn
                         into movement.
                       </span>
                     </li>
                     <li className="flex gap-3">
-                      <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-900 dark:bg-white" />
+                      <span
+                        className="mt-2 h-2.5 w-2.5 shrink-0"
+                        style={{ backgroundColor: "var(--success)" }}
+                      />
                       <span>
                         Helps separate real progress from noisy day-to-day market
                         movement.
@@ -534,42 +643,48 @@ export default function ProjectMomentumPage() {
                   </ul>
                 </div>
 
-                <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                  <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                    Inputs JSON
-                  </p>
-                  <pre className="mt-4 max-h-[360px] overflow-auto rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-[11px] text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300">
-                    {formatJson(row.inputs)}
-                  </pre>
+                <div className="mt-8 border-t border-[var(--border)] pt-5">
+                  <SectionLabel>How to interpret momentum</SectionLabel>
+
+                  <div className="mt-4 space-y-4 text-sm leading-7 text-[var(--text-body)]">
+                    <p>
+                      A stronger momentum reading usually means recent work is
+                      compounding instead of stalling.
+                    </p>
+                    <p>
+                      A weaker reading usually means either the market moved faster,
+                      execution slowed down, or the business still has a gap to close.
+                    </p>
+                    <p>
+                      This page should help the owner understand direction, not drown
+                      them in diagnostics.
+                    </p>
+                  </div>
                 </div>
               </aside>
             </section>
 
-            <section className="space-y-5">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                  Trend history
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950 dark:text-white">
-                  How momentum is moving across available history
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-neutral-700 dark:text-neutral-400">
-                  This section shows the recent direction of authority and
-                  momentum together. It is normalized to the history available for
-                  this project, so it helps you see relative movement rather than
-                  pretend everything is a fixed 0–100 bar.
-                </p>
-              </div>
+            <section className="border-b border-[var(--border)] py-8">
+              <SectionLabel>Trend history</SectionLabel>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+                How momentum is moving across available history
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                This section shows the recent direction of authority and momentum
+                together. It is normalized to the history available for this
+                project, so it helps you see relative movement instead of pretending
+                everything is a fixed 0–100 bar.
+              </p>
 
               {!trendDeduped.length ? (
-                <div className="rounded-2xl border border-neutral-300 bg-white p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">
+                <div className="mt-6 border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
                   No history yet. This will grow as nightly scoring continues.
                 </div>
               ) : (
                 <>
                   {trendStats ? (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                      <StatTile
+                    <div className="mt-6 grid gap-5 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-4">
+                      <SummaryStat
                         label="Latest authority"
                         value={fmt1(trendStats.latest.authority)}
                         helper={
@@ -578,7 +693,7 @@ export default function ProjectMomentumPage() {
                             : `Change vs prior: ${(trendStats.deltaA >= 0 ? "+" : "") + trendStats.deltaA.toFixed(1)}`
                         }
                       />
-                      <StatTile
+                      <SummaryStat
                         label="Latest momentum"
                         value={fmt1(trendStats.latest.momentum)}
                         helper={
@@ -587,12 +702,12 @@ export default function ProjectMomentumPage() {
                             : `Change vs prior: ${(trendStats.deltaM >= 0 ? "+" : "") + trendStats.deltaM.toFixed(1)}`
                         }
                       />
-                      <StatTile
+                      <SummaryStat
                         label="Authority range"
                         value={`${trendStats.minA.toFixed(1)}–${trendStats.maxA.toFixed(1)}`}
                         helper={`${trendDeduped.length} tracked days`}
                       />
-                      <StatTile
+                      <SummaryStat
                         label="Momentum range"
                         value={`${trendStats.minM.toFixed(1)}–${trendStats.maxM.toFixed(1)}`}
                         helper="Behavior trend across available history"
@@ -600,12 +715,10 @@ export default function ProjectMomentumPage() {
                     </div>
                   ) : null}
 
-                  <div className="rounded-2xl border border-neutral-300 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                    <p className="text-xs uppercase tracking-[0.16em] text-neutral-600 dark:text-neutral-500">
-                      Daily points
-                    </p>
+                  <div className="mt-8 border-t border-[var(--border)] pt-5">
+                    <SectionLabel>Daily points</SectionLabel>
 
-                    <div className="mt-4 divide-y divide-neutral-200 dark:divide-neutral-800">
+                    <div className="mt-4 divide-y divide-[var(--border)]">
                       {trendDeduped
                         .slice()
                         .reverse()
@@ -622,65 +735,96 @@ export default function ProjectMomentumPage() {
                           const widthM = clamp01((point.momentum - minM) / rangeM);
 
                           return (
-                            <div key={point.date} className="py-4">
+                            <article key={point.date} className="py-5">
                               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                <div className="text-sm font-medium text-neutral-950 dark:text-white">
+                                <div className="text-sm font-medium text-[var(--text-strong)]">
                                   {point.date}
                                 </div>
-                                <div className="text-xs text-neutral-700 dark:text-neutral-400">
+
+                                <div className="text-xs text-[var(--text-body)]">
                                   Authority{" "}
-                                  <span className="font-semibold text-neutral-950 dark:text-white">
+                                  <span className="font-semibold text-[var(--text-strong)]">
                                     {point.authority.toFixed(1)}
                                   </span>{" "}
                                   • Momentum{" "}
-                                  <span className="font-semibold text-neutral-950 dark:text-white">
+                                  <span className="font-semibold text-[var(--text-strong)]">
                                     {point.momentum.toFixed(1)}
                                   </span>
                                 </div>
                               </div>
 
-                              <div className="mt-3 space-y-3">
+                              <div className="mt-4 space-y-3">
                                 <div>
-                                  <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-500">
+                                  <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
                                     <span>Authority</span>
                                     <span>{(widthA * 100).toFixed(0)}%</span>
                                   </div>
-                                  <div className="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                                  <div
+                                    className="h-2"
+                                    style={{ backgroundColor: "var(--reference-soft)" }}
+                                  >
                                     <div
-                                      className="h-full rounded-full bg-neutral-950 dark:bg-white"
-                                      style={{ width: `${widthA * 100}%` }}
+                                      className="h-2"
+                                      style={{
+                                        width: `${widthA * 100}%`,
+                                        backgroundColor: "var(--brand-600)",
+                                      }}
                                     />
                                   </div>
                                 </div>
 
                                 <div>
-                                  <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-600 dark:text-neutral-500">
+                                  <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
                                     <span>Momentum</span>
                                     <span>{(widthM * 100).toFixed(0)}%</span>
                                   </div>
-                                  <div className="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                                  <div
+                                    className="h-2"
+                                    style={{ backgroundColor: "var(--reference-soft)" }}
+                                  >
                                     <div
-                                      className="h-full rounded-full bg-neutral-600 dark:bg-neutral-300"
-                                      style={{ width: `${widthM * 100}%` }}
+                                      className="h-2"
+                                      style={{
+                                        width: `${widthM * 100}%`,
+                                        backgroundColor: "var(--accent-blue-600)",
+                                      }}
                                     />
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                            </article>
                           );
                         })}
                     </div>
 
-                    <p className="mt-4 text-[11px] text-neutral-600 dark:text-neutral-500">
-                      Note: Bars are normalized to the min/max in the available
+                    <p className="mt-4 text-[11px] text-[var(--text-muted)]">
+                      Note: bars are normalized to the min/max in the available
                       history, not a fixed 0–100 scale.
                     </p>
                   </div>
                 </>
               )}
             </section>
+
+            <section className="py-8">
+              <SectionLabel>Details below the fold</SectionLabel>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+                Raw input reference
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+                This keeps the machine-facing input visible without letting it take
+                over the page. The owner story stays above; the raw reference stays
+                below.
+              </p>
+
+              <div className="mt-6 border-t border-[var(--border)] pt-5">
+                <pre className="overflow-auto border border-[var(--border)] bg-[var(--surface-alt)] p-4 text-[11px] text-[var(--text-strong)]">
+                  {formatJson(row.inputs)}
+                </pre>
+              </div>
+            </section>
           </>
-        )}
+        ) : null}
       </div>
     </main>
   );
