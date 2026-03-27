@@ -47,6 +47,32 @@ type OwnerHealthMarker = {
   nextActionHint: string;
 };
 
+type WebsiteSummary = {
+  siteUrl: string | null;
+  targetDomain: string | null;
+  targetBrandName: string | null;
+  category: string | null;
+  metro: string | null;
+  derivedSiteDomain: string | null;
+  hasSiteUrl: boolean;
+  hasTargetDomain: boolean;
+  hasBrandName: boolean;
+  hasDerivedSiteDomain: boolean;
+  hasDomainAlignment: boolean;
+  websiteReadinessLabel: string;
+  websiteReadinessScore: number;
+  plainLanguageSummary: string;
+  topIssue: string;
+  whyItMatters: string;
+  nextAction: {
+    title: string;
+    whoShouldDoIt: string;
+    difficulty: string;
+    reason: string;
+  };
+  evidence: string[];
+};
+
 type OwnerDashboardResponse = {
   ok: boolean;
   projectId: string;
@@ -102,15 +128,7 @@ type OwnerDashboardResponse = {
       hasReviewSignals: boolean;
       aiReadinessLabel: string;
     };
-    websiteSummary: {
-      siteUrl: string | null;
-      targetDomain: string | null;
-      targetBrandName: string | null;
-      hasSiteUrl: boolean;
-      hasTargetDomain: boolean;
-      hasBrandName: boolean;
-      websiteReadinessLabel: string;
-    };
+    websiteSummary: WebsiteSummary;
     outcomesSummary: {
       monthlyCustomerEvents: number | null;
       reviewConversionRate: number | null;
@@ -121,6 +139,12 @@ type OwnerDashboardResponse = {
       outcomesReadinessLabel: string;
     };
   };
+};
+
+type OwnerWebsiteSummaryResponse = {
+  ok: boolean;
+  projectId: string;
+  summary: WebsiteSummary;
 };
 
 type OwnerTasksResponse = {
@@ -239,6 +263,32 @@ function formatConversionRate(value: number | null): string {
   return `${Math.round(percent)}%`;
 }
 
+function getWebsiteAlignmentLabel(summary: WebsiteSummary): string {
+  if (!summary.hasTargetDomain || !summary.hasDerivedSiteDomain) {
+    return "Cannot check yet";
+  }
+
+  return summary.hasDomainAlignment ? "Aligned" : "Needs review";
+}
+
+function getWebsiteAlignmentHelper(summary: WebsiteSummary): string {
+  if (!summary.hasSiteUrl) {
+    return "A website URL is still needed before domain alignment can be checked.";
+  }
+
+  if (!summary.hasDerivedSiteDomain) {
+    return "The saved website URL did not produce a usable domain yet.";
+  }
+
+  if (!summary.hasTargetDomain) {
+    return "Save a target domain so Digital Brain can verify alignment.";
+  }
+
+  return summary.hasDomainAlignment
+    ? "The saved website URL and target domain currently point to the same domain."
+    : "The saved website URL and target domain do not currently point to the same domain.";
+}
+
 function getHealthTone(label: OwnerHealthMarker["label"]): Tone {
   if (label === "Visibility") {
     return { solid: "var(--brand-600)", soft: "var(--brand-100)" };
@@ -283,7 +333,9 @@ function getStepTone(status: string): Tone {
   return { solid: "var(--brand-600)", soft: "var(--brand-100)" };
 }
 
-function getSummaryTone(kind: "visibility" | "ai" | "website" | "outcomes"): Tone {
+function getSummaryTone(
+  kind: "visibility" | "ai" | "website" | "outcomes",
+): Tone {
   if (kind === "visibility") {
     return { solid: "var(--brand-600)", soft: "var(--brand-100)" };
   }
@@ -327,7 +379,9 @@ function HeaderMeta({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -344,7 +398,9 @@ function SummaryStat({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-1 text-base font-semibold text-[var(--text-strong)]">{value}</p>
+      <p className="mt-1 text-base font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -378,7 +434,9 @@ function HealthMarkerItem({ marker }: { marker: OwnerHealthMarker }) {
     <div className="px-4 py-4 xl:px-5" style={{ backgroundColor: tone.soft }}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[var(--text-body)]">{marker.label}</p>
+          <p className="text-sm font-semibold text-[var(--text-body)]">
+            {marker.label}
+          </p>
           <div className="mt-2 flex items-end gap-2">
             <p
               className="text-4xl font-semibold leading-none tracking-tight"
@@ -386,7 +444,9 @@ function HealthMarkerItem({ marker }: { marker: OwnerHealthMarker }) {
             >
               {marker.score}
             </p>
-            <p className="pb-1 text-sm font-medium text-[var(--text-muted)]">/ 100</p>
+            <p className="pb-1 text-sm font-medium text-[var(--text-muted)]">
+              / 100
+            </p>
           </div>
         </div>
 
@@ -403,8 +463,12 @@ function HealthMarkerItem({ marker }: { marker: OwnerHealthMarker }) {
         />
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-[var(--text-body)]">{marker.explanation}</p>
-      <p className="mt-2 text-xs font-medium text-[var(--text-muted)]">{marker.nextActionHint}</p>
+      <p className="mt-4 text-sm leading-6 text-[var(--text-body)]">
+        {marker.explanation}
+      </p>
+      <p className="mt-2 text-xs font-medium text-[var(--text-muted)]">
+        {marker.nextActionHint}
+      </p>
     </div>
   );
 }
@@ -423,8 +487,14 @@ function DetailRow({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
-      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+          {helper}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -446,7 +516,9 @@ function TabButton({
       style={{
         backgroundColor: active ? "var(--text-strong)" : "transparent",
         color: active ? "#ffffff" : "var(--text-body)",
-        border: active ? "1px solid var(--text-strong)" : "1px solid var(--border)",
+        border: active
+          ? "1px solid var(--text-strong)"
+          : "1px solid var(--border)",
       }}
     >
       {label}
@@ -498,22 +570,45 @@ export default function OwnerDashboardPage({ params }: Props) {
         setLoading(true);
         setError("");
 
-        const [dashboardResponse, tasksResponse] = await Promise.all([
-          fetch(`/api/projects/${projectId}/owner-dashboard`, { cache: "no-store" }),
-          fetch(`/api/projects/${projectId}/owner-tasks`, { cache: "no-store" }),
-        ]);
+        const [dashboardResponse, tasksResponse, websiteResponse] =
+          await Promise.all([
+            fetch(`/api/projects/${projectId}/owner-dashboard`, {
+              cache: "no-store",
+            }),
+            fetch(`/api/projects/${projectId}/owner-tasks`, {
+              cache: "no-store",
+            }),
+            fetch(`/api/projects/${projectId}/owner-website-summary`, {
+              cache: "no-store",
+            }),
+          ]);
 
-        if (!dashboardResponse.ok || !tasksResponse.ok) {
+        if (
+          !dashboardResponse.ok ||
+          !tasksResponse.ok ||
+          !websiteResponse.ok
+        ) {
           throw new Error("Failed to load owner dashboard.");
         }
 
-        const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
+        const dashboardJson =
+          (await dashboardResponse.json()) as OwnerDashboardResponse;
         const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+        const websiteJson =
+          (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
 
-        setDashboard(dashboardJson);
+        setDashboard({
+          ...dashboardJson,
+          dashboard: {
+            ...dashboardJson.dashboard,
+            websiteSummary: websiteJson.summary,
+          },
+        });
         setTasksData(tasksJson);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load owner dashboard.");
+        setError(
+          err instanceof Error ? err.message : "Failed to load owner dashboard.",
+        );
       } finally {
         setLoading(false);
       }
@@ -540,19 +635,40 @@ export default function OwnerDashboardPage({ params }: Props) {
         throw new Error("Failed to update task.");
       }
 
-      const [dashboardResponse, tasksResponse] = await Promise.all([
-        fetch(`/api/projects/${projectId}/owner-dashboard`, { cache: "no-store" }),
-        fetch(`/api/projects/${projectId}/owner-tasks`, { cache: "no-store" }),
-      ]);
+      const [dashboardResponse, tasksResponse, websiteResponse] =
+        await Promise.all([
+          fetch(`/api/projects/${projectId}/owner-dashboard`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${projectId}/owner-tasks`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${projectId}/owner-website-summary`, {
+            cache: "no-store",
+          }),
+        ]);
 
-      if (!dashboardResponse.ok || !tasksResponse.ok) {
+      if (
+        !dashboardResponse.ok ||
+        !tasksResponse.ok ||
+        !websiteResponse.ok
+      ) {
         throw new Error("Failed to refresh owner dashboard.");
       }
 
-      const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
+      const dashboardJson =
+        (await dashboardResponse.json()) as OwnerDashboardResponse;
       const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+      const websiteJson =
+        (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
 
-      setDashboard(dashboardJson);
+      setDashboard({
+        ...dashboardJson,
+        dashboard: {
+          ...dashboardJson.dashboard,
+          websiteSummary: websiteJson.summary,
+        },
+      });
       setTasksData(tasksJson);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task.");
@@ -585,11 +701,16 @@ export default function OwnerDashboardPage({ params }: Props) {
           index: index + 1,
           title: task.title,
           reason: task.plain_language_reason ?? "No explanation available.",
-          who: task.who_should_do_it ? formatWho(task.who_should_do_it) : "Not set",
+          who: task.who_should_do_it
+            ? formatWho(task.who_should_do_it)
+            : "Not set",
           time: task.time_to_complete_estimate ?? "Not set",
-          difficulty: task.difficulty ? formatDifficulty(task.difficulty) : "Not set",
+          difficulty: task.difficulty
+            ? formatDifficulty(task.difficulty)
+            : "Not set",
           expectedBenefit: task.expected_benefit ?? "Expected benefit not set.",
-          proofOfCompletion: task.proof_of_completion ?? "Proof of completion not set.",
+          proofOfCompletion:
+            task.proof_of_completion ?? "Proof of completion not set.",
           confidenceLabel: formatConfidence(task.confidence_level),
           status: task.status,
           task,
@@ -616,7 +737,9 @@ export default function OwnerDashboardPage({ params }: Props) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-base text-[var(--text-body)]">Loading owner dashboard...</p>
+          <p className="text-base text-[var(--text-body)]">
+            Loading owner dashboard...
+          </p>
         </div>
       </main>
     );
@@ -665,12 +788,15 @@ export default function OwnerDashboardPage({ params }: Props) {
                 {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {primaryStep?.reason ?? dashboard.dashboard.progress.nextLikelyImprovement}
+                {primaryStep?.reason ??
+                  dashboard.dashboard.progress.nextLikelyImprovement}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <InlineTag>Who: {primaryStep?.who ?? "Owner"}</InlineTag>
                 <InlineTag>Time: {primaryStep?.time ?? "Not set"}</InlineTag>
-                <InlineTag>Difficulty: {primaryStep?.difficulty ?? "Not set"}</InlineTag>
+                <InlineTag>
+                  Difficulty: {primaryStep?.difficulty ?? "Not set"}
+                </InlineTag>
               </div>
             </div>
           </div>
@@ -686,16 +812,25 @@ export default function OwnerDashboardPage({ params }: Props) {
             />
             <HeaderMeta
               label="Location / Market"
-              value={dashboard.projectLocationLabel ?? dashboard.projectMetro ?? "Not set"}
+              value={
+                dashboard.projectLocationLabel ??
+                dashboard.projectMetro ??
+                "Not set"
+              }
             />
             <HeaderMeta label="Scope" value={dashboard.pageScopeLabel} />
-            <HeaderMeta label="Snapshot" value={formatDate(dashboard.capturedAt)} />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(dashboard.capturedAt)}
+            />
           </div>
 
           <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3">
             <SummaryStat
               label="Start here"
-              value={primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+              value={
+                primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText
+              }
             />
             <SummaryStat
               label="Open tasks"
@@ -724,8 +859,8 @@ export default function OwnerDashboardPage({ params }: Props) {
               Follow these in order
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              This is the guided action flow that should give the clearest next wins without making
-              the owner learn SEO or AI visibility jargon.
+              This is the guided action flow that should give the clearest next wins
+              without making the owner learn SEO or AI visibility jargon.
             </p>
 
             <div className="mt-6">
@@ -761,7 +896,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                         <h3 className="text-xl font-semibold tracking-tight text-[var(--text-strong)]">
                           {step.title}
                         </h3>
-                        <InlineTag tone={tone}>{formatStatus(step.status)}</InlineTag>
+                        <InlineTag tone={tone}>
+                          {formatStatus(step.status)}
+                        </InlineTag>
                       </div>
 
                       <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
@@ -849,7 +986,9 @@ export default function OwnerDashboardPage({ params }: Props) {
 
               <div className="mt-4">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--brand-700)]">Helping now</p>
+                  <p className="text-sm font-semibold text-[var(--brand-700)]">
+                    Helping now
+                  </p>
                   <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                     {dashboard.dashboard.guidance.helpingNow.map((item) => (
                       <li key={item} className="flex gap-3">
@@ -901,7 +1040,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                   <div
                     className="h-2 bg-[var(--success)]"
                     style={{
-                      width: formatPercent(dashboard.dashboard.summary.completedTaskRate),
+                      width: formatPercent(
+                        dashboard.dashboard.summary.completedTaskRate,
+                      ),
                     }}
                   />
                 </div>
@@ -932,8 +1073,8 @@ export default function OwnerDashboardPage({ params }: Props) {
               Drill deeper without losing the main story
             </h2>
             <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
-              These tabs let you inspect the supporting evidence behind the decision engine without
-              turning the page into a traditional SEO dashboard.
+              These tabs let you inspect the supporting evidence behind the decision
+              engine without turning the page into a traditional SEO dashboard.
             </p>
           </div>
 
@@ -976,25 +1117,33 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Current local rank footing
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This shows the ranking context an owner can understand: what keyword is active,
-                    what metro is being tracked, and whether the business is moving into a stronger
-                    position.
+                    This shows the ranking context an owner can understand: what
+                    keyword is active, what metro is being tracked, and whether the
+                    business is moving into a stronger position.
                   </p>
 
                   <div className="mt-6">
                     <DetailRow
                       label="Latest rank"
-                      value={dashboard.dashboard.visibilitySummary.latestRank?.toString() ?? "Not set"}
+                      value={
+                        dashboard.dashboard.visibilitySummary.latestRank?.toString() ??
+                        "Not set"
+                      }
                       helper="Most recent captured position."
                     />
                     <DetailRow
                       label="Best rank"
-                      value={dashboard.dashboard.visibilitySummary.bestRank?.toString() ?? "Not set"}
+                      value={
+                        dashboard.dashboard.visibilitySummary.bestRank?.toString() ??
+                        "Not set"
+                      }
                       helper="Best observed position in current data."
                     />
                     <DetailRow
                       label="Last captured"
-                      value={formatDate(dashboard.dashboard.visibilitySummary.latestCapturedAt)}
+                      value={formatDate(
+                        dashboard.dashboard.visibilitySummary.latestCapturedAt,
+                      )}
                       helper="Most recent time this visibility snapshot was refreshed."
                     />
                   </div>
@@ -1046,9 +1195,10 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Machine-readiness signals
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the owner-facing evidence layer for AI visibility. It focuses on whether
-                    the business identity, category clarity, and review signals give machines enough
-                    confidence to understand the business.
+                    This is the owner-facing evidence layer for AI visibility. It
+                    focuses on whether the business identity, category clarity, and
+                    review signals give machines enough confidence to understand the
+                    business.
                   </p>
 
                   <div className="mt-6">
@@ -1072,7 +1222,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                   />
                   <DetailRow
                     label="Primary category"
-                    value={dashboard.dashboard.aiSummary.primaryCategory ?? "Not set"}
+                    value={
+                      dashboard.dashboard.aiSummary.primaryCategory ?? "Not set"
+                    }
                   />
                   <DetailRow
                     label="Plain-English read"
@@ -1084,15 +1236,25 @@ export default function OwnerDashboardPage({ params }: Props) {
                     </p>
                     <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                       <DetailBullet
-                        text={`Business name present: ${dashboard.dashboard.aiSummary.hasBusinessName ? "yes" : "no"}.`}
+                        text={`Business name present: ${
+                          dashboard.dashboard.aiSummary.hasBusinessName ? "yes" : "no"
+                        }.`}
                         color={aiTone.solid}
                       />
                       <DetailBullet
-                        text={`Primary category present: ${dashboard.dashboard.aiSummary.hasPrimaryCategory ? "yes" : "no"}.`}
+                        text={`Primary category present: ${
+                          dashboard.dashboard.aiSummary.hasPrimaryCategory
+                            ? "yes"
+                            : "no"
+                        }.`}
                         color="var(--accent-blue-600)"
                       />
                       <DetailBullet
-                        text={`Review signals present: ${dashboard.dashboard.aiSummary.hasReviewSignals ? "yes" : "no"}.`}
+                        text={`Review signals present: ${
+                          dashboard.dashboard.aiSummary.hasReviewSignals
+                            ? "yes"
+                            : "no"
+                        }.`}
                         color="var(--success)"
                       />
                     </ul>
@@ -1108,28 +1270,31 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Website trust
                   </p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-                    Website identity footing
+                    Website identity trust
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This section keeps the explanation owner-friendly: does the system have a clear
-                    website, domain, and brand identity to work with?
+                    This is the owner-facing website trust read. It explains whether
+                    Digital Brain has a clear website, domain, and brand anchor to
+                    work from before deeper website intelligence is added.
                   </p>
 
                   <div className="mt-6">
                     <DetailRow
-                      label="Site URL"
-                      value={dashboard.dashboard.websiteSummary.hasSiteUrl ? "Yes" : "No"}
-                      helper="Whether a website URL is present."
+                      label="Trust score"
+                      value={`${dashboard.dashboard.websiteSummary.websiteReadinessScore} / 100`}
+                      helper="Owner-facing website identity footing based on saved project data."
                     />
                     <DetailRow
-                      label="Target domain"
-                      value={dashboard.dashboard.websiteSummary.hasTargetDomain ? "Yes" : "No"}
-                      helper="Whether a domain anchor exists."
+                      label="Plain-English read"
+                      value={dashboard.dashboard.websiteSummary.websiteReadinessLabel}
+                      helper={
+                        dashboard.dashboard.websiteSummary.plainLanguageSummary
+                      }
                     />
                     <DetailRow
-                      label="Brand name"
-                      value={dashboard.dashboard.websiteSummary.hasBrandName ? "Yes" : "No"}
-                      helper="Whether brand identity is explicitly set."
+                      label="Top issue"
+                      value={dashboard.dashboard.websiteSummary.topIssue}
+                      helper={dashboard.dashboard.websiteSummary.whyItMatters}
                     />
                   </div>
                 </div>
@@ -1144,26 +1309,76 @@ export default function OwnerDashboardPage({ params }: Props) {
                     value={dashboard.dashboard.websiteSummary.targetDomain ?? "Not set"}
                   />
                   <DetailRow
-                    label="Plain-English read"
-                    value={dashboard.dashboard.websiteSummary.websiteReadinessLabel}
+                    label="Derived site domain"
+                    value={
+                      dashboard.dashboard.websiteSummary.derivedSiteDomain ??
+                      "Not set"
+                    }
                   />
+                  <DetailRow
+                    label="Brand name"
+                    value={
+                      dashboard.dashboard.websiteSummary.targetBrandName ??
+                      "Not set"
+                    }
+                  />
+                  <DetailRow
+                    label="Domain alignment"
+                    value={getWebsiteAlignmentLabel(
+                      dashboard.dashboard.websiteSummary,
+                    )}
+                    helper={getWebsiteAlignmentHelper(
+                      dashboard.dashboard.websiteSummary,
+                    )}
+                  />
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      One next action
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {dashboard.dashboard.websiteSummary.nextAction.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      {dashboard.dashboard.websiteSummary.nextAction.reason}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <InlineTag>
+                        Who:{" "}
+                        {dashboard.dashboard.websiteSummary.nextAction
+                          .whoShouldDoIt}
+                      </InlineTag>
+                      <InlineTag>
+                        Difficulty:{" "}
+                        {dashboard.dashboard.websiteSummary.nextAction.difficulty}
+                      </InlineTag>
+                    </div>
+                  </div>
+
                   <div className="border-t border-[var(--border)] py-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                       What this tells you now
                     </p>
                     <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                      <DetailBullet
-                        text="A clear domain and brand anchor reduces identity confusion."
-                        color={websiteTone.solid}
-                      />
-                      <DetailBullet
-                        text="Missing website identity details can weaken trust signals."
-                        color="var(--warning)"
-                      />
-                      <DetailBullet
-                        text="This section supports both Google visibility and broader machine understanding."
-                        color="var(--brand-600)"
-                      />
+                      {dashboard.dashboard.websiteSummary.evidence.map(
+                        (item, index) => (
+                          <DetailBullet
+                            key={`${index}-${item}`}
+                            text={item}
+                            color={
+                              index === 0
+                                ? websiteTone.solid
+                                : index === 1
+                                  ? "var(--warning)"
+                                  : index === 2
+                                    ? "var(--brand-600)"
+                                    : index === 3
+                                      ? "var(--accent-blue-600)"
+                                      : "var(--success)"
+                            }
+                          />
+                        ),
+                      )}
                     </ul>
                   </div>
                 </div>
@@ -1173,20 +1388,24 @@ export default function OwnerDashboardPage({ params }: Props) {
             {detailTab === "outcomes" ? (
               <>
                 <div>
-                  <p className="text-sm font-semibold text-[var(--success)]">Outcomes</p>
+                  <p className="text-sm font-semibold text-[var(--success)]">
+                    Outcomes
+                  </p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
                     Business impact footing
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the early owner-facing business-outcomes layer. It shows whether
-                    customer-event and conversion context exists yet, without exposing internal
-                    scoring logic.
+                    This is the early owner-facing business-outcomes layer. It
+                    shows whether customer-event and conversion context exists yet,
+                    without exposing internal scoring logic.
                   </p>
 
                   <div className="mt-6">
                     <DetailRow
                       label="Monthly events"
-                      value={formatCount(dashboard.dashboard.outcomesSummary.monthlyCustomerEvents)}
+                      value={formatCount(
+                        dashboard.dashboard.outcomesSummary.monthlyCustomerEvents,
+                      )}
                       helper="How many tracked customer events are connected."
                     />
                     <DetailRow
@@ -1202,11 +1421,17 @@ export default function OwnerDashboardPage({ params }: Props) {
                 <div>
                   <DetailRow
                     label="Singular label"
-                    value={dashboard.dashboard.outcomesSummary.eventLabelSingular ?? "Not set"}
+                    value={
+                      dashboard.dashboard.outcomesSummary.eventLabelSingular ??
+                      "Not set"
+                    }
                   />
                   <DetailRow
                     label="Plural label"
-                    value={dashboard.dashboard.outcomesSummary.eventLabelPlural ?? "Not set"}
+                    value={
+                      dashboard.dashboard.outcomesSummary.eventLabelPlural ??
+                      "Not set"
+                    }
                   />
                   <DetailRow
                     label="Plain-English read"
@@ -1245,9 +1470,9 @@ export default function OwnerDashboardPage({ params }: Props) {
                     Why these actions are on the page
                   </h3>
                   <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the owner-readable evidence layer for the guided actions. It explains
-                    what is being asked, who should do it, how hard it is, and what success looks
-                    like.
+                    This is the owner-readable evidence layer for the guided actions.
+                    It explains what is being asked, who should do it, how hard it
+                    is, and what success looks like.
                   </p>
 
                   <div className="mt-6 space-y-6">
@@ -1255,12 +1480,17 @@ export default function OwnerDashboardPage({ params }: Props) {
                       const tone = getStepTone(step.status);
 
                       return (
-                        <div key={`detail-${step.key}`} className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0">
+                        <div
+                          key={`detail-${step.key}`}
+                          className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0"
+                        >
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-base font-semibold text-[var(--text-strong)]">
                               {step.title}
                             </p>
-                            <InlineTag tone={tone}>{formatStatus(step.status)}</InlineTag>
+                            <InlineTag tone={tone}>
+                              {formatStatus(step.status)}
+                            </InlineTag>
                           </div>
 
                           <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
