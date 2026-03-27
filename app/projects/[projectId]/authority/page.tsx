@@ -47,7 +47,14 @@ type ActionItem = {
   title: string;
   detail: string;
   priority: "high" | "medium" | "low" | string;
-  category: "reviews" | "photos" | "posts" | "categories" | "citations" | "general" | string;
+  category:
+    | "reviews"
+    | "photos"
+    | "posts"
+    | "categories"
+    | "citations"
+    | "general"
+    | string;
 };
 
 type ActionsSuccessResponse = {
@@ -166,30 +173,30 @@ function buildAuthorityRead(row: AuthorityHistoryRow | null) {
     return {
       headline: "Protect a strong authority position",
       reason:
-        "This project is already showing strong authority signals. The main goal is to keep momentum up and defend the current position.",
+        "This business already shows strong authority signals. The main goal now is to protect that position and keep momentum moving.",
     };
   }
 
   if (row.authority_score >= 60) {
     return {
-      headline: "Strengthen the next layer of authority signals",
+      headline: "Strengthen the next layer of authority",
       reason:
-        "This project has a workable authority base, but it still has room to improve against stronger local competitors.",
+        "This business has a workable authority base, but it still has room to improve against stronger local competitors.",
     };
   }
 
   if (row.authority_score >= 40) {
     return {
-      headline: "Improve core trust and competitive footing",
+      headline: "Improve trust and market footing",
       reason:
-        "Authority is present but still weak enough to hold the project back. The next wins should focus on trust, completeness, and market strength.",
+        "Authority is present but still weak enough to hold the business back. The next wins should focus on trust, completeness, and competitive strength.",
     };
   }
 
   return {
     headline: "Build a stronger authority foundation",
     reason:
-      "This project still needs more trust, completeness, and competitive strength before it can become reliably strong in the market.",
+      "This business still needs more trust, completeness, and competitive strength before it can look strong in the market.",
   };
 }
 
@@ -220,6 +227,16 @@ function buildAuthorityTrend(rows: AuthorityHistoryRow[]) {
   return "Authority is steady compared with the previous checkpoint.";
 }
 
+function pickPrimaryAction(actions: ActionItem[]) {
+  const rank = (priority: string) => {
+    if (priority === "high") return 0;
+    if (priority === "medium") return 1;
+    return 2;
+  };
+
+  return [...actions].sort((a, b) => rank(a.priority) - rank(b.priority))[0] ?? null;
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -240,7 +257,9 @@ function HeaderMeta({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -327,6 +346,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
   const latestRow = historyRows[0] ?? null;
   const authorityRead = useMemo(() => buildAuthorityRead(latestRow), [latestRow]);
   const authorityTrend = useMemo(() => buildAuthorityTrend(historyRows), [historyRows]);
+  const primaryAction = useMemo(() => pickPrimaryAction(actions), [actions]);
 
   const groupedActions = useMemo(() => {
     return {
@@ -448,32 +468,48 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See how strong this business looks in the local market.
+                See how strong this business looks to Google right now.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page brings authority score, market footing, and recommended next actions into
-                the locked visual system without changing the underlying authority engine.
+                Authority shows how much trust, completeness, and competitive strength this business
+                has in the local market. Use this page to see where the business stands and what to
+                improve next.
               </p>
-            </div>
 
-            <div className="xl:pl-8">
-              <SectionLabel>Current authority read</SectionLabel>
-              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {authorityRead.headline}
-              </p>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {authorityRead.reason}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-5 flex flex-wrap gap-2">
                 <InlineTag tone="var(--brand-600)" bg="var(--brand-100)" border="var(--brand-600)">
-                  {formatTier(latestRow?.authority_tier ?? null)}
+                  Tier: {formatTier(latestRow?.authority_tier ?? null)}
                 </InlineTag>
                 <InlineTag>
                   Momentum: {formatMomentumLabel(latestRow?.momentum_label ?? null)}
                 </InlineTag>
-                <InlineTag>
-                  Score: {formatScore(latestRow?.authority_score ?? null)}
-                </InlineTag>
+                <InlineTag>Score: {formatScore(latestRow?.authority_score ?? null)}</InlineTag>
+              </div>
+            </div>
+
+            <div className="xl:pl-8">
+              <SectionLabel>What to do now</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {primaryAction?.title ?? authorityRead.headline}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {primaryAction?.detail ?? authorityRead.reason}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {primaryAction ? (
+                  <>
+                    <InlineTag
+                      tone={getPriorityTone(primaryAction.priority).tone}
+                      bg={getPriorityTone(primaryAction.priority).bg}
+                      border={getPriorityTone(primaryAction.priority).border}
+                    >
+                      {formatPriority(primaryAction.priority)}
+                    </InlineTag>
+                    <InlineTag>{categoryLabel(primaryAction.category)}</InlineTag>
+                  </>
+                ) : (
+                  <InlineTag>Waiting for the first authority action set</InlineTag>
+                )}
               </div>
             </div>
           </div>
@@ -495,10 +531,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 "Not set"
               }
             />
-            <HeaderMeta
-              label="Scope"
-              value={dashboardContext?.pageScopeLabel ?? "Not set"}
-            />
+            <HeaderMeta label="Scope" value={dashboardContext?.pageScopeLabel ?? "Not set"} />
             <HeaderMeta
               label="Snapshot"
               value={formatDate(latestRow?.captured_at ?? dashboardContext?.capturedAt ?? null)}
@@ -517,25 +550,25 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
-              label="Authority score"
+              label="Authority"
               value={formatScore(latestRow?.authority_score ?? null)}
               bg="var(--brand-100)"
               tone="var(--brand-700)"
             />
             <MetricStripItem
-              label="Competitive strength"
+              label="Market strength"
               value={formatScore(latestRow?.competitive_strength ?? null)}
               bg="var(--accent-blue-100)"
               tone="var(--accent-blue-600)"
             />
             <MetricStripItem
-              label="Structural optimization"
+              label="Profile strength"
               value={formatScore(latestRow?.structural_optimization ?? null)}
               bg="var(--accent-mint-100)"
               tone="var(--accent-mint-600)"
             />
             <MetricStripItem
-              label="Momentum score"
+              label="Momentum"
               value={formatScore(latestRow?.momentum_score ?? null)}
               bg="var(--success-soft)"
               tone="var(--success)"
@@ -550,8 +583,8 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
               Start with the strongest next moves
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              This is the design-treatment pass, so the goal is clarity and structure first. The
-              deeper wording pass can happen later without redesigning the page again.
+              Begin with the high-priority work first. These are the actions most likely to improve
+              how strong and trustworthy this business looks in its market.
             </p>
 
             <div className="mt-6">
@@ -559,19 +592,19 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 {
                   key: "high",
                   label: "High priority",
-                  helper: "Immediate actions with the strongest strategic weight.",
+                  helper: "Do these first because they carry the most weight right now.",
                   items: groupedActions.high,
                 },
                 {
                   key: "medium",
                   label: "Medium priority",
-                  helper: "Important follow-through actions that strengthen authority.",
+                  helper: "Do these after the highest-impact gaps are covered.",
                   items: groupedActions.medium,
                 },
                 {
                   key: "low",
                   label: "Lower priority",
-                  helper: "Useful follow-up work after the larger gaps are addressed.",
+                  helper: "These still help, but they matter less than the top items above.",
                   items: groupedActions.low,
                 },
               ]
@@ -716,11 +749,11 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>What this means</SectionLabel>
+              <SectionLabel>Plain-English read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
-                  label="Authority read"
+                  label="Current read"
                   value={authorityRead.headline}
                   helper="This is the plain-language read for the latest authority snapshot."
                 />
@@ -730,9 +763,9 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                   helper="This compares the latest authority checkpoint to the one before it."
                 />
                 <DetailRow
-                  label="Action snapshot"
+                  label="Action version"
                   value={actionsVersion ?? "Not set"}
-                  helper="This is the current stored action engine version tied to the authority page."
+                  helper="This is the stored action-engine version behind the current recommendations."
                 />
                 <DetailRow
                   label="Actions captured"
@@ -762,10 +795,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                     label="Momentum"
                     value={formatMomentumLabel(latestRow?.momentum_label ?? null)}
                   />
-                  <HeaderMeta
-                    label="Stored actions"
-                    value={String(actions.length)}
-                  />
+                  <HeaderMeta label="Stored actions" value={String(actions.length)} />
                 </div>
               </div>
             </section>
