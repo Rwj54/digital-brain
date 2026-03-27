@@ -11,6 +11,20 @@ type ClientRow = {
   created_at: string;
 };
 
+function formatCreatedAt(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date unknown";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function ClientsPage() {
   const router = useRouter();
 
@@ -109,10 +123,10 @@ export default function ClientsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-[28px] border border-[var(--border)] bg-white px-6 py-6 shadow-sm">
+        <div className="mx-auto max-w-6xl">
+          <section className="border-t border-[var(--border)] py-6">
             <p className="text-base text-[var(--text-body)]">Loading clients...</p>
-          </div>
+          </section>
         </div>
       </main>
     );
@@ -120,83 +134,70 @@ export default function ClientsPage() {
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
-        <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-7 sm:py-6">
-          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <section className="border-b border-[var(--border)] pb-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_260px] lg:items-start lg:gap-8">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
                 Client intake
               </p>
+
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
-                Create the client first, then start URL-first onboarding.
+                Create the client first, then move into project intake.
               </h1>
+
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                This keeps setup simple. Once the client exists, the next screen
-                becomes the project intake surface where Digital Brain starts
-                turning a website into an automation-ready local search project.
+                Keep this step simple. Once the client exists, the next screen becomes
+                the working place for project setup, URL-first onboarding, and the move
+                into an active Digital Brain project.
               </p>
             </div>
 
-            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--primary-soft)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)]">
-                What happens next
-              </p>
-
-              <div className="mt-4 grid gap-3">
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    1) Open client workspace
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    Each client gets a dedicated workspace for project intake and
-                    dashboards.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    2) Start URL-first project onboarding
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    Enter the website first. Digital Brain will infer what it
-                    can immediately and store automation-facing identity fields.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    3) Land in the project dashboard
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    The user moves directly into a working project instead of a
-                    dead-end setup flow.
-                  </p>
-                </div>
+            <div className="border-l border-[var(--border)] pl-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Flow
               </div>
+
+              <ol className="mt-3 grid gap-3 text-sm text-[var(--text-body)]">
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">1.</span>{" "}
+                  Create the client record.
+                </li>
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">2.</span>{" "}
+                  Open the client workspace.
+                </li>
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">3.</span>{" "}
+                  Start URL-first project onboarding.
+                </li>
+              </ol>
             </div>
           </div>
         </section>
 
         {status ? (
-          <section className="rounded-[24px] border border-[var(--danger)] bg-[var(--danger-soft)] px-5 py-4 shadow-sm">
+          <section className="border-l-4 border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3">
             <p className="text-sm font-medium text-[var(--danger)]">{status}</p>
           </section>
         ) : null}
 
-        <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+        <section className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          <section className="border-t border-[var(--border)] pt-6">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               Create client
             </p>
+
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-              Keep this step lightweight.
+              Keep this first step lightweight.
             </h2>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-              The client page will handle project intake, onboarding kickoff,
-              and the move into dashboard review.
+
+            <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--text-body)]">
+              This page only creates the client. The next screen handles project intake,
+              onboarding kickoff, and the move into the working project surface.
             </p>
 
-            <form onSubmit={createClient} className="mt-5 grid gap-4">
+            <form onSubmit={createClient} className="mt-6 grid gap-5">
               <div className="grid gap-2">
                 <label className="text-sm font-semibold text-[var(--text-strong)]">
                   Client name
@@ -205,7 +206,7 @@ export default function ClientsPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="JF Evans Lawn & Landscape"
-                  className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                  className="border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                   required
                 />
               </div>
@@ -218,60 +219,79 @@ export default function ClientsPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Optional notes about this client, market, or engagement."
-                  className="min-h-[120px] rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                  className="min-h-[120px] border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                 />
               </div>
 
-              <button
-                disabled={submitting}
-                className="inline-flex w-fit items-center justify-center rounded-2xl bg-[var(--brand-600)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Creating client..." : "Create client"}
-              </button>
+              <div className="pt-1">
+                <button
+                  disabled={submitting}
+                  className="inline-flex items-center justify-center border border-[var(--brand-600)] bg-[var(--brand-600)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitting ? "Creating client..." : "Create client"}
+                </button>
+              </div>
             </form>
           </section>
 
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
-            <div className="flex items-center justify-between gap-4">
+          <section className="border-t border-[var(--border)] pt-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Existing clients
                 </p>
+
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
                   Open a client workspace
                 </h2>
               </div>
 
-              <div className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)]">
-                {clients.length} client{clients.length === 1 ? "" : "s"}
+              <div className="text-sm text-[var(--text-body)]">
+                <span className="font-semibold text-[var(--text-strong)]">
+                  {clients.length}
+                </span>{" "}
+                client{clients.length === 1 ? "" : "s"}
               </div>
             </div>
 
             {clients.length === 0 ? (
-              <div className="mt-5 rounded-[24px] border border-dashed border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5 text-sm text-[var(--text-body)]">
-                No clients yet. Create one above to begin.
+              <div className="mt-6 border-t border-[var(--border)] pt-4">
+                <p className="text-sm leading-7 text-[var(--text-body)]">
+                  No clients yet. Create one on the left to begin.
+                </p>
               </div>
             ) : (
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="mt-6 border-t border-[var(--border)]">
                 {clients.map((client) => (
                   <article
                     key={client.id}
-                    className="rounded-[24px] border border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5"
+                    className="grid gap-4 border-t border-[var(--border)] py-5 first:border-t-0 first:pt-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-6"
                   >
-                    <h3 className="text-lg font-semibold text-[var(--text-strong)]">
-                      {client.name}
-                    </h3>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h3 className="text-lg font-semibold text-[var(--text-strong)]">
+                          {client.name}
+                        </h3>
+                        <span className="text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                          Added {formatCreatedAt(client.created_at)}
+                        </span>
+                      </div>
 
-                    <p className="mt-3 min-h-[72px] text-sm leading-7 text-[var(--text-body)]">
-                      {client.notes?.trim() ? client.notes : "No notes yet."}
-                    </p>
+                      <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                        {client.notes?.trim()
+                          ? client.notes
+                          : "No notes yet. Open the client workspace to start project intake."}
+                      </p>
+                    </div>
 
-                    <button
-                      onClick={() => router.push(`/clients/${client.id}`)}
-                      className="mt-4 inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[var(--brand-50)]"
-                    >
-                      Open client
-                    </button>
+                    <div className="md:pt-1">
+                      <button
+                        onClick={() => router.push(`/clients/${client.id}`)}
+                        className="inline-flex items-center justify-center border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:border-[var(--brand-600)] hover:text-[var(--brand-700)]"
+                      >
+                        Open client
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
