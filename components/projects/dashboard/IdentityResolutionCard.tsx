@@ -22,11 +22,8 @@ function IdentityRow({
   value: string;
 }) {
   return (
-    <div
-      className="grid gap-3 py-4 first:pt-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-6"
-      style={{ borderTop: "1px solid rgba(15, 104, 128, 0.14)" }}
-    >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+    <div className="grid gap-2 border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-6">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
         {label}
       </div>
       <div className="break-all text-sm font-semibold leading-7 text-[var(--text-strong)]">
@@ -49,31 +46,18 @@ export function IdentityResolutionCard({
       title="Business identity"
       subtitle="Core project identity used by onboarding and downstream automation."
     >
-      <div
-        className="border"
-        style={{ borderColor: "var(--brand-700)" }}
-      >
-        <div
-          className="border-b px-5 py-4 sm:px-6"
-          style={{
-            borderColor: "rgba(255,255,255,0.18)",
-            background:
-              "linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 62%, #1798bb 100%)",
-          }}
-        >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/84">
+      <div className="grid gap-6">
+        <section className="border border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5 sm:px-6">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
             Identity anchor
           </div>
-          <div className="mt-2 max-w-3xl text-sm leading-7 text-white/92">
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
             This is the source-of-truth business identity Digital Brain should use
             for matching, onboarding, profile resolution, and downstream action logic.
-          </div>
-        </div>
+          </p>
+        </section>
 
-        <div
-          className="px-5 py-5 sm:px-6"
-          style={{ backgroundColor: "rgba(235, 248, 250, 0.96)" }}
-        >
+        <section className="border border-[var(--border)] bg-white px-5 py-5 sm:px-6">
           <div className="grid gap-0">
             <IdentityRow label="Website URL" value={displayValue(siteUrl)} />
             <IdentityRow label="Target domain" value={displayValue(targetDomain)} />
@@ -92,18 +76,32 @@ export function IdentityResolutionCard({
               }
             />
           </div>
+        </section>
 
-          <div
-            className="mt-5 border-l-2 pl-4 text-xs leading-6 text-[var(--text-body)]"
-            style={{ borderColor: "var(--brand-600)" }}
-          >
-            Matching priority is moving toward{" "}
-            <span className="font-bold text-[var(--text-strong)]">target_place_id</span> →{" "}
-            <span className="font-bold text-[var(--text-strong)]">target_domain</span> →{" "}
-            <span className="font-bold text-[var(--text-strong)]">target_business_name</span> →{" "}
-            <span className="font-bold text-[var(--text-strong)]">target_brand_name</span>.
+        <section className="border-l-2 border-[var(--brand-600)] pl-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+            Matching priority
           </div>
-        </div>
+          <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+            Matching priority is moving toward{" "}
+            <span className="font-semibold text-[var(--text-strong)]">
+              target_place_id
+            </span>{" "}
+            →{" "}
+            <span className="font-semibold text-[var(--text-strong)]">
+              target_domain
+            </span>{" "}
+            →{" "}
+            <span className="font-semibold text-[var(--text-strong)]">
+              target_business_name
+            </span>{" "}
+            →{" "}
+            <span className="font-semibold text-[var(--text-strong)]">
+              target_brand_name
+            </span>
+            .
+          </p>
+        </section>
       </div>
     </Card>
   );
