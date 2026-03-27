@@ -12,6 +12,17 @@ type Project = {
   target_radius_miles: number | null;
 };
 
+type OwnerDashboardContext = {
+  ok: boolean;
+  error?: string;
+  projectId: string;
+  projectDisplayName: string | null;
+  domainDisplayValue: string | null;
+  projectLocationLabel: string | null;
+  pageScopeLabel: string;
+  capturedAt: string;
+};
+
 type CompetitorMetric = {
   project_id: string;
   competitor_domain: string;
@@ -174,6 +185,62 @@ function getDisplayName(c: CompetitorMetric) {
   return c.name?.trim() || c.competitor_name?.trim() || "—";
 }
 
+function buildCompetitorRead(
+  thresholdCompetitor: CompetitorMetric | null,
+  velocity: VelocityResult,
+  competitorsCount: number
+) {
+  if (!thresholdCompetitor || competitorsCount === 0) {
+    return {
+      headline: "Capture your first competitor benchmark",
+      reason:
+        "Run discovery to see which local businesses are currently setting the pace in this market.",
+      nextMoves: [
+        "Run competitor discovery for this project.",
+        "Review the top local businesses that appear most often.",
+        "Use the benchmark group to decide how much trust and activity you need to compete.",
+      ],
+    };
+  }
+
+  if (velocity.marketGrowth90d >= 120) {
+    return {
+      headline: "This market is moving fast",
+      reason:
+        "The benchmark competitor is gaining reviews quickly, so this market likely needs faster trust-building and stronger ongoing activity.",
+      nextMoves: [
+        "Treat review growth as a near-term priority.",
+        "Compare your business against the benchmark group, not just one competitor.",
+        "Re-check discovery often enough to catch fast market changes.",
+      ],
+    };
+  }
+
+  if (velocity.marketGrowth90d >= 60) {
+    return {
+      headline: "The benchmark group is still pulling ahead",
+      reason:
+        "Competitors are showing meaningful review growth, which means the market still expects steady trust and activity signals.",
+      nextMoves: [
+        "Use the benchmark group to set realistic review and authority goals.",
+        "Track which competitors keep appearing near the top.",
+        "Pair this page with authority and rank to see where the biggest gap is.",
+      ],
+    };
+  }
+
+  return {
+    headline: "The benchmark group looks beatable",
+    reason:
+      "The market is not moving at an extreme pace right now, which means steady trust-building and visibility improvements can still change your position.",
+    nextMoves: [
+      "Use the benchmark group to define the current local standard.",
+      "Focus on the competitors that appear most often and most recently.",
+      "Watch for changes in review growth before the market speeds up again.",
+    ],
+  };
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -277,6 +344,7 @@ export default function CompetitorsPage() {
 
   const [authed, setAuthed] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
+  const [dashboardContext, setDashboardContext] = useState<OwnerDashboardContext | null>(null);
   const [competitors, setCompetitors] = useState<CompetitorMetric[]>([]);
   const [snapshotsForThreshold, setSnapshotsForThreshold] = useState<CompetitorSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -308,6 +376,10 @@ export default function CompetitorsPage() {
     return computeVelocityAutoUpgrade(thresholdCompetitor, snapshotsForThreshold);
   }, [thresholdCompetitor, snapshotsForThreshold]);
 
+  const competitorRead = useMemo(() => {
+    return buildCompetitorRead(thresholdCompetitor, velocity, competitors.length);
+  }, [thresholdCompetitor, velocity, competitors.length]);
+
   async function requireAuth() {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
@@ -327,6 +399,20 @@ export default function CompetitorsPage() {
     if (error) throw new Error(`Project load failed: ${error.message}`);
     const row = (data ?? [])[0] as Project | undefined;
     return row ?? null;
+  }
+
+  async function loadDashboardContext() {
+    const res = await fetch(`/api/projects/${projectId}/owner-dashboard`, {
+      cache: "no-store",
+    });
+
+    const json = (await res.json()) as OwnerDashboardContext;
+
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error ?? "Failed to load owner dashboard context.");
+    }
+
+    return json;
   }
 
   async function loadCompetitors() {
@@ -368,12 +454,16 @@ export default function CompetitorsPage() {
     setStatus(null);
 
     try {
-      const proj = await loadProject();
+      const [proj, ownerContext] = await Promise.all([
+        loadProject(),
+        loadDashboardContext(),
+      ]);
 
       if (!proj) {
         setProject(null);
         setCompetitors([]);
         setSnapshotsForThreshold([]);
+        setDashboardContext(ownerContext);
         setStatus(
           "I can’t access this project. This usually means you are logged out or Row Level Security is blocking the current user."
         );
@@ -381,6 +471,7 @@ export default function CompetitorsPage() {
       }
 
       setProject(proj);
+      setDashboardContext(ownerContext);
 
       const comps = await loadCompetitors();
       setCompetitors(comps);
@@ -436,6 +527,13 @@ export default function CompetitorsPage() {
     }
   }
 
+  const businessValue = dashboardContext?.projectDisplayName ?? "Not set";
+  const domainValue = dashboardContext?.domainDisplayValue ?? "Not set";
+  const locationValue =
+    dashboardContext?.projectLocationLabel ?? project?.target_metro ?? "Not set";
+  const scopeValue = dashboardContext?.pageScopeLabel ?? "Project view";
+  const snapshotValue = formatDate(benchmarkUpdatedAt ?? dashboardContext?.capturedAt ?? null);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
@@ -455,60 +553,40 @@ export default function CompetitorsPage() {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See who is setting the current market benchmark.
+                See who is setting the pace in your market.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page keeps competitor intelligence readable during the design-treatment pass.
-                It shows the benchmark group, review-growth pace, and the discovered competitor set
-                without pulling the page back into the older dashboard style.
+                This page shows which local businesses appear strongest right now, which competitor
+                is setting the current benchmark, and how fast the market seems to be moving.
               </p>
             </div>
 
             <div className="xl:pl-8">
-              <SectionLabel>Current competitor read</SectionLabel>
+              <SectionLabel>What to do now</SectionLabel>
               <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {thresholdCompetitor
-                  ? `${shortName(getDisplayName(thresholdCompetitor))} is the current benchmark competitor.`
-                  : "No benchmark competitor is available yet."}
+                {competitorRead.headline}
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {thresholdCompetitor
-                  ? "The benchmark competitor is the current review reference point used to estimate the market growth pace."
-                  : "Run competitor discovery to capture the local benchmark group for this project."}
+                {competitorRead.reason}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <InlineTag tone="var(--brand-600)" bg="var(--brand-100)" border="var(--brand-600)">
                   {project?.primary_category ?? "Category not set"}
                 </InlineTag>
-                <InlineTag>{project?.target_metro ?? "Metro not set"}</InlineTag>
+                <InlineTag>{locationValue}</InlineTag>
                 <InlineTag>
-                  Radius: {project?.target_radius_miles ?? "—"} mi
+                  Radius: {project?.target_radius_miles != null ? `${project.target_radius_miles} mi` : "—"}
                 </InlineTag>
               </div>
             </div>
           </div>
 
           <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
-            <HeaderMeta
-              label="Category"
-              value={project?.primary_category ?? "Not set"}
-            />
-            <HeaderMeta
-              label="Market"
-              value={project?.target_metro ?? "Not set"}
-            />
-            <HeaderMeta
-              label="Radius"
-              value={project?.target_radius_miles != null ? `${project.target_radius_miles} miles` : "Not set"}
-            />
-            <HeaderMeta
-              label="Benchmark updated"
-              value={benchmarkUpdatedAt ? formatDate(benchmarkUpdatedAt) : "Not set"}
-            />
-            <HeaderMeta
-              label="Auth status"
-              value={authed ? "Authenticated" : "Not authenticated"}
-            />
+            <HeaderMeta label="Business" value={businessValue} />
+            <HeaderMeta label="Domain" value={domainValue} />
+            <HeaderMeta label="Location / Market" value={locationValue} />
+            <HeaderMeta label="Scope" value={scopeValue} />
+            <HeaderMeta label="Snapshot" value={snapshotValue} />
           </div>
         </section>
 
@@ -552,68 +630,109 @@ export default function CompetitorsPage() {
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
           <section>
-            <SectionLabel>Benchmark competitors</SectionLabel>
+            <SectionLabel>What to do next</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
               Start with the current benchmark group
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              These competitors define the current review benchmark for this market. This is the
-              design-treatment pass, so the goal here is clean scanning and working structure first.
+              These competitors define the current local standard. Use them to judge how much trust,
+              activity, and visibility work your business still needs.
             </p>
 
             <div className="mt-6">
+              {competitorRead.nextMoves.map((item, index) => (
+                <article
+                  key={item}
+                  className={`grid gap-4 py-6 md:grid-cols-[56px_1fr] md:items-start ${
+                    index === competitorRead.nextMoves.length - 1
+                      ? ""
+                      : "border-b border-[var(--border)]"
+                  }`}
+                >
+                  <div className="flex items-center md:justify-center">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
+                      style={{
+                        backgroundColor:
+                          index === 0 ? "var(--brand-700)" : "var(--reference-soft)",
+                        color: index === 0 ? "#ffffff" : "var(--text-strong)",
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                  </div>
+
+                  <div className="max-w-3xl">
+                    <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                      {item}
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                      {index === 0
+                        ? "This is the first move most likely to help you understand the current market standard."
+                        : "This supports the main market-benchmark read and helps turn competitor data into action."}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Benchmark competitors</SectionLabel>
+
               {top3.length === 0 ? (
-                <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
+                <div className="mt-4 text-sm text-[var(--text-body)]">
                   No competitors found yet. Run discovery to capture the local market set.
                 </div>
               ) : (
-                top3.map((c, idx) => (
-                  <article
-                    key={c.competitor_domain}
-                    className={`grid gap-4 py-6 md:grid-cols-[56px_1fr_auto] md:items-start ${
-                      idx === top3.length - 1 ? "" : "border-b border-[var(--border)]"
-                    }`}
-                  >
-                    <div className="flex items-center md:justify-center">
-                      <div
-                        className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
-                        style={{
-                          backgroundColor:
-                            idx === 0 ? "var(--brand-700)" : "var(--reference-soft)",
-                          color: idx === 0 ? "#ffffff" : "var(--text-strong)",
-                        }}
-                      >
-                        {idx + 1}
+                <div className="mt-4">
+                  {top3.map((c, idx) => (
+                    <article
+                      key={c.competitor_domain}
+                      className={`grid gap-4 py-6 md:grid-cols-[56px_1fr_auto] md:items-start ${
+                        idx === top3.length - 1 ? "" : "border-b border-[var(--border)]"
+                      }`}
+                    >
+                      <div className="flex items-center md:justify-center">
+                        <div
+                          className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
+                          style={{
+                            backgroundColor:
+                              idx === 0 ? "var(--brand-700)" : "var(--reference-soft)",
+                            color: idx === 0 ? "#ffffff" : "var(--text-strong)",
+                          }}
+                        >
+                          {idx + 1}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="max-w-3xl">
-                      <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
-                        {shortName(getDisplayName(c))}
-                      </p>
-                      <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                        {c.place_id ?? c.competitor_domain}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <InlineTag>Reviews: {c.total_reviews ?? 0}</InlineTag>
-                        <InlineTag>Rating: {c.rating ?? "—"}</InlineTag>
-                        {top3.length === 3 && idx === 1 ? (
-                          <InlineTag
-                            tone="var(--accent-blue-600)"
-                            bg="var(--accent-blue-100)"
-                            border="var(--accent-blue-600)"
-                          >
-                            Median benchmark
-                          </InlineTag>
-                        ) : null}
+                      <div className="max-w-3xl">
+                        <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                          {shortName(getDisplayName(c))}
+                        </p>
+                        <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                          {c.place_id ?? c.competitor_domain}
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <InlineTag>Reviews: {c.total_reviews ?? 0}</InlineTag>
+                          <InlineTag>Rating: {c.rating ?? "—"}</InlineTag>
+                          {top3.length === 3 && idx === 1 ? (
+                            <InlineTag
+                              tone="var(--accent-blue-600)"
+                              bg="var(--accent-blue-100)"
+                              border="var(--accent-blue-600)"
+                            >
+                              Median benchmark
+                            </InlineTag>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="text-sm text-[var(--text-body)] md:text-right">
-                      Last seen: {formatWhen(c.last_seen_at)}
-                    </div>
-                  </article>
-                ))
+                      <div className="text-sm text-[var(--text-body)] md:text-right">
+                        Last seen: {formatWhen(c.last_seen_at)}
+                      </div>
+                    </article>
+                  ))}
+                </div>
               )}
             </div>
 
