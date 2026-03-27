@@ -201,7 +201,10 @@ function buildActionPlan(summary: RankSummaryResponse["summary"]) {
   };
 }
 
-function buildTrendLine(series: RankSeriesPoint[], summary: RankSummaryResponse["summary"]): string {
+function buildTrendLine(
+  series: RankSeriesPoint[],
+  summary: RankSummaryResponse["summary"]
+): string {
   if (!summary) {
     return "No trend data available yet.";
   }
@@ -236,7 +239,9 @@ function HeaderMeta({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -523,6 +528,7 @@ export default function RankPage({ params }: PageProps) {
     () => buildVisibilityLabel(summary?.latestRank ?? null),
     [summary?.latestRank]
   );
+  const snapshotValue = formatDate(summary?.latestCapturedAt ?? dashboardContext?.capturedAt ?? null);
 
   if (loading) {
     return (
@@ -543,16 +549,16 @@ export default function RankPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See where you are showing up in Google.
+                See where this business is showing up in Google.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page translates ranking data into a plain-language visibility read, a next
-                move, and a simple recent checkpoint history for the selected keyword.
+                This page turns ranking data into a plain-language visibility read, a clear next
+                goal, and a simple checkpoint history for the selected keyword.
               </p>
             </div>
 
             <div className="xl:pl-8">
-              <SectionLabel>Current visibility read</SectionLabel>
+              <SectionLabel>What to do now</SectionLabel>
               <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
                 {actionPlan.headline}
               </p>
@@ -563,12 +569,8 @@ export default function RankPage({ params }: PageProps) {
                 <InlineTag tone="var(--brand-600)" bg="var(--brand-100)">
                   {visibilityLabel}
                 </InlineTag>
-                <InlineTag>
-                  Keyword: {selectedKeyword?.keyword ?? "Not set"}
-                </InlineTag>
-                <InlineTag>
-                  Metro: {selectedKeyword?.metro ?? "Not set"}
-                </InlineTag>
+                <InlineTag>Keyword: {selectedKeyword?.keyword ?? "Not set"}</InlineTag>
+                <InlineTag>Metro: {selectedKeyword?.metro ?? "Not set"}</InlineTag>
               </div>
             </div>
           </div>
@@ -594,10 +596,7 @@ export default function RankPage({ params }: PageProps) {
               label="Scope"
               value={dashboardContext?.pageScopeLabel ?? "Not set"}
             />
-            <HeaderMeta
-              label="Snapshot"
-              value={formatDate(dashboardContext?.capturedAt ?? null)}
-            />
+            <HeaderMeta label="Snapshot" value={snapshotValue} />
           </div>
         </section>
 
@@ -651,7 +650,7 @@ export default function RankPage({ params }: PageProps) {
               The clearest next visibility move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              This keeps the decision simple. It tells you the next practical goal for this keyword,
+              This keeps the decision simple. It shows the next practical goal for this keyword
               based on where the business is currently showing up.
             </p>
 
