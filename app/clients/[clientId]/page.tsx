@@ -155,7 +155,21 @@ function formatDomain(input: string): string {
   return domain ?? "—";
 }
 
-function MetricPill({
+function formatCreatedAt(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date unknown";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function PreviewRow({
   label,
   value,
 }: {
@@ -163,11 +177,13 @@ function MetricPill({
   value: string;
 }) {
   return (
-    <div className="rounded-[20px] border border-[var(--border)] bg-white px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+    <div className="border-t border-[var(--border)] py-3 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
-      </p>
-      <p className="mt-1 text-sm font-semibold text-[var(--text-strong)]">{value}</p>
+      </div>
+      <div className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+        {value}
+      </div>
     </div>
   );
 }
@@ -188,10 +204,7 @@ export default function ClientProjectsPage() {
   const [metro, setMetro] = useState("");
   const [radiusMiles, setRadiusMiles] = useState("25");
 
-  const normalizedPreviewDomain = useMemo(
-    () => formatDomain(siteUrl),
-    [siteUrl]
-  );
+  const normalizedPreviewDomain = useMemo(() => formatDomain(siteUrl), [siteUrl]);
 
   const inferredPreviewBrandName = useMemo(() => {
     const domain = extractDomainFromUrl(siteUrl);
@@ -370,10 +383,12 @@ export default function ClientProjectsPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-[28px] border border-[var(--border)] bg-white px-6 py-6 shadow-sm">
-            <p className="text-base text-[var(--text-body)]">Loading client workspace...</p>
-          </div>
+        <div className="mx-auto max-w-6xl">
+          <section className="border-t border-[var(--border)] py-6">
+            <p className="text-base text-[var(--text-body)]">
+              Loading client workspace...
+            </p>
+          </section>
         </div>
       </main>
     );
@@ -381,7 +396,7 @@ export default function ClientProjectsPage() {
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] text-[var(--text-strong)]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => router.push("/clients")}
@@ -391,20 +406,24 @@ export default function ClientProjectsPage() {
           </button>
         </div>
 
-        <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-7 sm:py-6">
-          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
+        <section className="border-b border-[var(--border)] pb-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_240px] lg:items-start lg:gap-8">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
                 Client workspace
               </p>
+
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[2.15rem] sm:leading-tight">
-                {client?.name ?? "Client"} — start a new project from the website first.
+                {client?.name ?? "Client"} — start a new project from the website
+                first.
               </h1>
+
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                This intake is now URL-first. Digital Brain will infer the
-                domain and brand immediately, persist identity fields, create the
-                project shell, and start onboarding automatically.
+                This intake is URL-first. Digital Brain will infer the domain and
+                brand immediately, save identity fields, create the project shell,
+                and start onboarding automatically.
               </p>
+
               {client?.notes ? (
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
                   {client.notes}
@@ -412,65 +431,52 @@ export default function ClientProjectsPage() {
               ) : null}
             </div>
 
-            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--primary-soft)] px-5 py-5 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--brand-700)]">
-                What Digital Brain does next
-              </p>
-
-              <div className="mt-4 grid gap-3">
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    1) Create the project shell
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    Store the website plus automation-facing identity fields.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    2) Start onboarding automatically
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    Seed the first keyword and run the current onboarding chain.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-white/80 px-4 py-3">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    3) Land in the project dashboard
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-body)]">
-                    Move directly into a working project instead of an empty setup
-                    flow.
-                  </p>
-                </div>
+            <div className="border-l border-[var(--border)] pl-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                What happens next
               </div>
+
+              <ol className="mt-3 grid gap-3 text-sm text-[var(--text-body)]">
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">1.</span>{" "}
+                  Create the project shell and save identity fields.
+                </li>
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">2.</span>{" "}
+                  Start onboarding automatically with the first seed keyword.
+                </li>
+                <li className="border-t border-[var(--border)] pt-3">
+                  <span className="font-semibold text-[var(--text-strong)]">3.</span>{" "}
+                  Land directly in the working project dashboard.
+                </li>
+              </ol>
             </div>
           </div>
         </section>
 
         {status ? (
-          <section className="rounded-[24px] border border-[var(--danger)] bg-[var(--danger-soft)] px-5 py-4 shadow-sm">
+          <section className="border-l-4 border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3">
             <p className="text-sm font-medium text-[var(--danger)]">{status}</p>
           </section>
         ) : null}
 
-        <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
+        <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="border-t border-[var(--border)] pt-6">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               Start intelligent onboarding
             </p>
+
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
               Begin with the website URL.
             </h2>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+
+            <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--text-body)]">
               Long-term goal: URL-only onboarding. Current safe step: URL-mostly
               onboarding, with a few support details still required while the
               identity layer gets smarter.
             </p>
 
-            <form onSubmit={startProjectOnboarding} className="mt-5 grid gap-5">
+            <form onSubmit={startProjectOnboarding} className="mt-6 grid gap-5">
               <div className="grid gap-2">
                 <label className="text-sm font-semibold text-[var(--text-strong)]">
                   Website URL
@@ -479,24 +485,37 @@ export default function ClientProjectsPage() {
                   value={siteUrl}
                   onChange={(e) => setSiteUrl(e.target.value)}
                   placeholder="example.com"
-                  className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                  className="border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                   required
                 />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <MetricPill label="Domain preview" value={normalizedPreviewDomain} />
-                <MetricPill label="Brand preview" value={inferredPreviewBrandName} />
-              </div>
+              <section className="border border-[var(--border)] bg-[var(--reference-soft)] px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  Identity preview
+                </div>
 
-              <div className="rounded-[24px] border border-[var(--border)] bg-[var(--reference-soft)] px-4 py-4">
-                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                <div className="mt-4 grid gap-3">
+                  <PreviewRow
+                    label="Domain preview"
+                    value={normalizedPreviewDomain}
+                  />
+                  <PreviewRow
+                    label="Brand preview"
+                    value={inferredPreviewBrandName}
+                  />
+                </div>
+              </section>
+
+              <section className="border-t border-[var(--border)] pt-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Still needed for now
-                </p>
-                <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                </div>
+
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
                   These support inputs still power the current onboarding chain.
-                  They are intentionally secondary, because the product is moving
-                  toward inferring more of this automatically.
+                  They are secondary, because the product is moving toward inferring
+                  more of this automatically.
                 </p>
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -508,7 +527,7 @@ export default function ClientProjectsPage() {
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
                       placeholder="Landscaper"
-                      className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                      className="border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                       required
                     />
                   </div>
@@ -521,7 +540,7 @@ export default function ClientProjectsPage() {
                       value={metro}
                       onChange={(e) => setMetro(e.target.value)}
                       placeholder="Council Bluffs, IA"
-                      className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                      className="border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                       required
                     />
                   </div>
@@ -534,84 +553,101 @@ export default function ClientProjectsPage() {
                       value={radiusMiles}
                       onChange={(e) => setRadiusMiles(e.target.value)}
                       placeholder="25"
-                      className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)]"
+                      className="border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none transition focus:border-[var(--brand-600)]"
                     />
                     <p className="text-xs text-[var(--text-muted)]">
                       Defaults to 25 if left blank.
                     </p>
                   </div>
                 </div>
-              </div>
+              </section>
 
-              <button
-                disabled={submitting}
-                className="inline-flex w-fit items-center justify-center rounded-2xl bg-[var(--brand-600)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Creating project..." : "Create project and continue"}
-              </button>
+              <div className="pt-1">
+                <button
+                  disabled={submitting}
+                  className="inline-flex items-center justify-center border border-[var(--brand-600)] bg-[var(--brand-600)] px-5 py-3 text-sm font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitting ? "Creating project..." : "Create project and continue"}
+                </button>
+              </div>
             </form>
           </section>
 
-          <section className="rounded-[32px] border border-[var(--border)] bg-white px-5 py-5 shadow-sm sm:px-6">
-            <div className="flex items-center justify-between gap-4">
+          <section className="border-t border-[var(--border)] pt-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                   Existing projects
                 </p>
+
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
                   Open an existing project
                 </h2>
               </div>
 
-              <div className="rounded-full bg-[var(--reference-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--text-body)]">
-                {projects.length} project{projects.length === 1 ? "" : "s"}
+              <div className="text-sm text-[var(--text-body)]">
+                <span className="font-semibold text-[var(--text-strong)]">
+                  {projects.length}
+                </span>{" "}
+                project{projects.length === 1 ? "" : "s"}
               </div>
             </div>
 
             {projects.length === 0 ? (
-              <div className="mt-5 rounded-[24px] border border-dashed border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5 text-sm text-[var(--text-body)]">
-                No projects yet. Start with the website URL above.
+              <div className="mt-6 border-t border-[var(--border)] pt-4">
+                <p className="text-sm leading-7 text-[var(--text-body)]">
+                  No projects yet. Start with the website URL on the left.
+                </p>
               </div>
             ) : (
-              <div className="mt-5 grid gap-4">
+              <div className="mt-6 border-t border-[var(--border)]">
                 {projects.map((project) => (
                   <article
                     key={project.id}
-                    className="rounded-[24px] border border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5"
+                    className="grid gap-4 border-t border-[var(--border)] py-5 first:border-t-0 first:pt-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-6"
                   >
-                    <h3 className="text-lg font-semibold text-[var(--text-strong)]">
-                      {formatDomain(project.site_url)}
-                    </h3>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h3 className="text-lg font-semibold text-[var(--text-strong)]">
+                          {formatDomain(project.site_url)}
+                        </h3>
+                        <span className="text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                          Added {formatCreatedAt(project.created_at)}
+                        </span>
+                      </div>
 
-                    <div className="mt-3 space-y-1 text-sm leading-7 text-[var(--text-body)]">
-                      <div>
-                        <span className="font-semibold text-[var(--text-strong)]">
-                          Category:
-                        </span>{" "}
-                        {project.category}
-                      </div>
-                      <div>
-                        <span className="font-semibold text-[var(--text-strong)]">
-                          Metro:
-                        </span>{" "}
-                        {project.metro}
-                      </div>
-                      <div>
-                        <span className="font-semibold text-[var(--text-strong)]">
-                          Radius:
-                        </span>{" "}
-                        {project.radius_miles} mi
+                      <div className="mt-3 space-y-1 text-sm leading-7 text-[var(--text-body)]">
+                        <div>
+                          <span className="font-semibold text-[var(--text-strong)]">
+                            Category:
+                          </span>{" "}
+                          {project.category}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[var(--text-strong)]">
+                            Metro:
+                          </span>{" "}
+                          {project.metro}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-[var(--text-strong)]">
+                            Radius:
+                          </span>{" "}
+                          {project.radius_miles} mi
+                        </div>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() =>
-                        router.push(`/clients/${clientId}/projects/${project.id}`)
-                      }
-                      className="mt-4 inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] shadow-sm ring-1 ring-[var(--border)] transition hover:bg-[var(--brand-50)]"
-                    >
-                      Open dashboard
-                    </button>
+                    <div className="md:pt-1">
+                      <button
+                        onClick={() =>
+                          router.push(`/clients/${clientId}/projects/${project.id}`)
+                        }
+                        className="inline-flex items-center justify-center border border-[var(--border)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--text-strong)] transition hover:border-[var(--brand-600)] hover:text-[var(--brand-700)]"
+                      >
+                        Open dashboard
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
