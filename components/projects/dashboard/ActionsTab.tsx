@@ -87,9 +87,12 @@ export function ActionsTab({
             </p>
           </section>
 
-          <section className="border border-[var(--border)] bg-white px-5 py-5 sm:px-6">
+          <section
+            className="border border-[var(--border)] px-5 py-5 sm:px-6"
+            style={{ backgroundColor: "rgba(245, 158, 11, 0.06)" }}
+          >
             <div className="border-b border-[var(--border)] pb-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--warning)]">
                 High-conversion playbook
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
