@@ -73,6 +73,31 @@ type WebsiteSummary = {
   evidence: string[];
 };
 
+type AiSummary = Record<string, unknown> & {
+  gbpName?: string | null;
+  primaryCategory?: string | null;
+  totalReviews?: number | null;
+  rating?: number | null;
+  hasBusinessName?: boolean;
+  hasPrimaryCategory?: boolean;
+  hasReviewSignals?: boolean;
+  aiReadinessLabel?: string;
+  aiReadinessScore?: number | null;
+  plainLanguageSummary?: string;
+  topIssue?: string;
+  whyItMatters?: string;
+  nextAction?:
+    | {
+        title?: string;
+        whoShouldDoIt?: string;
+        who_should_do_it?: string;
+        difficulty?: string;
+        reason?: string;
+      }
+    | null;
+  evidence?: string[] | null;
+};
+
 type OwnerDashboardResponse = {
   ok: boolean;
   projectId: string;
@@ -118,16 +143,7 @@ type OwnerDashboardResponse = {
       latestCapturedAt: string | null;
       visibilityLabel: string;
     };
-    aiSummary: {
-      gbpName: string | null;
-      primaryCategory: string | null;
-      totalReviews: number | null;
-      rating: number | null;
-      hasBusinessName: boolean;
-      hasPrimaryCategory: boolean;
-      hasReviewSignals: boolean;
-      aiReadinessLabel: string;
-    };
+    aiSummary: AiSummary;
     websiteSummary: WebsiteSummary;
     outcomesSummary: {
       monthlyCustomerEvents: number | null;
@@ -145,6 +161,12 @@ type OwnerWebsiteSummaryResponse = {
   ok: boolean;
   projectId: string;
   summary: WebsiteSummary;
+};
+
+type OwnerAiSummaryResponse = {
+  ok: boolean;
+  projectId: string;
+  summary: AiSummary;
 };
 
 type OwnerTasksResponse = {
@@ -203,6 +225,80 @@ type Tone = {
 };
 
 type DetailTab = "visibility" | "ai" | "website" | "outcomes" | "tasks";
+
+type AiNextAction = {
+  title: string;
+  whoShouldDoIt: string;
+  difficulty: string;
+  reason: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readStringValue(
+  source: Record<string, unknown>,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function readNumberValue(
+  source: Record<string, unknown>,
+  keys: string[],
+): number | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function readBooleanValue(
+  source: Record<string, unknown>,
+  keys: string[],
+): boolean | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function readStringArrayValue(
+  source: Record<string, unknown>,
+  keys: string[],
+): string[] {
+  for (const key of keys) {
+    const value = source[key];
+    if (Array.isArray(value)) {
+      const strings = value.filter(
+        (item): item is string =>
+          typeof item === "string" && item.trim().length > 0,
+      );
+
+      if (strings.length > 0) {
+        return strings;
+      }
+    }
+  }
+
+  return [];
+}
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -287,6 +383,184 @@ function getWebsiteAlignmentHelper(summary: WebsiteSummary): string {
   return summary.hasDomainAlignment
     ? "The saved website URL and target domain currently point to the same domain."
     : "The saved website URL and target domain do not currently point to the same domain.";
+}
+
+function getAiReadinessScore(summary: AiSummary): number | null {
+  return readNumberValue(summary, [
+    "aiReadinessScore",
+    "readinessScore",
+    "score",
+  ]);
+}
+
+function getAiPlainLanguageSummary(summary: AiSummary): string | null {
+  return readStringValue(summary, [
+    "plainLanguageSummary",
+    "summary",
+    "summaryText",
+  ]);
+}
+
+function getAiTopIssue(summary: AiSummary): string | null {
+  return readStringValue(summary, ["topIssue", "top_issue"]);
+}
+
+function getAiWhyItMatters(summary: AiSummary): string | null {
+  return readStringValue(summary, [
+    "whyItMatters",
+    "why_it_matters",
+    "reason",
+  ]);
+}
+
+function getAiNamingAlignmentLabel(summary: AiSummary): string {
+  const explicit = readStringValue(summary, [
+    "namingAlignmentLabel",
+    "nameAlignmentLabel",
+  ]);
+  if (explicit) return explicit;
+
+  const alignment = readBooleanValue(summary, [
+    "hasNamingAlignment",
+    "namingAlignment",
+    "hasNameAlignment",
+    "nameAlignment",
+  ]);
+
+  if (alignment === null) {
+    return "Cannot check yet";
+  }
+
+  return alignment ? "Aligned" : "Needs review";
+}
+
+function getAiNamingAlignmentHelper(summary: AiSummary): string {
+  const explicit = readStringValue(summary, [
+    "namingAlignmentExplanation",
+    "namingAlignmentHelper",
+    "nameAlignmentExplanation",
+    "nameAlignmentHelper",
+  ]);
+  if (explicit) return explicit;
+
+  const targetBrand = readStringValue(summary, [
+    "projectTargetBrandName",
+    "targetBrandName",
+    "savedBrandName",
+  ]);
+  const gbpName = summary.gbpName ?? null;
+  const alignment = readBooleanValue(summary, [
+    "hasNamingAlignment",
+    "namingAlignment",
+    "hasNameAlignment",
+    "nameAlignment",
+  ]);
+
+  if (!targetBrand || !gbpName) {
+    return "A saved brand name and visible GBP name are both needed before naming alignment can be checked.";
+  }
+
+  if (alignment === null) {
+    return "Digital Brain has the identity values, but the naming alignment result is not available yet.";
+  }
+
+  return alignment
+    ? "The saved brand identity and visible GBP name look aligned."
+    : "The saved brand identity and visible GBP name do not fully align yet.";
+}
+
+function getAiCategoryAlignmentLabel(summary: AiSummary): string {
+  const explicit = readStringValue(summary, ["categoryAlignmentLabel"]);
+  if (explicit) return explicit;
+
+  const alignment = readBooleanValue(summary, [
+    "hasCategoryAlignment",
+    "categoryAlignment",
+  ]);
+
+  if (alignment === null) {
+    return "Cannot check yet";
+  }
+
+  return alignment ? "Aligned" : "Needs review";
+}
+
+function getAiCategoryAlignmentHelper(summary: AiSummary): string {
+  const explicit = readStringValue(summary, [
+    "categoryAlignmentExplanation",
+    "categoryAlignmentHelper",
+  ]);
+  if (explicit) return explicit;
+
+  const projectCategory = readStringValue(summary, [
+    "projectCategory",
+    "targetCategory",
+    "savedCategory",
+  ]);
+  const primaryCategory = summary.primaryCategory ?? null;
+  const alignment = readBooleanValue(summary, [
+    "hasCategoryAlignment",
+    "categoryAlignment",
+  ]);
+
+  if (!projectCategory || !primaryCategory) {
+    return "A saved project category and visible GBP primary category are both needed before category alignment can be checked.";
+  }
+
+  if (alignment === null) {
+    return "Digital Brain has the category values, but the category alignment result is not available yet.";
+  }
+
+  return alignment
+    ? "The saved project category and visible GBP primary category look aligned."
+    : "The saved project category and visible GBP primary category do not fully align yet.";
+}
+
+function getAiNextAction(summary: AiSummary): AiNextAction {
+  const fallbackReason =
+    getAiWhyItMatters(summary) ??
+    "Digital Brain still needs clearer business identity signals for stronger AI visibility.";
+
+  if (isRecord(summary.nextAction)) {
+    return {
+      title:
+        readStringValue(summary.nextAction, ["title"]) ??
+        "Strengthen the saved business identity",
+      whoShouldDoIt:
+        readStringValue(summary.nextAction, [
+          "whoShouldDoIt",
+          "who_should_do_it",
+        ]) ?? "Owner",
+      difficulty:
+        readStringValue(summary.nextAction, ["difficulty"]) ?? "Easy",
+      reason:
+        readStringValue(summary.nextAction, ["reason"]) ?? fallbackReason,
+    };
+  }
+
+  return {
+    title: "Strengthen the saved business identity",
+    whoShouldDoIt: "Owner",
+    difficulty: "Easy",
+    reason: fallbackReason,
+  };
+}
+
+function getAiEvidence(summary: AiSummary): string[] {
+  const explicitEvidence = readStringArrayValue(summary, ["evidence"]);
+  if (explicitEvidence.length > 0) {
+    return explicitEvidence;
+  }
+
+  const hasBusinessName = summary.hasBusinessName === true;
+  const hasPrimaryCategory = summary.hasPrimaryCategory === true;
+  const hasReviewSignals = summary.hasReviewSignals === true;
+
+  return [
+    `Business name present: ${hasBusinessName ? "yes" : "no"}.`,
+    `Primary category present: ${hasPrimaryCategory ? "yes" : "no"}.`,
+    `Review signals present: ${hasReviewSignals ? "yes" : "no"}.`,
+  ];
 }
 
 function getHealthTone(label: OwnerHealthMarker["label"]): Tone {
@@ -570,23 +844,31 @@ export default function OwnerDashboardPage({ params }: Props) {
         setLoading(true);
         setError("");
 
-        const [dashboardResponse, tasksResponse, websiteResponse] =
-          await Promise.all([
-            fetch(`/api/projects/${projectId}/owner-dashboard`, {
-              cache: "no-store",
-            }),
-            fetch(`/api/projects/${projectId}/owner-tasks`, {
-              cache: "no-store",
-            }),
-            fetch(`/api/projects/${projectId}/owner-website-summary`, {
-              cache: "no-store",
-            }),
-          ]);
+        const [
+          dashboardResponse,
+          tasksResponse,
+          websiteResponse,
+          aiResponse,
+        ] = await Promise.all([
+          fetch(`/api/projects/${projectId}/owner-dashboard`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${projectId}/owner-tasks`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${projectId}/owner-website-summary`, {
+            cache: "no-store",
+          }),
+          fetch(`/api/projects/${projectId}/owner-ai-summary`, {
+            cache: "no-store",
+          }),
+        ]);
 
         if (
           !dashboardResponse.ok ||
           !tasksResponse.ok ||
-          !websiteResponse.ok
+          !websiteResponse.ok ||
+          !aiResponse.ok
         ) {
           throw new Error("Failed to load owner dashboard.");
         }
@@ -596,11 +878,13 @@ export default function OwnerDashboardPage({ params }: Props) {
         const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
         const websiteJson =
           (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
+        const aiJson = (await aiResponse.json()) as OwnerAiSummaryResponse;
 
         setDashboard({
           ...dashboardJson,
           dashboard: {
             ...dashboardJson.dashboard,
+            aiSummary: aiJson.summary,
             websiteSummary: websiteJson.summary,
           },
         });
@@ -623,35 +907,46 @@ export default function OwnerDashboardPage({ params }: Props) {
 
       const nextStatus = task.status === "completed" ? "open" : "completed";
 
-      const response = await fetch(`/api/projects/${projectId}/owner-tasks/${task.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `/api/projects/${projectId}/owner-tasks/${task.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: nextStatus }),
         },
-        body: JSON.stringify({ status: nextStatus }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error("Failed to update task.");
       }
 
-      const [dashboardResponse, tasksResponse, websiteResponse] =
-        await Promise.all([
-          fetch(`/api/projects/${projectId}/owner-dashboard`, {
-            cache: "no-store",
-          }),
-          fetch(`/api/projects/${projectId}/owner-tasks`, {
-            cache: "no-store",
-          }),
-          fetch(`/api/projects/${projectId}/owner-website-summary`, {
-            cache: "no-store",
-          }),
-        ]);
+      const [
+        dashboardResponse,
+        tasksResponse,
+        websiteResponse,
+        aiResponse,
+      ] = await Promise.all([
+        fetch(`/api/projects/${projectId}/owner-dashboard`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/projects/${projectId}/owner-tasks`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/projects/${projectId}/owner-website-summary`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/projects/${projectId}/owner-ai-summary`, {
+          cache: "no-store",
+        }),
+      ]);
 
       if (
         !dashboardResponse.ok ||
         !tasksResponse.ok ||
-        !websiteResponse.ok
+        !websiteResponse.ok ||
+        !aiResponse.ok
       ) {
         throw new Error("Failed to refresh owner dashboard.");
       }
@@ -661,11 +956,13 @@ export default function OwnerDashboardPage({ params }: Props) {
       const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
       const websiteJson =
         (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
+      const aiJson = (await aiResponse.json()) as OwnerAiSummaryResponse;
 
       setDashboard({
         ...dashboardJson,
         dashboard: {
           ...dashboardJson.dashboard,
+          aiSummary: aiJson.summary,
           websiteSummary: websiteJson.summary,
         },
       });
@@ -759,11 +1056,20 @@ export default function OwnerDashboardPage({ params }: Props) {
     );
   }
 
+  const stepsCount = steps.length;
   const primaryStep = steps[0];
   const visibilityTone = getSummaryTone("visibility");
   const aiTone = getSummaryTone("ai");
   const websiteTone = getSummaryTone("website");
   const outcomesTone = getSummaryTone("outcomes");
+
+  const aiSummary = dashboard.dashboard.aiSummary;
+  const aiReadinessScore = getAiReadinessScore(aiSummary);
+  const aiPlainLanguageSummary = getAiPlainLanguageSummary(aiSummary);
+  const aiTopIssue = getAiTopIssue(aiSummary);
+  const aiWhyItMatters = getAiWhyItMatters(aiSummary);
+  const aiNextAction = getAiNextAction(aiSummary);
+  const aiEvidence = getAiEvidence(aiSummary);
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
@@ -972,7 +1278,7 @@ export default function OwnerDashboardPage({ params }: Props) {
                 );
               })}
 
-              {steps.length === 0 ? (
+              {stepsCount === 0 ? (
                 <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
                   No task or priority steps are available yet.
                 </div>
@@ -1203,14 +1509,23 @@ export default function OwnerDashboardPage({ params }: Props) {
 
                   <div className="mt-6">
                     <DetailRow
-                      label="Review count"
-                      value={formatCount(dashboard.dashboard.aiSummary.totalReviews)}
-                      helper="Reviews help with trust and machine understanding."
+                      label="AI visibility score"
+                      value={
+                        aiReadinessScore !== null
+                          ? `${aiReadinessScore} / 100`
+                          : "Not set"
+                      }
+                      helper="Owner-facing machine-readiness footing based on saved GBP and project identity facts."
                     />
                     <DetailRow
-                      label="Rating"
-                      value={formatRating(dashboard.dashboard.aiSummary.rating)}
-                      helper="Average rating across visible review signals."
+                      label="Plain-English read"
+                      value={aiSummary.aiReadinessLabel ?? "Not set"}
+                      helper={aiPlainLanguageSummary ?? undefined}
+                    />
+                    <DetailRow
+                      label="Top issue"
+                      value={aiTopIssue ?? "Not set"}
+                      helper={aiWhyItMatters ?? undefined}
                     />
                   </div>
                 </div>
@@ -1218,45 +1533,73 @@ export default function OwnerDashboardPage({ params }: Props) {
                 <div>
                   <DetailRow
                     label="GBP name"
-                    value={dashboard.dashboard.aiSummary.gbpName ?? "Not set"}
+                    value={aiSummary.gbpName ?? "Not set"}
                   />
                   <DetailRow
                     label="Primary category"
-                    value={
-                      dashboard.dashboard.aiSummary.primaryCategory ?? "Not set"
-                    }
+                    value={aiSummary.primaryCategory ?? "Not set"}
                   />
                   <DetailRow
-                    label="Plain-English read"
-                    value={dashboard.dashboard.aiSummary.aiReadinessLabel}
+                    label="Review count"
+                    value={formatCount(aiSummary.totalReviews ?? null)}
                   />
+                  <DetailRow
+                    label="Rating"
+                    value={formatRating(aiSummary.rating ?? null)}
+                  />
+                  <DetailRow
+                    label="Naming alignment"
+                    value={getAiNamingAlignmentLabel(aiSummary)}
+                    helper={getAiNamingAlignmentHelper(aiSummary)}
+                  />
+                  <DetailRow
+                    label="Category alignment"
+                    value={getAiCategoryAlignmentLabel(aiSummary)}
+                    helper={getAiCategoryAlignmentHelper(aiSummary)}
+                  />
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      One next action
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {aiNextAction.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      {aiNextAction.reason}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <InlineTag>
+                        Who: {formatWho(aiNextAction.whoShouldDoIt)}
+                      </InlineTag>
+                      <InlineTag>
+                        Difficulty: {formatDifficulty(aiNextAction.difficulty)}
+                      </InlineTag>
+                    </div>
+                  </div>
+
                   <div className="border-t border-[var(--border)] py-4">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                       What this tells you now
                     </p>
                     <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                      <DetailBullet
-                        text={`Business name present: ${
-                          dashboard.dashboard.aiSummary.hasBusinessName ? "yes" : "no"
-                        }.`}
-                        color={aiTone.solid}
-                      />
-                      <DetailBullet
-                        text={`Primary category present: ${
-                          dashboard.dashboard.aiSummary.hasPrimaryCategory
-                            ? "yes"
-                            : "no"
-                        }.`}
-                        color="var(--accent-blue-600)"
-                      />
-                      <DetailBullet
-                        text={`Review signals present: ${
-                          dashboard.dashboard.aiSummary.hasReviewSignals
-                            ? "yes"
-                            : "no"
-                        }.`}
-                        color="var(--success)"
-                      />
+                      {aiEvidence.map((item, index) => (
+                        <DetailBullet
+                          key={`${index}-${item}`}
+                          text={item}
+                          color={
+                            index === 0
+                              ? aiTone.solid
+                              : index === 1
+                                ? "var(--accent-blue-600)"
+                                : index === 2
+                                  ? "var(--success)"
+                                  : index === 3
+                                    ? "var(--warning)"
+                                    : "var(--brand-600)"
+                          }
+                        />
+                      ))}
                     </ul>
                   </div>
                 </div>
