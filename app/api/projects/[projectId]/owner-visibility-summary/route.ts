@@ -41,6 +41,21 @@ type VisibilitySummary = {
   evidence: string[];
 };
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
 function getEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -59,6 +74,26 @@ function getServiceRoleSupabase() {
 
 function formatDate(value: string | null): string {
   if (!value) return "Not set";
+
+  const leadingDateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (leadingDateMatch) {
+    const [, year, month, day] = leadingDateMatch;
+    const monthIndex = Number(month) - 1;
+    const dayNumber = Number(day);
+
+    if (
+      Number.isInteger(monthIndex) &&
+      monthIndex >= 0 &&
+      monthIndex < MONTH_NAMES.length &&
+      Number.isInteger(dayNumber) &&
+      dayNumber >= 1 &&
+      dayNumber <= 31
+    ) {
+      return `${MONTH_NAMES[monthIndex]} ${dayNumber}, ${year}`;
+    }
+
+    return value;
+  }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -147,7 +182,8 @@ function buildVisibilitySummary(input: {
       bestRank,
       latestCapturedAt,
       previousRank,
-      visibilityLabel: "Tracking is configured, but no visibility snapshot is saved yet",
+      visibilityLabel:
+        "Tracking is configured, but no visibility snapshot is saved yet",
       visibilityReadinessScore: 34,
       plainLanguageSummary:
         "Digital Brain knows what search to watch, but it does not have a saved visibility snapshot yet.",
@@ -216,7 +252,8 @@ function buildVisibilitySummary(input: {
     visibilityReadinessScore = 46;
     plainLanguageSummary =
       "Digital Brain is tracking the search, but visibility is weak right now.";
-    topIssue = "The business is being tracked, but not showing strongly enough yet.";
+    topIssue =
+      "The business is being tracked, but not showing strongly enough yet.";
     whyItMatters =
       "Weak visibility makes it harder for owners to connect local search effort to real customer discovery.";
     nextAction = {
@@ -255,7 +292,9 @@ function buildVisibilitySummary(input: {
       `Tracked keyword: ${keyword}.`,
       `Tracked market: ${metro}.`,
       `Latest saved rank: #${latestRank}.`,
-      bestRank !== null ? `Best saved rank so far: #${bestRank}.` : "No best-rank history is available yet.",
+      bestRank !== null
+        ? `Best saved rank so far: #${bestRank}.`
+        : "No best-rank history is available yet.",
       movementEvidence,
       latestCapturedAt
         ? `Last visibility snapshot: ${formatDate(latestCapturedAt)}.`
@@ -290,7 +329,9 @@ export async function GET(_request: Request, context: RouteContext) {
       .returns<RankKeywordRow[]>();
 
     if (keywordsError) {
-      throw new Error(`Failed to load active rank keyword: ${keywordsError.message}`);
+      throw new Error(
+        `Failed to load active rank keyword: ${keywordsError.message}`,
+      );
     }
 
     const activeKeyword = keywords?.[0] ?? null;
@@ -314,7 +355,9 @@ export async function GET(_request: Request, context: RouteContext) {
       .returns<RankSnapshotRow[]>();
 
     if (snapshotsError) {
-      throw new Error(`Failed to load rank snapshots: ${snapshotsError.message}`);
+      throw new Error(
+        `Failed to load rank snapshots: ${snapshotsError.message}`,
+      );
     }
 
     const latestRank = snapshots?.[0]?.rank_position ?? null;
