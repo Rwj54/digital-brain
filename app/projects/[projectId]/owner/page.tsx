@@ -49,9 +49,37 @@ import {
   TabButton,
 } from "@/components/owner/OwnerPagePrimitives";
 
+type VisibilitySummary =
+  OwnerDashboardResponse["dashboard"]["visibilitySummary"] & {
+    previousRank: number | null;
+    visibilityReadinessScore: number;
+    plainLanguageSummary: string;
+    topIssue: string;
+    whyItMatters: string;
+    nextAction: {
+      title: string;
+      whoShouldDoIt: string;
+      difficulty: string;
+      reason: string;
+    };
+    evidence: string[];
+  };
+
+type OwnerVisibilitySummaryResponse = {
+  ok: boolean;
+  projectId: string;
+  summary: VisibilitySummary;
+};
+
+type OwnerDashboardView = Omit<OwnerDashboardResponse, "dashboard"> & {
+  dashboard: Omit<OwnerDashboardResponse["dashboard"], "visibilitySummary"> & {
+    visibilitySummary: VisibilitySummary;
+  };
+};
+
 export default function OwnerDashboardPage({ params }: Props) {
   const [projectId, setProjectId] = useState<string>("");
-  const [dashboard, setDashboard] = useState<OwnerDashboardResponse | null>(null);
+  const [dashboard, setDashboard] = useState<OwnerDashboardView | null>(null);
   const [tasksData, setTasksData] = useState<OwnerTasksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
@@ -78,6 +106,7 @@ export default function OwnerDashboardPage({ params }: Props) {
         const [
           dashboardResponse,
           tasksResponse,
+          visibilityResponse,
           websiteResponse,
           aiResponse,
         ] = await Promise.all([
@@ -87,7 +116,10 @@ export default function OwnerDashboardPage({ params }: Props) {
           fetch(`/api/projects/${projectId}/owner-tasks`, {
             cache: "no-store",
           }),
-          fetch(`/api/projects/${projectId}/owner-website-summary`, {
+          fetch(`/api/projects/${projectId}/owner-visibility-summary`, {
+            cache: "no-store",
+          }),
+                    fetch(`/api/projects/${projectId}/owner-website-summary`, {
             cache: "no-store",
           }),
           fetch(`/api/projects/${projectId}/owner-ai-summary`, {
@@ -98,6 +130,7 @@ export default function OwnerDashboardPage({ params }: Props) {
         if (
           !dashboardResponse.ok ||
           !tasksResponse.ok ||
+          !visibilityResponse.ok ||
           !websiteResponse.ok ||
           !aiResponse.ok
         ) {
@@ -107,6 +140,8 @@ export default function OwnerDashboardPage({ params }: Props) {
         const dashboardJson =
           (await dashboardResponse.json()) as OwnerDashboardResponse;
         const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+        const visibilityJson =
+          (await visibilityResponse.json()) as OwnerVisibilitySummaryResponse;
         const websiteJson =
           (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
         const aiJson = (await aiResponse.json()) as OwnerAiSummaryResponse;
@@ -115,6 +150,7 @@ export default function OwnerDashboardPage({ params }: Props) {
           ...dashboardJson,
           dashboard: {
             ...dashboardJson.dashboard,
+            visibilitySummary: visibilityJson.summary,
             aiSummary: aiJson.summary,
             websiteSummary: websiteJson.summary,
           },
@@ -156,6 +192,7 @@ export default function OwnerDashboardPage({ params }: Props) {
       const [
         dashboardResponse,
         tasksResponse,
+        visibilityResponse,
         websiteResponse,
         aiResponse,
       ] = await Promise.all([
@@ -163,6 +200,9 @@ export default function OwnerDashboardPage({ params }: Props) {
           cache: "no-store",
         }),
         fetch(`/api/projects/${projectId}/owner-tasks`, {
+          cache: "no-store",
+        }),
+        fetch(`/api/projects/${projectId}/owner-visibility-summary`, {
           cache: "no-store",
         }),
         fetch(`/api/projects/${projectId}/owner-website-summary`, {
@@ -176,6 +216,7 @@ export default function OwnerDashboardPage({ params }: Props) {
       if (
         !dashboardResponse.ok ||
         !tasksResponse.ok ||
+        !visibilityResponse.ok ||
         !websiteResponse.ok ||
         !aiResponse.ok
       ) {
@@ -185,14 +226,16 @@ export default function OwnerDashboardPage({ params }: Props) {
       const dashboardJson =
         (await dashboardResponse.json()) as OwnerDashboardResponse;
       const tasksJson = (await tasksResponse.json()) as OwnerTasksResponse;
+      const visibilityJson =
+        (await visibilityResponse.json()) as OwnerVisibilitySummaryResponse;
       const websiteJson =
         (await websiteResponse.json()) as OwnerWebsiteSummaryResponse;
       const aiJson = (await aiResponse.json()) as OwnerAiSummaryResponse;
-
-      setDashboard({
+            setDashboard({
         ...dashboardJson,
         dashboard: {
           ...dashboardJson.dashboard,
+          visibilitySummary: visibilityJson.summary,
           aiSummary: aiJson.summary,
           websiteSummary: websiteJson.summary,
         },
@@ -296,122 +339,16 @@ export default function OwnerDashboardPage({ params }: Props) {
   const websiteTone = getSummaryTone("website");
   const outcomesTone = getSummaryTone("outcomes");
 
+  const visibilitySummary = dashboard.dashboard.visibilitySummary;
+  const visibilityNextAction = visibilitySummary.nextAction;
+
   const aiSummary = dashboard.dashboard.aiSummary;
   const aiReadinessScore = getAiReadinessScore(aiSummary);
   const aiPlainLanguageSummary = getAiPlainLanguageSummary(aiSummary);
   const aiTopIssue = getAiTopIssue(aiSummary);
   const aiWhyItMatters = getAiWhyItMatters(aiSummary);
   const aiNextAction = getAiNextAction(aiSummary);
-  const aiEvidence = getAiEvidence(aiSummary);
-
-  return (
-    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-7xl">
-        <section className="border-b border-[var(--border)] pb-6">
-          <SectionLabel>Owner dashboard</SectionLabel>
-
-          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
-            <div>
-              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                {dashboard.dashboard.hero.headline}
-              </h1>
-
-              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                {dashboard.dashboard.hero.supportLine}
-              </p>
-            </div>
-
-            <div className="xl:pl-8">
-              <SectionLabel>What to do now</SectionLabel>
-              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
-              </p>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {primaryStep?.reason ??
-                  dashboard.dashboard.progress.nextLikelyImprovement}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <InlineTag>Who: {primaryStep?.who ?? "Owner"}</InlineTag>
-                <InlineTag>Time: {primaryStep?.time ?? "Not set"}</InlineTag>
-                <InlineTag>
-                  Difficulty: {primaryStep?.difficulty ?? "Not set"}
-                </InlineTag>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
-            <HeaderMeta
-              label="Business"
-              value={dashboard.projectDisplayName ?? "Not set"}
-            />
-            <HeaderMeta
-              label="Domain"
-              value={dashboard.domainDisplayValue ?? "Not set"}
-            />
-            <HeaderMeta
-              label="Location / Market"
-              value={
-                dashboard.projectLocationLabel ??
-                dashboard.projectMetro ??
-                "Not set"
-              }
-            />
-            <HeaderMeta label="Scope" value={dashboard.pageScopeLabel} />
-            <HeaderMeta
-              label="Snapshot"
-              value={formatDate(dashboard.capturedAt)}
-            />
-          </div>
-
-          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3">
-            <SummaryStat
-              label="Start here"
-              value={
-                primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText
-              }
-            />
-            <SummaryStat
-              label="Open tasks"
-              value={String(tasksData.summary.openTasks)}
-            />
-            <SummaryStat
-              label="Completion rate"
-              value={formatPercent(dashboard.dashboard.summary.completedTaskRate)}
-            />
-          </div>
-        </section>
-
-        <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Health markers</SectionLabel>
-          <div className="mt-5 grid gap-4 xl:grid-cols-4">
-            {dashboard.dashboard.healthMarkers.map((marker) => (
-              <HealthMarkerItem key={marker.label} marker={marker} />
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-10 py-8 xl:grid-cols-[1.22fr_0.78fr]">
-          <section id="next-steps">
-            <SectionLabel>Your next 3 steps</SectionLabel>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-              Follow these in order
-            </h2>
-            <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              This is the guided action flow that should give the clearest next wins
-              without making the owner learn SEO or AI visibility jargon.
-            </p>
-
-            <div className="mt-6">
-              {steps.map((step, index) => {
-                const tone = getStepTone(step.status);
-                const numberTone = getStepNumberTone(step.index);
-                const isTask = step.kind === "task";
-                const isSaving = isTask && savingTaskId === step.task.id;
-                const isCompleted = step.status === "completed";
-                const isLast = index === steps.length - 1;
-
-                return (
+                  return (
                   <article
                     key={step.key}
                     className={`grid gap-4 py-6 md:grid-cols-[56px_1fr_auto] md:items-start ${
@@ -510,221 +447,7 @@ export default function OwnerDashboardPage({ params }: Props) {
                   </article>
                 );
               })}
-
-              {stepsCount === 0 ? (
-                <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
-                  No task or priority steps are available yet.
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <aside className="space-y-8">
-            <section>
-              <SectionLabel>What Google wants next</SectionLabel>
-
-              <div className="mt-4">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--brand-700)]">
-                    Helping now
-                  </p>
-                  <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                    {dashboard.dashboard.guidance.helpingNow.map((item) => (
-                      <li key={item} className="flex gap-3">
-                        <span className="mt-2 h-2.5 w-2.5 shrink-0 bg-[var(--brand-600)]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="mt-5 border-t border-[var(--border)] pt-5">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    Google still wants
-                  </p>
-                  <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                    {dashboard.dashboard.guidance.googleStillWants.map((item) => (
-                      <li key={item} className="flex gap-3">
-                        <span className="mt-2 h-2.5 w-2.5 shrink-0 bg-[var(--warning)]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </section>
-
-            <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
-
-              <div className="mt-4">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
-                      {formatPercent(dashboard.dashboard.summary.completedTaskRate)}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                      completion rate across current owner tasks
-                    </p>
-                  </div>
-
-                  <InlineTag
-                    tone={{ solid: "var(--success)", soft: "var(--success-soft)" }}
-                  >
-                    {tasksData.summary.completedTasks} completed
-                  </InlineTag>
-                </div>
-
-                <div className="mt-4 h-2 bg-[var(--reference-soft)]">
-                  <div
-                    className="h-2 bg-[var(--success)]"
-                    style={{
-                      width: formatPercent(
-                        dashboard.dashboard.summary.completedTaskRate,
-                      ),
-                    }}
-                  />
-                </div>
-
-                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
-                  <SummaryStat
-                    label="Open now"
-                    value={String(tasksData.summary.openTasks)}
-                  />
-                  <SummaryStat
-                    label="Current priorities"
-                    value={String(dashboard.dashboard.summary.priorityCount)}
-                  />
-                  <SummaryStat
-                    label="Last updated"
-                    value={formatDate(dashboard.dashboard.progress.lastUpdated)}
-                  />
-                </div>
-              </div>
-            </section>
-          </aside>
-        </section>
-
-        <section className="border-t border-[var(--border)] py-8">
-          <div className="max-w-3xl">
-            <SectionLabel>Details below the fold</SectionLabel>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-              Drill deeper without losing the main story
-            </h2>
-            <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
-              These tabs let you inspect the supporting evidence behind the decision
-              engine without turning the page into a traditional SEO dashboard.
-            </p>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <TabButton
-              label="Visibility details"
-              active={detailTab === "visibility"}
-              onClick={() => setDetailTab("visibility")}
-            />
-            <TabButton
-              label="AI visibility"
-              active={detailTab === "ai"}
-              onClick={() => setDetailTab("ai")}
-            />
-            <TabButton
-              label="Website trust"
-              active={detailTab === "website"}
-              onClick={() => setDetailTab("website")}
-            />
-            <TabButton
-              label="Outcomes"
-              active={detailTab === "outcomes"}
-              onClick={() => setDetailTab("outcomes")}
-            />
-            <TabButton
-              label="Task evidence"
-              active={detailTab === "tasks"}
-              onClick={() => setDetailTab("tasks")}
-            />
-          </div>
-
-          <div className="mt-6 grid gap-8 xl:grid-cols-[1fr_0.92fr]">
-            {detailTab === "visibility" ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[var(--brand-700)]">
-                    Visibility details
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-                    Current local rank footing
-                  </h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This shows the ranking context an owner can understand: what
-                    keyword is active, what metro is being tracked, and whether the
-                    business is moving into a stronger position.
-                  </p>
-
-                  <div className="mt-6">
-                    <DetailRow
-                      label="Latest rank"
-                      value={
-                        dashboard.dashboard.visibilitySummary.latestRank?.toString() ??
-                        "Not set"
-                      }
-                      helper="Most recent captured position."
-                    />
-                    <DetailRow
-                      label="Best rank"
-                      value={
-                        dashboard.dashboard.visibilitySummary.bestRank?.toString() ??
-                        "Not set"
-                      }
-                      helper="Best observed position in current data."
-                    />
-                    <DetailRow
-                      label="Last captured"
-                      value={formatDate(
-                        dashboard.dashboard.visibilitySummary.latestCapturedAt,
-                      )}
-                      helper="Most recent time this visibility snapshot was refreshed."
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <DetailRow
-                    label="Keyword"
-                    value={dashboard.dashboard.visibilitySummary.keyword ?? "Not set"}
-                  />
-                  <DetailRow
-                    label="Metro"
-                    value={dashboard.dashboard.visibilitySummary.metro ?? "Not set"}
-                  />
-                  <DetailRow
-                    label="Plain-English read"
-                    value={dashboard.dashboard.visibilitySummary.visibilityLabel}
-                  />
-                  <div className="border-t border-[var(--border)] py-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      What this tells you now
-                    </p>
-                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                      <DetailBullet
-                        text="Visibility is tied to one active keyword and one metro context."
-                        color={visibilityTone.solid}
-                      />
-                      <DetailBullet
-                        text="The latest rank is the clearest near-term signal for owner-facing progress."
-                        color="var(--accent-blue-600)"
-                      />
-                      <DetailBullet
-                        text="Best rank helps show whether the current effort is capable of breaking through."
-                        color="var(--success)"
-                      />
-                    </ul>
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {detailTab === "ai" ? (
+                       {detailTab === "ai" ? (
               <>
                 <div>
                   <p className="text-sm font-semibold text-[var(--accent-mint-600)]">
@@ -852,6 +575,374 @@ export default function OwnerDashboardPage({ params }: Props) {
                     This is the owner-facing website trust read. It explains whether
                     Digital Brain has a clear website, domain, and brand anchor to
                     work from before deeper website intelligence is added.
+                  </p>   
+                                      {dashboard.dashboard.guidance.helpingNow.map((item) => (
+                      <li key={item} className="flex gap-3">
+                        <span className="mt-2 h-2.5 w-2.5 shrink-0 bg-[var(--brand-600)]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mt-5 border-t border-[var(--border)] pt-5">
+                  <p className="text-sm font-semibold text-[var(--text-strong)]">
+                    Google still wants
+                  </p>
+                  <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                    {dashboard.dashboard.guidance.googleStillWants.map((item) => (
+                      <li key={item} className="flex gap-3">
+                        <span className="mt-2 h-2.5 w-2.5 shrink-0 bg-[var(--warning)]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Progress and proof</SectionLabel>
+
+              <div className="mt-4">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                      {formatPercent(dashboard.dashboard.summary.completedTaskRate)}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      completion rate across current owner tasks
+                    </p>
+                  </div>
+
+                  <InlineTag
+                    tone={{ solid: "var(--success)", soft: "var(--success-soft)" }}
+                  >
+                    {tasksData.summary.completedTasks} completed
+                  </InlineTag>
+                </div>
+
+                <div className="mt-4 h-2 bg-[var(--reference-soft)]">
+                  <div
+                    className="h-2 bg-[var(--success)]"
+                    style={{
+                      width: formatPercent(
+                        dashboard.dashboard.summary.completedTaskRate,
+                      ),
+                    }}
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                  <SummaryStat
+                    label="Open now"
+                    value={String(tasksData.summary.openTasks)}
+                  />
+                  <SummaryStat
+                    label="Current priorities"
+                    value={String(dashboard.dashboard.summary.priorityCount)}
+                  />
+                  <SummaryStat
+                    label="Last updated"
+                    value={formatDate(dashboard.dashboard.progress.lastUpdated)}
+                  />
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+
+        <section className="border-t border-[var(--border)] py-8">
+          <div className="max-w-3xl">
+            <SectionLabel>Details below the fold</SectionLabel>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Drill deeper without losing the main story
+            </h2>
+            <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
+              These tabs let you inspect the supporting evidence behind the decision
+              engine without turning the page into a traditional SEO dashboard.
+            </p>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <TabButton
+              label="Visibility details"
+              active={detailTab === "visibility"}
+              onClick={() => setDetailTab("visibility")}
+            />
+            <TabButton
+              label="AI visibility"
+              active={detailTab === "ai"}
+              onClick={() => setDetailTab("ai")}
+            />
+            <TabButton
+              label="Website trust"
+              active={detailTab === "website"}
+              onClick={() => setDetailTab("website")}
+            />
+            <TabButton
+              label="Outcomes"
+              active={detailTab === "outcomes"}
+              onClick={() => setDetailTab("outcomes")}
+            />
+            <TabButton
+                          label="Task evidence"
+              active={detailTab === "tasks"}
+              onClick={() => setDetailTab("tasks")}
+            />
+          </div>
+
+          <div className="mt-6 grid gap-8 xl:grid-cols-[1fr_0.92fr]">
+            {detailTab === "visibility" ? (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--brand-700)]">
+                    Visibility details
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Local visibility footing
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the owner-facing visibility evidence layer. It shows how
+                    the business is performing for the primary tracked search in the
+                    saved market, what the main issue is, and what to do next.
+                  </p>
+
+                  <div className="mt-6">
+                    <DetailRow
+                      label="Visibility score"
+                      value={`${visibilitySummary.visibilityReadinessScore} / 100`}
+                      helper="Owner-facing visibility footing for the currently tracked search."
+                    />
+                    <DetailRow
+                      label="Plain-English read"
+                      value={visibilitySummary.visibilityLabel}
+                      helper={visibilitySummary.plainLanguageSummary}
+                    />
+                    <DetailRow
+                      label="Top issue"
+                      value={visibilitySummary.topIssue}
+                      helper={visibilitySummary.whyItMatters}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <DetailRow
+                    label="Keyword"
+                    value={visibilitySummary.keyword ?? "Not set"}
+                  />
+                  <DetailRow
+                    label="Metro"
+                    value={visibilitySummary.metro ?? "Not set"}
+                  />
+                  <DetailRow
+                    label="Latest rank"
+                    value={
+                      visibilitySummary.latestRank !== null
+                        ? `#${visibilitySummary.latestRank}`
+                        : "Not set"
+                    }
+                  />
+                  <DetailRow
+                    label="Previous rank"
+                    value={
+                      visibilitySummary.previousRank !== null
+                        ? `#${visibilitySummary.previousRank}`
+                        : "Not set"
+                    }
+                  />
+                  <DetailRow
+                    label="Best rank"
+                    value={
+                      visibilitySummary.bestRank !== null
+                        ? `#${visibilitySummary.bestRank}`
+                        : "Not set"
+                    }
+                  />
+                  <DetailRow
+                    label="Last captured"
+                    value={formatDate(visibilitySummary.latestCapturedAt)}
+                  />
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      One next action
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {visibilityNextAction.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      {visibilityNextAction.reason}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <InlineTag>
+                        Who: {formatWho(visibilityNextAction.whoShouldDoIt)}
+                      </InlineTag>
+                      <InlineTag>
+                        Difficulty: {formatDifficulty(visibilityNextAction.difficulty)}
+                      </InlineTag>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                    </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      {visibilitySummary.evidence.map((item, index) => (
+                        <DetailBullet
+                          key={`${index}-${item}`}
+                          text={item}
+                          color={
+                                                    index === 0
+                              ? visibilityTone.solid
+                              : index === 1
+                                ? "var(--accent-blue-600)"
+                                : index === 2
+                                  ? "var(--success)"
+                                  : index === 3
+                                    ? "var(--warning)"
+                                    : index === 4
+                                      ? "var(--brand-600)"
+                                      : "var(--accent-mint-600)"
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {detailTab === "ai" ? (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--accent-mint-600)]">
+                    AI visibility
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Machine-readiness signals
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the owner-facing evidence layer for AI visibility. It
+                    focuses on whether the business identity, category clarity, and
+                    review signals give machines enough confidence to understand the
+                    business.
+                  </p>
+
+                  <div className="mt-6">
+                    <DetailRow
+                      label="AI visibility score"
+                      value={
+                        aiReadinessScore !== null
+                          ? `${aiReadinessScore} / 100`
+                          : "Not set"
+                      }
+                      helper="Owner-facing machine-readiness footing based on saved GBP and project identity facts."
+                    />
+                    <DetailRow
+                      label="Plain-English read"
+                      value={aiSummary.aiReadinessLabel ?? "Not set"}
+                      helper={aiPlainLanguageSummary ?? undefined}
+                    />
+                    <DetailRow
+                      label="Top issue"
+                      value={aiTopIssue ?? "Not set"}
+                      helper={aiWhyItMatters ?? undefined}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <DetailRow
+                    label="GBP name"
+                    value={aiSummary.gbpName ?? "Not set"}
+                  />
+                  <DetailRow
+                    label="Primary category"
+                    value={aiSummary.primaryCategory ?? "Not set"}
+                  />
+                  <DetailRow
+                    label="Review count"
+                    value={formatCount(aiSummary.totalReviews ?? null)}
+                  />
+                  <DetailRow
+                    label="Rating"
+                    value={formatRating(aiSummary.rating ?? null)}
+                  />
+                  <DetailRow
+                    label="Naming alignment"
+                    value={getAiNamingAlignmentLabel(aiSummary)}
+                    helper={getAiNamingAlignmentHelper(aiSummary)}
+                  />
+                  <DetailRow
+                    label="Category alignment"
+                    value={getAiCategoryAlignmentLabel(aiSummary)}
+                    helper={getAiCategoryAlignmentHelper(aiSummary)}
+                  />
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      One next action
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+                      {aiNextAction.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                      {aiNextAction.reason}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <InlineTag>
+                        Who: {formatWho(aiNextAction.whoShouldDoIt)}
+                      </InlineTag>
+                      <InlineTag>
+                        Difficulty: {formatDifficulty(aiNextAction.difficulty)}
+                      </InlineTag>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[var(--border)] py-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      What this tells you now
+                                         </p>
+                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                      {aiEvidence.map((item, index) => (
+                        <DetailBullet
+                          key={`${index}-${item}`}
+                          text={item}
+                          color={
+                            index === 0
+                              ? aiTone.solid
+                              : index === 1
+                                ? "var(--accent-blue-600)"
+                                : index === 2
+                                  ? "var(--success)"
+                                  : index === 3
+                                    ? "var(--warning)"
+                                    : "var(--brand-600)"
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {detailTab === "website" ? (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-[var(--accent-blue-600)]">
+                    Website trust
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
+                    Website identity trust
+                  </h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                    This is the owner-facing website trust read. It explains whether
+                    Digital Brain has a clear website, domain, and brand anchor to
+                    work from before deeper website intelligence is added.
                   </p>
 
                   <div className="mt-6">
@@ -929,189 +1020,8 @@ export default function OwnerDashboardPage({ params }: Props) {
                         {dashboard.dashboard.websiteSummary.nextAction.difficulty}
                       </InlineTag>
                     </div>
-                  </div>
-
-                  <div className="border-t border-[var(--border)] py-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      What this tells you now
-                    </p>
-                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                      {dashboard.dashboard.websiteSummary.evidence.map(
-                        (item, index) => (
-                          <DetailBullet
-                            key={`${index}-${item}`}
-                            text={item}
-                            color={
-                              index === 0
-                                ? websiteTone.solid
-                                : index === 1
-                                  ? "var(--warning)"
-                                  : index === 2
-                                    ? "var(--brand-600)"
-                                    : index === 3
-                                      ? "var(--accent-blue-600)"
-                                      : "var(--success)"
-                            }
-                          />
-                        ),
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {detailTab === "outcomes" ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[var(--success)]">
-                    Outcomes
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-                    Business impact footing
-                  </h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the early owner-facing business-outcomes layer. It
-                    shows whether customer-event and conversion context exists yet,
-                    without exposing internal scoring logic.
-                  </p>
-
-                  <div className="mt-6">
-                    <DetailRow
-                      label="Monthly events"
-                      value={formatCount(
-                        dashboard.dashboard.outcomesSummary.monthlyCustomerEvents,
-                      )}
-                      helper="How many tracked customer events are connected."
-                    />
-                    <DetailRow
-                      label="Conversion rate"
-                      value={formatConversionRate(
-                        dashboard.dashboard.outcomesSummary.reviewConversionRate,
-                      )}
-                      helper="Current review-to-customer conversion footing."
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <DetailRow
-                    label="Singular label"
-                    value={
-                      dashboard.dashboard.outcomesSummary.eventLabelSingular ??
-                      "Not set"
-                    }
-                  />
-                  <DetailRow
-                    label="Plural label"
-                    value={
-                      dashboard.dashboard.outcomesSummary.eventLabelPlural ??
-                      "Not set"
-                    }
-                  />
-                  <DetailRow
-                    label="Plain-English read"
-                    value={dashboard.dashboard.outcomesSummary.outcomesReadinessLabel}
-                  />
-                  <div className="border-t border-[var(--border)] py-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      What this tells you now
-                    </p>
-                    <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                      <DetailBullet
-                        text="This is the beginning of the business-results layer, not the full outcome engine."
-                        color={outcomesTone.solid}
-                      />
-                      <DetailBullet
-                        text="Once event and conversion data deepen, this section becomes much more valuable."
-                        color="var(--brand-600)"
-                      />
-                      <DetailBullet
-                        text="Right now this helps owners see whether visibility work is being tied to real outcomes."
-                        color="var(--accent-blue-600)"
-                      />
-                    </ul>
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {detailTab === "tasks" ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[var(--brand-700)]">
-                    Task evidence
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-                    Why these actions are on the page
-                  </h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                    This is the owner-readable evidence layer for the guided actions.
-                    It explains what is being asked, who should do it, how hard it
-                    is, and what success looks like.
-                  </p>
-
-                  <div className="mt-6 space-y-6">
-                    {steps.map((step) => {
-                      const tone = getStepTone(step.status);
-
-                      return (
-                        <div
-                          key={`detail-${step.key}`}
-                          className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold text-[var(--text-strong)]">
-                              {step.title}
-                            </p>
-                            <InlineTag tone={tone}>
-                              {formatStatus(step.status)}
-                            </InlineTag>
-                          </div>
-
-                          <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                            {step.reason}
-                          </p>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <InlineTag>Who: {step.who}</InlineTag>
-                            <InlineTag>Time: {step.time}</InlineTag>
-                            <InlineTag>Difficulty: {step.difficulty}</InlineTag>
-                          </div>
-
-                          <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-                            <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                                Expected benefit
-                              </dt>
-                              <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                                {step.expectedBenefit}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                                What success looks like
-                              </dt>
-                              <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                                {step.proofOfCompletion}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                                Confidence
-                              </dt>
-                              <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                                {step.confidenceLabel}
-                              </dd>
-                            </div>
-                          </dl>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
+                  </div>   
+                                    <div>
                   <DetailRow
                     label="Open tasks"
                     value={String(tasksData.summary.openTasks)}
