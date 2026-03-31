@@ -47,11 +47,11 @@ export function IdentityResolutionCard({
       subtitle="Core project identity used by onboarding and downstream automation."
     >
       <div className="grid gap-6">
-        <section className="border border-[var(--border)] bg-[var(--reference-soft)] px-5 py-5 sm:px-6">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+        <section className="border border-[var(--brand-700)] bg-[var(--brand-700)] px-5 py-5 text-white sm:px-6">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/84">
             Identity anchor
           </div>
-          <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-white/92">
             This is the source-of-truth business identity Digital Brain should use
             for matching, onboarding, profile resolution, and downstream action logic.
           </p>
