@@ -1,0 +1,94 @@
+import {
+  formatDate,
+  formatPercent,
+} from "@/lib/owner/formatters";
+import {
+  type OwnerPageDashboard,
+  type RenderStep,
+} from "@/lib/owner/types";
+import {
+  HeaderMeta,
+  InlineTag,
+  SectionLabel,
+  SummaryStat,
+} from "@/components/owner/OwnerPagePrimitives";
+
+type Props = {
+  dashboard: OwnerPageDashboard;
+  primaryStep: RenderStep | null;
+  openTasks: number;
+};
+
+export function OwnerHeroSection({
+  dashboard,
+  primaryStep,
+  openTasks,
+}: Props) {
+  return (
+    <section className="border-b border-[var(--border)] pb-6">
+      <SectionLabel>Owner dashboard</SectionLabel>
+
+      <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+        <div>
+          <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+            {dashboard.dashboard.hero.headline}
+          </h1>
+
+          <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+            {dashboard.dashboard.hero.supportLine}
+          </p>
+        </div>
+
+        <div className="xl:pl-8">
+          <SectionLabel>What to do now</SectionLabel>
+          <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+            {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+          </p>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+            {primaryStep?.reason ?? dashboard.dashboard.progress.nextLikelyImprovement}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <InlineTag>Who: {primaryStep?.who ?? "Owner"}</InlineTag>
+            <InlineTag>Time: {primaryStep?.time ?? "Not set"}</InlineTag>
+            <InlineTag>
+              Difficulty: {primaryStep?.difficulty ?? "Not set"}
+            </InlineTag>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+        <HeaderMeta
+          label="Business"
+          value={dashboard.projectDisplayName ?? "Not set"}
+        />
+        <HeaderMeta
+          label="Domain"
+          value={dashboard.domainDisplayValue ?? "Not set"}
+        />
+        <HeaderMeta
+          label="Location / Market"
+          value={
+            dashboard.projectLocationLabel ??
+            dashboard.projectMetro ??
+            "Not set"
+          }
+        />
+        <HeaderMeta label="Scope" value={dashboard.pageScopeLabel} />
+        <HeaderMeta label="Snapshot" value={formatDate(dashboard.capturedAt)} />
+      </div>
+
+      <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3">
+        <SummaryStat
+          label="Start here"
+          value={primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+        />
+        <SummaryStat label="Open tasks" value={String(openTasks)} />
+        <SummaryStat
+          label="Completion rate"
+          value={formatPercent(dashboard.dashboard.summary.completedTaskRate)}
+        />
+      </div>
+    </section>
+  );
+}

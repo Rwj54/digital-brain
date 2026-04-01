@@ -43,6 +43,31 @@ export type OwnerHealthMarker = {
   nextActionHint: string;
 };
 
+export type OwnerDashboardVisibilitySummary = {
+  hasActiveKeyword: boolean;
+  keyword: string | null;
+  metro: string | null;
+  latestRank: number | null;
+  bestRank: number | null;
+  latestCapturedAt: string | null;
+  visibilityLabel: string;
+};
+
+export type OwnerVisibilitySummary = OwnerDashboardVisibilitySummary & {
+  previousRank: number | null;
+  visibilityReadinessScore: number;
+  plainLanguageSummary: string;
+  topIssue: string;
+  whyItMatters: string;
+  nextAction: {
+    title: string;
+    whoShouldDoIt: string;
+    difficulty: string;
+    reason: string;
+  };
+  evidence: string[];
+};
+
 export type WebsiteSummary = {
   siteUrl: string | null;
   targetDomain: string | null;
@@ -130,15 +155,7 @@ export type OwnerDashboardResponse = {
       completedTasks: number;
       completedTaskRate: number;
     };
-    visibilitySummary: {
-      hasActiveKeyword: boolean;
-      keyword: string | null;
-      metro: string | null;
-      latestRank: number | null;
-      bestRank: number | null;
-      latestCapturedAt: string | null;
-      visibilityLabel: string;
-    };
+    visibilitySummary: OwnerDashboardVisibilitySummary;
     aiSummary: AiSummary;
     websiteSummary: WebsiteSummary;
     outcomesSummary: {
@@ -165,6 +182,12 @@ export type OwnerAiSummaryResponse = {
   summary: AiSummary;
 };
 
+export type OwnerVisibilitySummaryResponse = {
+  ok: boolean;
+  projectId: string;
+  summary: OwnerVisibilitySummary;
+};
+
 export type OwnerTasksResponse = {
   ok: boolean;
   projectId: string;
@@ -176,6 +199,22 @@ export type OwnerTasksResponse = {
     completedTasks: number;
   };
   tasks: OwnerTask[];
+};
+
+export type OwnerPageDashboard = Omit<OwnerDashboardResponse, "dashboard"> & {
+  dashboard: Omit<
+    OwnerDashboardResponse["dashboard"],
+    "visibilitySummary" | "aiSummary" | "websiteSummary"
+  > & {
+    visibilitySummary: OwnerVisibilitySummary;
+    aiSummary: AiSummary;
+    websiteSummary: WebsiteSummary;
+  };
+};
+
+export type OwnerPageData = {
+  dashboard: OwnerPageDashboard;
+  tasksData: OwnerTasksResponse;
 };
 
 export type Props = {
