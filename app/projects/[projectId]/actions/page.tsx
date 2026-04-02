@@ -1,48 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { type ReactNode } from "react";
+
+import {
+  type ProjectActionItem,
+  useProjectActionsPageState,
+} from "@/lib/actions/useProjectActionsPageState";
 
 type PageProps = {
   params: Promise<{
     projectId: string;
   }>;
-};
-
-type ProjectActionsRow = {
-  id: string;
-  project_id: string;
-  captured_at: string;
-  version: string;
-  actions_json: ProjectActionItem[] | null;
-  created_at: string;
-};
-
-type ProjectActionItem = {
-  title: string;
-  detail: string;
-  priority: "low" | "medium" | "high" | string;
-  category: "reviews" | "competition" | "rank" | "general" | string;
-};
-
-type ProjectActionsResponse = {
-  ok: boolean;
-  error?: string;
-  projectId: string;
-  actionsRow: ProjectActionsRow | null;
-};
-
-type OwnerDashboardResponse = {
-  ok: boolean;
-  error?: string;
-  projectId: string;
-  projectDisplayName: string | null;
-  projectCategory: string | null;
-  projectMetro: string | null;
-  domainDisplayValue: string | null;
-  projectLocationLabel: string | null;
-  pageScopeLabel: string;
-  capturedAt: string;
 };
 
 function categoryLabel(category: string) {
@@ -132,58 +101,6 @@ function getCategoryTone(category: string) {
   };
 }
 
-function buildActionRead(leadAction: ProjectActionItem | null, totalActions: number) {
-  if (!leadAction || totalActions === 0) {
-    return {
-      headline: "Get your first action set",
-      reason:
-        "This project does not yet have stored action guidance. Once the next action-generation cycle completes, the clearest next steps will appear here.",
-      nextMoves: [
-        "Run the workflows that generate project actions.",
-        "Come back once a stored action set exists for this project.",
-        "Start with the highest-priority action when the list appears.",
-      ],
-    };
-  }
-
-  if (leadAction.priority === "high") {
-    return {
-      headline: "Start with the highest-priority work",
-      reason:
-        "The first stored action is marked high priority, which means it should be handled before the lower-priority items below it.",
-      nextMoves: [
-        "Complete the first high-priority action before moving down the list.",
-        "Use category tags to understand whether the work is about reviews, rank, or competition.",
-        "Return to authority, rank, or competitors pages when you need more context.",
-      ],
-    };
-  }
-
-  if (leadAction.priority === "medium") {
-    return {
-      headline: "Work through the current action list in order",
-      reason:
-        "There are no top-priority blockers in the current set, so the best move is to work through the medium-priority items first.",
-      nextMoves: [
-        "Start with the first listed action.",
-        "Use the grouped sections to finish medium-priority work before lower-priority items.",
-        "Check back after the next action refresh to see whether priorities changed.",
-      ],
-    };
-  }
-
-  return {
-    headline: "Use this page as your working checklist",
-    reason:
-      "The current action set is lighter, so this page is mainly a clean working order for the next useful improvements.",
-    nextMoves: [
-      "Start with the first listed action.",
-      "Use category tags to understand what kind of work each action supports.",
-      "Re-check later when a new stored action set is available.",
-    ],
-  };
-}
-
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -204,7 +121,9 @@ function HeaderMeta({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">{value}</p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -225,7 +144,10 @@ function MetricStripItem({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: tone }}>
+      <p
+        className="mt-2 text-3xl font-semibold tracking-tight"
+        style={{ color: tone }}
+      >
         {value}
       </p>
     </div>
@@ -271,117 +193,110 @@ function DetailRow({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
-      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+          {helper}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ActionGroup({
+  label,
+  helper,
+  groupKey,
+  items,
+}: {
+  label: string;
+  helper: string;
+  groupKey: string;
+  items: ProjectActionItem[];
+}) {
+  return (
+    <div className="py-6 first:pt-0">
+      <p className="text-lg font-semibold text-[var(--text-strong)]">{label}</p>
+      <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">{helper}</p>
+
+      <div className="mt-5">
+        {items.map((action, index) => {
+          const priorityTone = getPriorityTone(action.priority);
+          const categoryTone = getCategoryTone(action.category);
+
+          return (
+            <article
+              key={`${groupKey}-${index}-${action.title}`}
+              className={`grid gap-4 py-5 md:grid-cols-[1fr_auto] md:items-start ${
+                index === items.length - 1 ? "" : "border-b border-[var(--border)]"
+              }`}
+            >
+              <div className="max-w-3xl">
+                <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                  {action.title}
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                  {action.detail}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InlineTag
+                    tone={priorityTone.tone}
+                    bg={priorityTone.bg}
+                    border={priorityTone.border}
+                  >
+                    {formatPriority(action.priority)}
+                  </InlineTag>
+                  <InlineTag
+                    tone={categoryTone.tone}
+                    bg={categoryTone.bg}
+                    border={categoryTone.border}
+                  >
+                    {categoryLabel(action.category)}
+                  </InlineTag>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export default function ActionsPage({ params }: PageProps) {
-  const [projectId, setProjectId] = useState("");
-  const [actionsRow, setActionsRow] = useState<ProjectActionsRow | null>(null);
-  const [dashboardContext, setDashboardContext] = useState<OwnerDashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadPage() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const resolvedParams = await params;
-        const resolvedProjectId = resolvedParams.projectId;
-
-        if (!resolvedProjectId) {
-          throw new Error("Missing projectId.");
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setProjectId(resolvedProjectId);
-
-        const [actionsResponse, dashboardResponse] = await Promise.all([
-          fetch(`/api/projects/${resolvedProjectId}/actions`, {
-            cache: "no-store",
-          }),
-          fetch(`/api/projects/${resolvedProjectId}/owner-dashboard`, {
-            cache: "no-store",
-          }),
-        ]);
-
-        const actionsJson = (await actionsResponse.json()) as ProjectActionsResponse;
-        const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
-
-        if (!actionsResponse.ok || !actionsJson.ok) {
-          throw new Error(actionsJson.error ?? "Failed to load project actions.");
-        }
-
-        if (!dashboardResponse.ok || !dashboardJson.ok) {
-          throw new Error(dashboardJson.error ?? "Failed to load owner dashboard context.");
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setActionsRow(actionsJson.actionsRow);
-        setDashboardContext(dashboardJson);
-      } catch (err) {
-        if (!isMounted) {
-          return;
-        }
-
-        setError(err instanceof Error ? err.message : "Failed to load actions page.");
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadPage();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [params]);
-
-  const actions = useMemo(() => {
-    return Array.isArray(actionsRow?.actions_json) ? actionsRow.actions_json : [];
-  }, [actionsRow]);
-
-  const groupedActions = useMemo(() => {
-    return {
-      high: actions.filter((item) => item.priority === "high"),
-      medium: actions.filter((item) => item.priority === "medium"),
-      low: actions.filter((item) => item.priority !== "high" && item.priority !== "medium"),
-    };
-  }, [actions]);
-
-  const totalActions = actions.length;
-  const highCount = groupedActions.high.length;
-  const mediumCount = groupedActions.medium.length;
-  const lowCount = groupedActions.low.length;
-  const leadAction = actions[0] ?? null;
-  const actionRead = useMemo(
-    () => buildActionRead(leadAction, totalActions),
-    [leadAction, totalActions]
-  );
+  const {
+    projectId,
+    actionsRow,
+    dashboardContext,
+    loading,
+    error,
+    actions,
+    groupedActions,
+    totalActions,
+    highCount,
+    mediumCount,
+    lowCount,
+    leadAction,
+    actionRead,
+  } = useProjectActionsPageState(params);
 
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-base text-[var(--text-body)]">Loading actions page...</p>
+          <p className="text-base text-[var(--text-body)]">
+            Loading actions page...
+          </p>
         </div>
       </main>
     );
   }
+
+  const snapshotValue = formatDate(
+    actionsRow?.captured_at ?? dashboardContext?.capturedAt ?? null,
+  );
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
@@ -395,8 +310,9 @@ export default function ActionsPage({ params }: PageProps) {
                 See the next actions to work on for this project.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page organizes the current stored action set into a clear working order so you
-                can see what matters most right now without digging through raw system output.
+                This page organizes the current stored action set into a clear
+                working order so you can see what matters most right now without
+                digging through raw system output.
               </p>
             </div>
 
@@ -454,10 +370,7 @@ export default function ActionsPage({ params }: PageProps) {
               label="Scope"
               value={dashboardContext?.pageScopeLabel ?? "Not set"}
             />
-            <HeaderMeta
-              label="Snapshot"
-              value={formatDate(actionsRow?.captured_at ?? dashboardContext?.capturedAt ?? null)}
-            />
+            <HeaderMeta label="Snapshot" value={snapshotValue} />
           </div>
         </section>
 
@@ -471,8 +384,9 @@ export default function ActionsPage({ params }: PageProps) {
           <section className="border-b border-[var(--border)] py-6">
             <SectionLabel>No action set yet</SectionLabel>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
-              No stored growth actions were found for this project yet. This page will become more
-              useful after the next successful action-generation cycle.
+              No stored growth actions were found for this project yet. This
+              page will become more useful after the next successful
+              action-generation cycle.
             </p>
           </section>
         ) : null}
@@ -517,8 +431,9 @@ export default function ActionsPage({ params }: PageProps) {
                   Start with these actions
                 </h2>
                 <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                  Actions are grouped by priority so the page stays easy to scan. Start with high
-                  priority work first, then move down the list.
+                  Actions are grouped by priority so the page stays easy to
+                  scan. Start with high priority work first, then move down the
+                  list.
                 </p>
 
                 <div className="mt-6">
@@ -536,7 +451,9 @@ export default function ActionsPage({ params }: PageProps) {
                           className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
                           style={{
                             backgroundColor:
-                              index === 0 ? "var(--brand-700)" : "var(--reference-soft)",
+                              index === 0
+                                ? "var(--brand-700)"
+                                : "var(--reference-soft)",
                             color: index === 0 ? "#ffffff" : "var(--text-strong)",
                           }}
                         >
@@ -565,19 +482,22 @@ export default function ActionsPage({ params }: PageProps) {
                     {
                       key: "high",
                       label: "High priority",
-                      helper: "Do these first because they carry the strongest weight right now.",
+                      helper:
+                        "Do these first because they carry the strongest weight right now.",
                       items: groupedActions.high,
                     },
                     {
                       key: "medium",
                       label: "Medium priority",
-                      helper: "Move to these after the highest-priority work is underway.",
+                      helper:
+                        "Move to these after the highest-priority work is underway.",
                       items: groupedActions.medium,
                     },
                     {
                       key: "low",
                       label: "Lower priority",
-                      helper: "These still help, but they matter less than the higher-priority items above.",
+                      helper:
+                        "These still help, but they matter less than the higher-priority items above.",
                       items: groupedActions.low,
                     },
                   ]
@@ -589,55 +509,12 @@ export default function ActionsPage({ params }: PageProps) {
                           groupIndex === 0 ? "" : "border-t border-[var(--border)]"
                         }`}
                       >
-                        <p className="text-lg font-semibold text-[var(--text-strong)]">
-                          {group.label}
-                        </p>
-                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {group.helper}
-                        </p>
-
-                        <div className="mt-5">
-                          {group.items.map((action, index) => {
-                            const priorityTone = getPriorityTone(action.priority);
-                            const categoryTone = getCategoryTone(action.category);
-
-                            return (
-                              <article
-                                key={`${group.key}-${index}-${action.title}`}
-                                className={`grid gap-4 py-5 md:grid-cols-[1fr_auto] md:items-start ${
-                                  index === group.items.length - 1
-                                    ? ""
-                                    : "border-b border-[var(--border)]"
-                                }`}
-                              >
-                                <div className="max-w-3xl">
-                                  <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
-                                    {action.title}
-                                  </p>
-                                  <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                                    {action.detail}
-                                  </p>
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    <InlineTag
-                                      tone={priorityTone.tone}
-                                      bg={priorityTone.bg}
-                                      border={priorityTone.border}
-                                    >
-                                      {formatPriority(action.priority)}
-                                    </InlineTag>
-                                    <InlineTag
-                                      tone={categoryTone.tone}
-                                      bg={categoryTone.bg}
-                                      border={categoryTone.border}
-                                    >
-                                      {categoryLabel(action.category)}
-                                    </InlineTag>
-                                  </div>
-                                </div>
-                              </article>
-                            );
-                          })}
-                        </div>
+                        <ActionGroup
+                          label={group.label}
+                          helper={group.helper}
+                          groupKey={group.key}
+                          items={group.items}
+                        />
                       </div>
                     ))}
                 </div>
@@ -724,8 +601,14 @@ export default function ActionsPage({ params }: PageProps) {
                     </p>
 
                     <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
-                      <HeaderMeta label="High priority" value={String(highCount)} />
-                      <HeaderMeta label="Medium priority" value={String(mediumCount)} />
+                      <HeaderMeta
+                        label="High priority"
+                        value={String(highCount)}
+                      />
+                      <HeaderMeta
+                        label="Medium priority"
+                        value={String(mediumCount)}
+                      />
                       <HeaderMeta label="Lower priority" value={String(lowCount)} />
                     </div>
                   </div>
