@@ -1,80 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { type ReactNode } from "react";
+
+import { useProjectAuthorityPageState } from "@/lib/authority/useProjectAuthorityPageState";
 
 type PageProps = {
   params: Promise<{
     projectId: string;
   }>;
 };
-
-type OwnerDashboardResponse = {
-  ok: boolean;
-  error?: string;
-  projectId: string;
-  projectDisplayName: string | null;
-  projectCategory: string | null;
-  projectMetro: string | null;
-  domainDisplayValue: string | null;
-  projectLocationLabel: string | null;
-  pageScopeLabel: string;
-  capturedAt: string;
-};
-
-type AuthorityHistoryRow = {
-  project_id: string;
-  captured_at: string;
-  version: string | null;
-  authority_score: number | null;
-  authority_tier: string | null;
-  competitive_strength: number | null;
-  structural_optimization: number | null;
-  momentum_score: number | null;
-  momentum_label: string | null;
-  created_at: string;
-};
-
-type AuthorityHistoryResponse = {
-  ok: boolean;
-  error?: string;
-  projectId: string;
-  limit: number;
-  rows: AuthorityHistoryRow[];
-};
-
-type ActionItem = {
-  title: string;
-  detail: string;
-  priority: "high" | "medium" | "low" | string;
-  category:
-    | "reviews"
-    | "photos"
-    | "posts"
-    | "categories"
-    | "citations"
-    | "general"
-    | string;
-};
-
-type ActionsSuccessResponse = {
-  ok: true;
-  projectId: string;
-  capturedAt: string | null;
-  version: string;
-  actions: ActionItem[];
-  authorityScore?: number | null;
-  authorityTier?: string | null;
-  momentumScore?: number | null;
-  momentumLabel?: string | null;
-};
-
-type ActionsErrorResponse = {
-  ok: false;
-  error: string;
-};
-
-type ActionsResponse = ActionsSuccessResponse | ActionsErrorResponse;
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -160,83 +95,6 @@ function getPriorityTone(priority: string) {
   };
 }
 
-function buildAuthorityRead(row: AuthorityHistoryRow | null) {
-  if (!row || row.authority_score === null) {
-    return {
-      headline: "Get your first authority checkpoint",
-      reason:
-        "Digital Brain does not yet have enough authority data to show how strong this business looks in the local market.",
-    };
-  }
-
-  if (row.authority_score >= 80) {
-    return {
-      headline: "Protect a strong authority position",
-      reason:
-        "This business already shows strong authority signals. The main goal now is to protect that position and keep momentum moving.",
-    };
-  }
-
-  if (row.authority_score >= 60) {
-    return {
-      headline: "Strengthen the next layer of authority",
-      reason:
-        "This business has a workable authority base, but it still has room to improve against stronger local competitors.",
-    };
-  }
-
-  if (row.authority_score >= 40) {
-    return {
-      headline: "Improve trust and market footing",
-      reason:
-        "Authority is present but still weak enough to hold the business back. The next wins should focus on trust, completeness, and competitive strength.",
-    };
-  }
-
-  return {
-    headline: "Build a stronger authority foundation",
-    reason:
-      "This business still needs more trust, completeness, and competitive strength before it can look strong in the market.",
-  };
-}
-
-function buildAuthorityTrend(rows: AuthorityHistoryRow[]) {
-  if (rows.length < 2) {
-    return "Only one authority checkpoint is available so far.";
-  }
-
-  const latest = rows[0];
-  const previous = rows[1];
-
-  if (
-    latest.authority_score !== null &&
-    previous.authority_score !== null &&
-    latest.authority_score > previous.authority_score
-  ) {
-    return `Authority is improving. Score moved from ${previous.authority_score.toFixed(1)} to ${latest.authority_score.toFixed(1)}.`;
-  }
-
-  if (
-    latest.authority_score !== null &&
-    previous.authority_score !== null &&
-    latest.authority_score < previous.authority_score
-  ) {
-    return `Authority slipped. Score moved from ${previous.authority_score.toFixed(1)} to ${latest.authority_score.toFixed(1)}.`;
-  }
-
-  return "Authority is steady compared with the previous checkpoint.";
-}
-
-function pickPrimaryAction(actions: ActionItem[]) {
-  const rank = (priority: string) => {
-    if (priority === "high") return 0;
-    if (priority === "medium") return 1;
-    return 2;
-  };
-
-  return [...actions].sort((a, b) => rank(a.priority) - rank(b.priority))[0] ?? null;
-}
-
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -280,7 +138,10 @@ function MetricStripItem({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: tone }}>
+      <p
+        className="mt-2 text-3xl font-semibold tracking-tight"
+        style={{ color: tone }}
+      >
         {value}
       </p>
     </div>
@@ -326,134 +187,44 @@ function DetailRow({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">{value}</p>
-      {helper ? <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">{helper}</p> : null}
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+          {helper}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 export default function ProjectAuthorityPage({ params }: PageProps) {
-  const [projectId, setProjectId] = useState("");
-  const [dashboardContext, setDashboardContext] = useState<OwnerDashboardResponse | null>(null);
-  const [historyRows, setHistoryRows] = useState<AuthorityHistoryRow[]>([]);
-  const [actions, setActions] = useState<ActionItem[]>([]);
-  const [actionsVersion, setActionsVersion] = useState<string | null>(null);
-  const [actionsCapturedAt, setActionsCapturedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const latestRow = historyRows[0] ?? null;
-  const authorityRead = useMemo(() => buildAuthorityRead(latestRow), [latestRow]);
-  const authorityTrend = useMemo(() => buildAuthorityTrend(historyRows), [historyRows]);
-  const primaryAction = useMemo(() => pickPrimaryAction(actions), [actions]);
-
-  const groupedActions = useMemo(() => {
-    return {
-      high: actions.filter((item) => item.priority === "high"),
-      medium: actions.filter((item) => item.priority === "medium"),
-      low: actions.filter((item) => item.priority !== "high" && item.priority !== "medium"),
-    };
-  }, [actions]);
-
-  async function loadPageData(resolvedProjectId: string) {
-    const [dashboardResponse, historyResponse, actionsResponse] = await Promise.all([
-      fetch(`/api/projects/${resolvedProjectId}/owner-dashboard`, {
-        cache: "no-store",
-      }),
-      fetch(`/api/projects/${resolvedProjectId}/authority-history?limit=12`, {
-        cache: "no-store",
-      }),
-      fetch(`/api/projects/${resolvedProjectId}/actions`, {
-        cache: "no-store",
-      }),
-    ]);
-
-    const dashboardJson = (await dashboardResponse.json()) as OwnerDashboardResponse;
-    const historyJson = (await historyResponse.json()) as AuthorityHistoryResponse;
-    const actionsJson = (await actionsResponse.json()) as ActionsResponse;
-
-    if (!dashboardResponse.ok || !dashboardJson.ok) {
-      throw new Error(dashboardJson.error ?? "Failed to load owner dashboard context.");
-    }
-
-    if (!historyResponse.ok || !historyJson.ok) {
-      throw new Error(historyJson.error ?? "Failed to load authority history.");
-    }
-
-    if (!actionsResponse.ok || !actionsJson.ok) {
-      throw new Error(actionsJson.ok ? "Failed to load actions." : actionsJson.error);
-    }
-
-    setDashboardContext(dashboardJson);
-    setHistoryRows(Array.isArray(historyJson.rows) ? historyJson.rows : []);
-    setActions(Array.isArray(actionsJson.actions) ? actionsJson.actions : []);
-    setActionsVersion(actionsJson.version ?? null);
-    setActionsCapturedAt(actionsJson.capturedAt ?? null);
-  }
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadPage() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const resolvedParams = await params;
-        const resolvedProjectId = resolvedParams.projectId;
-
-        if (!resolvedProjectId) {
-          throw new Error("Missing projectId.");
-        }
-
-        if (!isMounted) {
-          return;
-        }
-
-        setProjectId(resolvedProjectId);
-        await loadPageData(resolvedProjectId);
-      } catch (err) {
-        if (!isMounted) {
-          return;
-        }
-
-        setError(err instanceof Error ? err.message : "Failed to load authority page.");
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadPage();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [params]);
-
-  async function refreshPage() {
-    if (!projectId) {
-      return;
-    }
-
-    try {
-      setRefreshing(true);
-      setError(null);
-      await loadPageData(projectId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to refresh authority page.");
-    } finally {
-      setRefreshing(false);
-    }
-  }
+  const {
+    projectId,
+    dashboardContext,
+    historyRows,
+    actions,
+    actionsVersion,
+    actionsCapturedAt,
+    loading,
+    refreshing,
+    error,
+    latestRow,
+    authorityRead,
+    authorityTrend,
+    primaryAction,
+    groupedActions,
+    refreshPage,
+  } = useProjectAuthorityPageState(params);
 
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-base text-[var(--text-body)]">Loading authority page...</p>
+          <p className="text-base text-[var(--text-body)]">
+            Loading authority page...
+          </p>
         </div>
       </main>
     );
@@ -471,19 +242,25 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 See how strong this business looks to Google right now.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                Authority shows how much trust, completeness, and competitive strength this business
-                has in the local market. Use this page to see where the business stands and what to
-                improve next.
+                Authority shows how much trust, completeness, and competitive
+                strength this business has in the local market. Use this page to
+                see where the business stands and what to improve next.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
-                <InlineTag tone="var(--brand-600)" bg="var(--brand-100)" border="var(--brand-600)">
+                <InlineTag
+                  tone="var(--brand-600)"
+                  bg="var(--brand-100)"
+                  border="var(--brand-600)"
+                >
                   Tier: {formatTier(latestRow?.authority_tier ?? null)}
                 </InlineTag>
                 <InlineTag>
                   Momentum: {formatMomentumLabel(latestRow?.momentum_label ?? null)}
                 </InlineTag>
-                <InlineTag>Score: {formatScore(latestRow?.authority_score ?? null)}</InlineTag>
+                <InlineTag>
+                  Score: {formatScore(latestRow?.authority_score ?? null)}
+                </InlineTag>
               </div>
             </div>
 
@@ -531,10 +308,15 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 "Not set"
               }
             />
-            <HeaderMeta label="Scope" value={dashboardContext?.pageScopeLabel ?? "Not set"} />
+            <HeaderMeta
+              label="Scope"
+              value={dashboardContext?.pageScopeLabel ?? "Not set"}
+            />
             <HeaderMeta
               label="Snapshot"
-              value={formatDate(latestRow?.captured_at ?? dashboardContext?.capturedAt ?? null)}
+              value={formatDate(
+                latestRow?.captured_at ?? dashboardContext?.capturedAt ?? null,
+              )}
             />
           </div>
         </section>
@@ -583,8 +365,9 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
               Start with the strongest next moves
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Begin with the high-priority work first. These are the actions most likely to improve
-              how strong and trustworthy this business looks in its market.
+              Begin with the high-priority work first. These are the actions
+              most likely to improve how strong and trustworthy this business
+              looks in its market.
             </p>
 
             <div className="mt-6">
@@ -592,19 +375,22 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 {
                   key: "high",
                   label: "High priority",
-                  helper: "Do these first because they carry the most weight right now.",
+                  helper:
+                    "Do these first because they carry the most weight right now.",
                   items: groupedActions.high,
                 },
                 {
                   key: "medium",
                   label: "Medium priority",
-                  helper: "Do these after the highest-impact gaps are covered.",
+                  helper:
+                    "Do these after the highest-impact gaps are covered.",
                   items: groupedActions.medium,
                 },
                 {
                   key: "low",
                   label: "Lower priority",
-                  helper: "These still help, but they matter less than the top items above.",
+                  helper:
+                    "These still help, but they matter less than the top items above.",
                   items: groupedActions.low,
                 },
               ]
@@ -612,9 +398,13 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                 .map((group, groupIndex) => (
                   <div
                     key={group.key}
-                    className={`py-6 ${groupIndex === 0 ? "" : "border-t border-[var(--border)]"}`}
+                    className={`py-6 ${
+                      groupIndex === 0 ? "" : "border-t border-[var(--border)]"
+                    }`}
                   >
-                    <p className="text-lg font-semibold text-[var(--text-strong)]">{group.label}</p>
+                    <p className="text-lg font-semibold text-[var(--text-strong)]">
+                      {group.label}
+                    </p>
                     <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
                       {group.helper}
                     </p>
@@ -795,7 +585,10 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                     label="Momentum"
                     value={formatMomentumLabel(latestRow?.momentum_label ?? null)}
                   />
-                  <HeaderMeta label="Stored actions" value={String(actions.length)} />
+                  <HeaderMeta
+                    label="Stored actions"
+                    value={String(actions.length)}
+                  />
                 </div>
               </div>
             </section>
