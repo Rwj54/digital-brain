@@ -8,6 +8,9 @@ type PersistResolvedIdentityFieldsResult = {
 };
 
 type PersistCanonicalAutomationFieldsResult = {
+  categoryPersisted: boolean;
+  metroPersisted: boolean;
+  radiusMilesPersisted: boolean;
   primaryCategoryPersisted: boolean;
   targetMetroPersisted: boolean;
   targetRadiusMilesPersisted: boolean;
@@ -43,6 +46,7 @@ type AuthorityBaselineResult = Awaited<ReturnType<typeof runAuthorityBaseline>>;
 
 export type BuildOnboardingNotesInput = {
   identity: ReturnType<typeof enrichProjectIdentity>;
+  websiteSignalNotes: string[];
   persistedIdentity: PersistResolvedIdentityFieldsResult;
   persistedAutomationFields: PersistCanonicalAutomationFieldsResult;
   persistedRankCoordinates: PersistRankCoordinatesResult;
@@ -75,7 +79,7 @@ function appendIdentityPersistenceNotes(
     identity: ReturnType<typeof enrichProjectIdentity>;
     persistedIdentity: PersistResolvedIdentityFieldsResult;
     persistedAutomationFields: PersistCanonicalAutomationFieldsResult;
-  }
+  },
 ): void {
   const { identity, persistedIdentity, persistedAutomationFields } = params;
 
@@ -91,11 +95,34 @@ function appendIdentityPersistenceNotes(
   }
 
   if (
+    persistedAutomationFields.categoryPersisted &&
+    identity.canonicalCategory
+  ) {
+    notes.push(`Persisted canonical category into category: ${identity.canonicalCategory}`);
+  }
+
+  if (
+    persistedAutomationFields.metroPersisted &&
+    identity.canonicalMetro
+  ) {
+    notes.push(`Persisted canonical metro into metro: ${identity.canonicalMetro}`);
+  }
+
+  if (
+    persistedAutomationFields.radiusMilesPersisted &&
+    typeof identity.canonicalRadiusMiles === "number"
+  ) {
+    notes.push(
+      `Persisted canonical radius into radius_miles: ${identity.canonicalRadiusMiles}`,
+    );
+  }
+
+  if (
     persistedAutomationFields.primaryCategoryPersisted &&
     identity.canonicalCategory
   ) {
     notes.push(
-      `Promoted canonical category into primary_category: ${identity.canonicalCategory}`
+      `Promoted canonical category into primary_category: ${identity.canonicalCategory}`,
     );
   }
 
@@ -104,7 +131,7 @@ function appendIdentityPersistenceNotes(
     identity.canonicalMetro
   ) {
     notes.push(
-      `Persisted automation-safe target_metro: ${identity.canonicalMetro}`
+      `Persisted automation-safe target_metro: ${identity.canonicalMetro}`,
     );
   }
 
@@ -113,7 +140,7 @@ function appendIdentityPersistenceNotes(
     typeof identity.canonicalRadiusMiles === "number"
   ) {
     notes.push(
-      `Persisted canonical target_radius_miles: ${identity.canonicalRadiusMiles}`
+      `Persisted canonical target_radius_miles: ${identity.canonicalRadiusMiles}`,
     );
   }
 
@@ -127,27 +154,27 @@ function appendRankCoordinateNotes(
   params: {
     identity: ReturnType<typeof enrichProjectIdentity>;
     persistedRankCoordinates: PersistRankCoordinatesResult;
-  }
+  },
 ): void {
   const { identity, persistedRankCoordinates } = params;
 
   if (persistedRankCoordinates.rankCoordinatesPersisted) {
     notes.push(
-      `Persisted rank coordinates from DataForSEO business info: ${persistedRankCoordinates.resolvedRankLat}, ${persistedRankCoordinates.resolvedRankLng}.`
+      `Persisted rank coordinates from DataForSEO business info: ${persistedRankCoordinates.resolvedRankLat}, ${persistedRankCoordinates.resolvedRankLng}.`,
     );
     notes.push(
-      `Rank coordinate match strategy: ${persistedRankCoordinates.matchedBy}.`
+      `Rank coordinate match strategy: ${persistedRankCoordinates.matchedBy}.`,
     );
 
     if (persistedRankCoordinates.matchedTitle) {
       notes.push(
-        `Matched business listing title for rank coordinates: ${persistedRankCoordinates.matchedTitle}`
+        `Matched business listing title for rank coordinates: ${persistedRankCoordinates.matchedTitle}`,
       );
     }
 
     if (persistedRankCoordinates.matchedDomain) {
       notes.push(
-        `Matched business listing domain for rank coordinates: ${persistedRankCoordinates.matchedDomain}`
+        `Matched business listing domain for rank coordinates: ${persistedRankCoordinates.matchedDomain}`,
       );
     }
 
@@ -167,10 +194,10 @@ function appendRankCoordinateNotes(
     persistedRankCoordinates.resolvedRankLng !== null
   ) {
     notes.push(
-      `Rank coordinates resolved during onboarding: ${persistedRankCoordinates.resolvedRankLat}, ${persistedRankCoordinates.resolvedRankLng}.`
+      `Rank coordinates resolved during onboarding: ${persistedRankCoordinates.resolvedRankLat}, ${persistedRankCoordinates.resolvedRankLng}.`,
     );
     notes.push(
-      `Rank coordinate match strategy: ${persistedRankCoordinates.matchedBy}.`
+      `Rank coordinate match strategy: ${persistedRankCoordinates.matchedBy}.`,
     );
   }
 }
@@ -182,7 +209,7 @@ function appendNormalizationNotes(
     normalizedKeywords: NormalizeProjectRankKeywordsResult;
     normalizedRankSnapshots: NormalizeLegacyRankSnapshotsResult;
     canonicalKeywordForSnapshots: string;
-  }
+  },
 ): void {
   const {
     identity,
@@ -193,7 +220,7 @@ function appendNormalizationNotes(
 
   if (normalizedKeywords.normalizedKeywordCount > 0 && identity.canonicalMetro) {
     notes.push(
-      `Normalized ${normalizedKeywords.normalizedKeywordCount} project rank keyword record(s) to canonical keyword casing and metro: ${identity.canonicalMetro}.`
+      `Normalized ${normalizedKeywords.normalizedKeywordCount} project rank keyword record(s) to canonical keyword casing and metro: ${identity.canonicalMetro}.`,
     );
   }
 
@@ -203,37 +230,37 @@ function appendNormalizationNotes(
     canonicalKeywordForSnapshots
   ) {
     notes.push(
-      `Normalized ${normalizedRankSnapshots.normalizedSnapshotCount} legacy rank snapshot row(s) to canonical rank context: ${canonicalKeywordForSnapshots} / ${identity.canonicalMetro}.`
+      `Normalized ${normalizedRankSnapshots.normalizedSnapshotCount} legacy rank snapshot row(s) to canonical rank context: ${canonicalKeywordForSnapshots} / ${identity.canonicalMetro}.`,
     );
   }
 }
 
 function appendBaselineNotes(
   notes: string[],
-  baselineRankDiscovery: BaselineRankDiscoveryResult
+  baselineRankDiscovery: BaselineRankDiscoveryResult,
 ): void {
   if (baselineRankDiscovery.executed) {
     notes.push(
-      `Baseline rank discovery executed during onboarding for ${baselineRankDiscovery.keyword} / ${baselineRankDiscovery.metro}.`
+      `Baseline rank discovery executed during onboarding for ${baselineRankDiscovery.keyword} / ${baselineRankDiscovery.metro}.`,
     );
     notes.push(
-      `Baseline rank discovery stored ${baselineRankDiscovery.storedCount} snapshot row(s) from ${baselineRankDiscovery.candidateCount} discovered candidate(s).`
+      `Baseline rank discovery stored ${baselineRankDiscovery.storedCount} snapshot row(s) from ${baselineRankDiscovery.candidateCount} discovered candidate(s).`,
     );
 
     if (baselineRankDiscovery.targetProfileHydrated) {
       notes.push(
-        `Hydrated gbp_profiles from baseline rank discovery using ${baselineRankDiscovery.targetProfileMatchedBy} match.`
+        `Hydrated gbp_profiles from baseline rank discovery using ${baselineRankDiscovery.targetProfileMatchedBy} match.`,
       );
 
       if (baselineRankDiscovery.targetProfileName) {
         notes.push(
-          `Hydrated target GBP profile name: ${baselineRankDiscovery.targetProfileName}.`
+          `Hydrated target GBP profile name: ${baselineRankDiscovery.targetProfileName}.`,
         );
       }
 
       if (baselineRankDiscovery.targetProfilePlaceId) {
         notes.push(
-          `Hydrated target GBP profile place_id: ${baselineRankDiscovery.targetProfilePlaceId}.`
+          `Hydrated target GBP profile place_id: ${baselineRankDiscovery.targetProfilePlaceId}.`,
         );
       }
     }
@@ -255,25 +282,25 @@ function appendKeywordReadinessNotes(
       metro: string;
       priority: number;
     }>;
-  }
+  },
 ): void {
   const { seededKeywordCount, refreshedActiveKeywords } = params;
 
   if (seededKeywordCount > 0) {
     notes.push(
-      `Seeded ${seededKeywordCount} keyword(s) during onboarding startup.`
+      `Seeded ${seededKeywordCount} keyword(s) during onboarding startup.`,
     );
   }
 
   if (refreshedActiveKeywords.length === 0) {
     notes.push(
-      "Project has no active rank keywords yet, so rank and authority baselines remain blocked."
+      "Project has no active rank keywords yet, so rank and authority baselines remain blocked.",
     );
     return;
   }
 
   notes.push(
-    `Project has ${refreshedActiveKeywords.length} active rank keyword(s) ready for downstream workflows.`
+    `Project has ${refreshedActiveKeywords.length} active rank keyword(s) ready for downstream workflows.`,
   );
 }
 
@@ -281,7 +308,7 @@ function appendCompetitorDiscoveryNotes(
   notes: string[],
   competitorDiscoveryStarted: boolean,
   competitorDiscoveryFailureNote: string | null | undefined,
-  identity: ReturnType<typeof enrichProjectIdentity>
+  identity: ReturnType<typeof enrichProjectIdentity>,
 ): void {
   if (competitorDiscoveryStarted) {
     notes.push("Competitor discovery started successfully during onboarding.");
@@ -292,21 +319,21 @@ function appendCompetitorDiscoveryNotes(
 
   if (!identity.readiness.competitorDiscoveryReady) {
     notes.push(
-      "Competitor discovery was skipped because canonical category or canonical metro is still missing."
+      "Competitor discovery was skipped because canonical category or canonical metro is still missing.",
     );
   }
 }
 
 function appendAuthorityNotes(
   notes: string[],
-  authorityBaseline: AuthorityBaselineResult
+  authorityBaseline: AuthorityBaselineResult,
 ): void {
   if (authorityBaseline.executed) {
     notes.push(
-      `Authority baseline executed during onboarding: score ${authorityBaseline.authorityScore}, tier ${authorityBaseline.authorityTier}, momentum ${authorityBaseline.momentumLabel}.`
+      `Authority baseline executed during onboarding: score ${authorityBaseline.authorityScore}, tier ${authorityBaseline.authorityTier}, momentum ${authorityBaseline.momentumLabel}.`,
     );
     notes.push(
-      `Authority baseline stored ${authorityBaseline.actionsCount} project action(s).`
+      `Authority baseline stored ${authorityBaseline.actionsCount} project action(s).`,
     );
     return;
   }
@@ -323,7 +350,7 @@ function appendPlanningNotes(
     authorityBaseline: AuthorityBaselineResult;
     baselineRankPlanned: boolean;
     authorityBaselinePlanned: boolean;
-  }
+  },
 ): void {
   const {
     baselineRankDiscovery,
@@ -334,38 +361,39 @@ function appendPlanningNotes(
 
   if (baselineRankDiscovery.executed) {
     notes.push(
-      "Baseline rank discovery has already been initialized during onboarding."
+      "Baseline rank discovery has already been initialized during onboarding.",
     );
   } else if (baselineRankPlanned) {
     notes.push(
-      "Baseline rank discovery is now structurally ready once the rank workflow is invoked."
+      "Baseline rank discovery is now structurally ready once the rank workflow is invoked.",
     );
   } else {
     notes.push(
-      "Baseline rank discovery is not ready yet because rank coordinates or active keywords are still missing."
+      "Baseline rank discovery is not ready yet because rank coordinates or active keywords are still missing.",
     );
   }
 
   if (authorityBaseline.executed) {
     notes.push(
-      "Authority baseline has already been initialized during onboarding."
+      "Authority baseline has already been initialized during onboarding.",
     );
   } else if (authorityBaselinePlanned) {
     notes.push(
-      "Authority baseline is now structurally ready once the authority workflow is invoked."
+      "Authority baseline is now structurally ready once the authority workflow is invoked.",
     );
   } else {
     notes.push(
-      "Authority baseline is not ready yet because the rank baseline prerequisites are not fully satisfied."
+      "Authority baseline is not ready yet because the rank baseline prerequisites are not fully satisfied.",
     );
   }
 }
 
 export function buildOnboardingNotes(
-  params: BuildOnboardingNotesInput
+  params: BuildOnboardingNotesInput,
 ): string[] {
   const notes: string[] = [
     "Phase 3G onboarding now attempts rank coordinate automation after canonical identity and automation fields are resolved.",
+    ...params.websiteSignalNotes,
     ...params.identity.notes,
   ];
 
@@ -398,7 +426,7 @@ export function buildOnboardingNotes(
     notes,
     params.competitorDiscoveryStarted,
     params.competitorDiscoveryFailureNote,
-    params.identity
+    params.identity,
   );
 
   appendAuthorityNotes(notes, params.authorityBaseline);

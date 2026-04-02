@@ -1,5 +1,6 @@
 import { loadProjectOnboardingContext } from "@/lib/onboarding/loadProjectOnboardingContext";
 import { enrichProjectIdentity } from "@/lib/onboarding/enrichProjectIdentity";
+import { extractWebsiteOnboardingSignals } from "@/lib/onboarding/extractWebsiteOnboardingSignals";
 import { buildOnboardingNotes } from "@/lib/onboarding/buildOnboardingNotes";
 import { buildProjectOnboardingJobSuccessSummary } from "@/lib/onboarding/buildProjectOnboardingJobSuccessSummary";
 import {
@@ -98,8 +99,64 @@ function normalizeKeywordValue(value: string | null | undefined): string {
   return normalizeString(value).toLowerCase();
 }
 
+function pickFirstNonEmptyString(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    const normalized = normalizeString(value);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function pickFirstPositiveInteger(
+  ...values: Array<number | null | undefined>
+): number | null {
+  for (const value of values) {
+    const normalized = normalizePositiveInteger(value);
+    if (normalized !== null) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function buildEffectiveSeedKeywords(params: {
+  inputSeedKeywords: SeedRankKeywordInput[] | undefined;
+  canonicalCategory: string | null;
+  canonicalMetro: string | null;
+}): SeedRankKeywordInput[] {
+  const providedSeedKeywords = Array.isArray(params.inputSeedKeywords)
+    ? params.inputSeedKeywords
+    : [];
+
+  if (providedSeedKeywords.length > 0) {
+    return providedSeedKeywords;
+  }
+
+  const canonicalCategory = normalizeString(params.canonicalCategory);
+  const canonicalMetro = normalizeString(params.canonicalMetro);
+
+  if (!canonicalCategory || !canonicalMetro) {
+    return [];
+  }
+
+  return [
+    {
+      keyword: canonicalCategory,
+      metro: canonicalMetro,
+      priority: 1,
+      isActive: true,
+    },
+  ];
+}
+
 export async function runProjectOnboarding(
-  input: RunProjectOnboardingInput
+  input: RunProjectOnboardingInput,
 ): Promise<RunProjectOnboardingResult> {
   const projectId =
     typeof input.projectId === "string" ? input.projectId.trim() : "";
@@ -128,7 +185,7 @@ export async function runProjectOnboarding(
   try {
     const { project } = await loadProjectOnboardingContext(projectId);
 
-    const identity = enrichProjectIdentity({
+    const initialIdentity = enrichProjectIdentity({
       siteUrl: project.site_url,
       category: project.category,
       metro: project.metro,
@@ -143,9 +200,52 @@ export async function runProjectOnboarding(
       mapsLocationCode: project.maps_location_code,
     });
 
+    const websiteSignals = await extractWebsiteOnboardingSignals({
+      siteUrl: initialIdentity.canonicalSiteUrl ?? project.site_url,
+    });
+
+    const effectiveCategory = pickFirstNonEmptyString(
+      project.primary_category,
+      project.category,
+      websiteSignals.inferredCategory,
+    );
+
+    const effectiveMetro = pickFirstNonEmptyString(
+      project.target_metro,
+      project.metro,
+      websiteSignals.inferredMetro,
+    );
+
+    const effectiveRadiusMiles = pickFirstPositiveInteger(
+      project.target_radius_miles,
+      project.radius_miles,
+      websiteSignals.inferredRadiusMiles,
+    );
+
+    const identity = enrichProjectIdentity({
+      siteUrl: project.site_url,
+      category: effectiveCategory,
+      metro: effectiveMetro,
+      radiusMiles: effectiveRadiusMiles,
+      primaryCategory: effectiveCategory,
+      targetMetro: effectiveMetro,
+      targetRadiusMiles: effectiveRadiusMiles,
+      targetDomain: project.target_domain,
+      targetBrandName: project.target_brand_name,
+      rankLat: project.rank_lat,
+      rankLng: project.rank_lng,
+      mapsLocationCode: project.maps_location_code,
+    });
+
+    const effectiveSeedKeywords = buildEffectiveSeedKeywords({
+      inputSeedKeywords: input.seedKeywords,
+      canonicalCategory: identity.canonicalCategory,
+      canonicalMetro: identity.canonicalMetro,
+    });
+
     const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
       projectId,
-      seedKeywords: input.seedKeywords ?? [],
+      seedKeywords: effectiveSeedKeywords,
       canonicalMetro: identity.canonicalMetro,
     });
 
@@ -160,6 +260,9 @@ export async function runProjectOnboarding(
     const persistedAutomationFields =
       await persistProjectOnboardingAutomationFields({
         projectId,
+        currentCategory: project.category,
+        currentMetro: project.metro,
+        currentRadiusMiles: project.radius_miles,
         currentPrimaryCategory: project.primary_category,
         currentTargetMetro: project.target_metro,
         currentTargetRadiusMiles: project.target_radius_miles,
@@ -199,7 +302,7 @@ export async function runProjectOnboarding(
     });
 
     const canonicalKeywordForSnapshots =
-      normalizeKeywordValue((input.seedKeywords ?? [])[0]?.keyword) ||
+      normalizeKeywordValue(effectiveSeedKeywords[0]?.keyword) ||
       normalizeKeywordValue(identity.canonicalCategory);
 
     const normalizedRankSnapshots =
@@ -228,8 +331,10 @@ export async function runProjectOnboarding(
 
     const hasActiveKeywords = refreshedActiveKeywords.length > 0;
     const hasRankCoordinates =
-      (persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null) !== null &&
-      (persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null) !== null;
+      (persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null) !==
+        null &&
+      (persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null) !==
+        null;
 
     const baselineRankPlanned = hasRankCoordinates && hasActiveKeywords;
 
@@ -275,6 +380,7 @@ export async function runProjectOnboarding(
 
     const notes = buildOnboardingNotes({
       identity,
+      websiteSignalNotes: websiteSignals.notes,
       persistedIdentity,
       persistedAutomationFields,
       persistedRankCoordinates,

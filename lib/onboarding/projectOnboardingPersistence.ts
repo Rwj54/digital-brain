@@ -68,6 +68,9 @@ export async function persistProjectOnboardingIdentityFields(params: {
 
 export async function persistProjectOnboardingAutomationFields(params: {
   projectId: string;
+  currentCategory: string | null;
+  currentMetro: string | null;
+  currentRadiusMiles: number | null;
   currentPrimaryCategory: string | null;
   currentTargetMetro: string | null;
   currentTargetRadiusMiles: number | null;
@@ -76,16 +79,22 @@ export async function persistProjectOnboardingAutomationFields(params: {
   canonicalMetro: string | null;
   canonicalRadiusMiles: number | null;
 }): Promise<{
+  categoryPersisted: boolean;
+  metroPersisted: boolean;
+  radiusMilesPersisted: boolean;
   primaryCategoryPersisted: boolean;
   targetMetroPersisted: boolean;
   targetRadiusMilesPersisted: boolean;
   mapsLocationCodePersisted: boolean;
   resolvedMapsLocationCode: number | null;
 }> {
+  const currentCategory = normalizeString(params.currentCategory);
+  const currentMetro = normalizeString(params.currentMetro);
+  const currentRadiusMiles = normalizePositiveInteger(params.currentRadiusMiles);
   const currentPrimaryCategory = normalizeString(params.currentPrimaryCategory);
   const currentTargetMetro = normalizeString(params.currentTargetMetro);
   const currentTargetRadiusMiles = normalizePositiveInteger(
-    params.currentTargetRadiusMiles
+    params.currentTargetRadiusMiles,
   );
   const currentMapsLocationCode = normalizePositiveInteger(params.currentMapsLocationCode);
 
@@ -102,11 +111,26 @@ export async function persistProjectOnboardingAutomationFields(params: {
   }
 
   const updates: {
+    category?: string;
+    metro?: string;
+    radius_miles?: number;
     primary_category?: string;
     target_metro?: string;
     target_radius_miles?: number;
     maps_location_code?: number;
   } = {};
+
+  if (canonicalCategory && currentCategory !== canonicalCategory) {
+    updates.category = canonicalCategory;
+  }
+
+  if (canonicalMetro && currentMetro !== canonicalMetro) {
+    updates.metro = canonicalMetro;
+  }
+
+  if (canonicalRadiusMiles !== null && currentRadiusMiles !== canonicalRadiusMiles) {
+    updates.radius_miles = canonicalRadiusMiles;
+  }
 
   if (!currentPrimaryCategory && canonicalCategory) {
     updates.primary_category = canonicalCategory;
@@ -131,12 +155,18 @@ export async function persistProjectOnboardingAutomationFields(params: {
   }
 
   if (
+    !updates.category &&
+    !updates.metro &&
+    typeof updates.radius_miles !== "number" &&
     !updates.primary_category &&
     !updates.target_metro &&
     typeof updates.target_radius_miles !== "number" &&
     typeof updates.maps_location_code !== "number"
   ) {
     return {
+      categoryPersisted: false,
+      metroPersisted: false,
+      radiusMilesPersisted: false,
       primaryCategoryPersisted: false,
       targetMetroPersisted: false,
       targetRadiusMilesPersisted: false,
@@ -154,11 +184,14 @@ export async function persistProjectOnboardingAutomationFields(params: {
 
   if (error) {
     throw new Error(
-      `Failed to persist canonical automation fields: ${error.message}`
+      `Failed to persist canonical automation fields: ${error.message}`,
     );
   }
 
   return {
+    categoryPersisted: Boolean(updates.category),
+    metroPersisted: Boolean(updates.metro),
+    radiusMilesPersisted: typeof updates.radius_miles === "number",
     primaryCategoryPersisted: Boolean(updates.primary_category),
     targetMetroPersisted: Boolean(updates.target_metro),
     targetRadiusMilesPersisted:
