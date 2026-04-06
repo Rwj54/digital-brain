@@ -304,7 +304,9 @@ export function OwnerDetailSections({
                   {aiNextAction.reason}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <InlineTag>Who: {formatWho(aiNextAction.whoShouldDoIt)}</InlineTag>
+                  <InlineTag>
+                    Who: {formatWho(aiNextAction.whoShouldDoIt)}
+                  </InlineTag>
                   <InlineTag>
                     Difficulty: {formatDifficulty(aiNextAction.difficulty)}
                   </InlineTag>
@@ -341,8 +343,9 @@ export function OwnerDetailSections({
                   AI navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the full AI visibility page for the dedicated machine-readiness read,
-                  supporting evidence, and owner-facing AI action guidance.
+                  Open the full AI visibility page for the dedicated
+                  machine-readiness read, supporting evidence, and owner-facing
+                  AI action guidance.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
@@ -402,7 +405,9 @@ export function OwnerDetailSections({
               />
               <DetailRow
                 label="Target domain"
-                value={dashboard.dashboard.websiteSummary.targetDomain ?? "Not set"}
+                value={
+                  dashboard.dashboard.websiteSummary.targetDomain ?? "Not set"
+                }
               />
               <DetailRow
                 label="Derived site domain"
@@ -413,12 +418,18 @@ export function OwnerDetailSections({
               />
               <DetailRow
                 label="Brand name"
-                value={dashboard.dashboard.websiteSummary.targetBrandName ?? "Not set"}
+                value={
+                  dashboard.dashboard.websiteSummary.targetBrandName ?? "Not set"
+                }
               />
               <DetailRow
                 label="Domain alignment"
-                value={getWebsiteAlignmentLabel(dashboard.dashboard.websiteSummary)}
-                helper={getWebsiteAlignmentHelper(dashboard.dashboard.websiteSummary)}
+                value={getWebsiteAlignmentLabel(
+                  dashboard.dashboard.websiteSummary,
+                )}
+                helper={getWebsiteAlignmentHelper(
+                  dashboard.dashboard.websiteSummary,
+                )}
               />
 
               <div className="border-t border-[var(--border)] py-4">
@@ -433,10 +444,12 @@ export function OwnerDetailSections({
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <InlineTag>
-                    Who: {dashboard.dashboard.websiteSummary.nextAction.whoShouldDoIt}
+                    Who:{" "}
+                    {dashboard.dashboard.websiteSummary.nextAction.whoShouldDoIt}
                   </InlineTag>
                   <InlineTag>
-                    Difficulty: {dashboard.dashboard.websiteSummary.nextAction.difficulty}
+                    Difficulty:{" "}
+                    {dashboard.dashboard.websiteSummary.nextAction.difficulty}
                   </InlineTag>
                 </div>
               </div>
@@ -446,24 +459,49 @@ export function OwnerDetailSections({
                   What this tells you now
                 </p>
                 <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
-                  {dashboard.dashboard.websiteSummary.evidence.map((item, index) => (
-                    <DetailBullet
-                      key={`${index}-${item}`}
-                      text={item}
-                      color={
-                        index === 0
-                          ? websiteTone.solid
-                          : index === 1
-                            ? "var(--warning)"
-                            : index === 2
-                              ? "var(--brand-600)"
-                              : index === 3
-                                ? "var(--accent-blue-600)"
-                                : "var(--success)"
-                      }
-                    />
-                  ))}
+                  {dashboard.dashboard.websiteSummary.evidence.map(
+                    (item, index) => (
+                      <DetailBullet
+                        key={`${index}-${item}`}
+                        text={item}
+                        color={
+                          index === 0
+                            ? websiteTone.solid
+                            : index === 1
+                              ? "var(--warning)"
+                              : index === 2
+                                ? "var(--brand-600)"
+                                : index === 3
+                                  ? "var(--accent-blue-600)"
+                                  : "var(--success)"
+                        }
+                      />
+                    ),
+                  )}
                 </ul>
+              </div>
+
+              <div className="border-t border-[var(--border)] py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Website navigation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  Open the full website page for the dedicated website identity
+                  read, supporting evidence, and owner-facing website action
+                  guidance.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${dashboard.projectId}/website`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open full website page
+                  </Link>
+                </div>
               </div>
             </div>
           </>
@@ -479,15 +517,17 @@ export function OwnerDetailSections({
                 Business impact footing
               </h3>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                This is the early owner-facing business-outcomes layer. It
-                shows whether customer-event and conversion context exists yet,
+                This is the early owner-facing business-outcomes layer. It shows
+                whether customer-event and conversion context exists yet,
                 without exposing internal scoring logic.
               </p>
 
               <div className="mt-6">
                 <DetailRow
                   label="Monthly events"
-                  value={formatCount(dashboard.dashboard.outcomesSummary.monthlyCustomerEvents)}
+                  value={formatCount(
+                    dashboard.dashboard.outcomesSummary.monthlyCustomerEvents,
+                  )}
                   helper="How many tracked customer events are connected."
                 />
                 <DetailRow
@@ -503,11 +543,17 @@ export function OwnerDetailSections({
             <div>
               <DetailRow
                 label="Singular label"
-                value={dashboard.dashboard.outcomesSummary.eventLabelSingular ?? "Not set"}
+                value={
+                  dashboard.dashboard.outcomesSummary.eventLabelSingular ??
+                  "Not set"
+                }
               />
               <DetailRow
                 label="Plural label"
-                value={dashboard.dashboard.outcomesSummary.eventLabelPlural ?? "Not set"}
+                value={
+                  dashboard.dashboard.outcomesSummary.eventLabelPlural ??
+                  "Not set"
+                }
               />
               <DetailRow
                 label="Plain-English read"
@@ -546,9 +592,9 @@ export function OwnerDetailSections({
                 Why these actions are on the page
               </h3>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
-                This is the owner-readable evidence layer for the guided actions.
-                It explains what is being asked, who should do it, how hard it
-                is, and what success looks like.
+                This is the owner-readable evidence layer for the guided
+                actions. It explains what is being asked, who should do it, how
+                hard it is, and what success looks like.
               </p>
 
               <div className="mt-6 space-y-6">
