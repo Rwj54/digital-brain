@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   formatConversionRate,
   formatCount,
@@ -332,6 +334,28 @@ export function OwnerDetailSections({
                     />
                   ))}
                 </ul>
+              </div>
+
+              <div className="border-t border-[var(--border)] py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  AI navigation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  Open the full AI visibility page for the dedicated machine-readiness read,
+                  supporting evidence, and owner-facing AI action guidance.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${dashboard.projectId}/ai`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open full AI visibility page
+                  </Link>
+                </div>
               </div>
             </div>
           </>
