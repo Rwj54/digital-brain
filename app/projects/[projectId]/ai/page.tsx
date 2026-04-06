@@ -1,0 +1,628 @@
+"use client";
+
+import Link from "next/link";
+import { type ReactNode } from "react";
+
+import { useProjectAiPageState } from "@/lib/ai/useProjectAiPageState";
+
+type PageProps = {
+  params: Promise<{
+    projectId: string;
+  }>;
+};
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MetricStripItem({
+  label,
+  value,
+  bg,
+  tone,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  tone: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ backgroundColor: bg }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p
+        className="mt-2 text-3xl font-semibold tracking-tight"
+        style={{ color: tone }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function InlineTag({
+  children,
+  tone,
+  bg,
+  border,
+}: {
+  children: ReactNode;
+  tone?: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: tone ?? "var(--text-body)",
+        backgroundColor: bg ?? "transparent",
+        borderColor: border ?? "var(--border)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+          {helper}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function EvidenceBullet({
+  text,
+  color,
+}: {
+  text: string;
+  color: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className="mt-2 h-2.5 w-2.5 shrink-0"
+        style={{ backgroundColor: color }}
+      />
+      <span>{text}</span>
+    </li>
+  );
+}
+
+function boolLabel(value: boolean | undefined) {
+  return value ? "Yes" : "No";
+}
+
+function scoreLabel(value: number | null | undefined) {
+  return typeof value === "number" ? `${value}` : "Not set";
+}
+
+function textValue(value: string | null | undefined, fallback = "Not set") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function reviewSignalsValue(
+  totalReviews: number | null | undefined,
+  rating: number | null | undefined,
+) {
+  const reviews = typeof totalReviews === "number" ? totalReviews : 0;
+  const ratingText =
+    typeof rating === "number" ? rating.toFixed(1) : "not set yet";
+
+  return `${reviews} reviews, rating ${ratingText}`;
+}
+
+export default function ProjectAiPage({ params }: PageProps) {
+  const { projectId, dashboardContext, aiSummary, loading, error } =
+    useProjectAiPageState(params);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">
+            Loading AI page...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !aiSummary) {
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="border-t-2 border-[var(--danger)] pt-5">
+            <p className="text-base font-medium text-[var(--danger)]">
+              {error || "Failed to load AI page."}
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const aiScore =
+    typeof aiSummary.aiReadinessScore === "number"
+      ? aiSummary.aiReadinessScore
+      : 0;
+
+  const aiLabel = textValue(
+    typeof aiSummary.aiReadinessLabel === "string"
+      ? aiSummary.aiReadinessLabel
+      : null,
+  );
+
+  const plainLanguageSummary = textValue(
+    typeof aiSummary.plainLanguageSummary === "string"
+      ? aiSummary.plainLanguageSummary
+      : null,
+    "Digital Brain does not yet have enough information for a stronger AI visibility read.",
+  );
+
+  const topIssue = textValue(
+    typeof aiSummary.topIssue === "string" ? aiSummary.topIssue : null,
+  );
+
+  const whyItMatters = textValue(
+    typeof aiSummary.whyItMatters === "string" ? aiSummary.whyItMatters : null,
+    "Machines need clear business identity and trust signals to understand this business well.",
+  );
+
+  const nextActionTitle = textValue(
+    aiSummary.nextAction?.title,
+    "Review the AI identity foundation",
+  );
+
+  const nextActionWho = textValue(
+    aiSummary.nextAction?.whoShouldDoIt ?? aiSummary.nextAction?.who_should_do_it,
+    "Owner or marketing lead",
+  );
+
+  const nextActionDifficulty = textValue(
+    aiSummary.nextAction?.difficulty,
+    "Easy",
+  );
+
+  const nextActionReason = textValue(
+    aiSummary.nextAction?.reason,
+    "Strengthening the business identity foundation improves machine understanding and later AI visibility guidance.",
+  );
+
+  const evidence = Array.isArray(aiSummary.evidence)
+    ? aiSummary.evidence.filter(
+        (item): item is string =>
+          typeof item === "string" && item.trim().length > 0,
+      )
+    : [];
+
+  const businessName = textValue(
+    typeof aiSummary.gbpName === "string" ? aiSummary.gbpName : null,
+  );
+
+  const primaryCategory = textValue(
+    typeof aiSummary.primaryCategory === "string"
+      ? aiSummary.primaryCategory
+      : null,
+  );
+
+  const targetBrandName = textValue(
+    typeof aiSummary.targetBrandName === "string"
+      ? aiSummary.targetBrandName
+      : null,
+  );
+
+  const projectCategory = textValue(
+    typeof aiSummary.projectCategory === "string"
+      ? aiSummary.projectCategory
+      : null,
+  );
+
+  const reviewSignals = reviewSignalsValue(
+    typeof aiSummary.totalReviews === "number" ? aiSummary.totalReviews : null,
+    typeof aiSummary.rating === "number" ? aiSummary.rating : null,
+  );
+
+  return (
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>AI visibility center</SectionLabel>
+
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+                See whether Digital Brain has enough identity and trust detail
+                to read this business clearly for machine understanding.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                This page gives the owner-facing AI visibility read. It shows
+                whether the saved business identity, category clarity, and trust
+                signals are strong enough for a reliable early machine-readiness
+                view.
+              </p>
+            </div>
+
+            <div className="xl:pl-8">
+              <SectionLabel>What to do now</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {nextActionTitle}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {nextActionReason}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag
+                  tone="var(--accent-blue-600)"
+                  bg="var(--accent-blue-100)"
+                  border="var(--accent-blue-600)"
+                >
+                  {aiLabel}
+                </InlineTag>
+                <InlineTag>Who: {nextActionWho}</InlineTag>
+                <InlineTag>Difficulty: {nextActionDifficulty}</InlineTag>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Business"
+              value={dashboardContext?.projectDisplayName ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Domain"
+              value={dashboardContext?.domainDisplayValue ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Location / Market"
+              value={
+                dashboardContext?.projectLocationLabel ??
+                dashboardContext?.projectMetro ??
+                "Not set"
+              }
+            />
+            <HeaderMeta
+              label="Scope"
+              value={dashboardContext?.pageScopeLabel ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(dashboardContext?.capturedAt ?? null)}
+            />
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>AI markers</SectionLabel>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricStripItem
+              label="AI score"
+              value={scoreLabel(aiSummary.aiReadinessScore)}
+              bg="var(--brand-100)"
+              tone="var(--brand-700)"
+            />
+            <MetricStripItem
+              label="Business name saved"
+              value={boolLabel(aiSummary.hasBusinessName)}
+              bg="var(--accent-blue-100)"
+              tone="var(--accent-blue-600)"
+            />
+            <MetricStripItem
+              label="Category saved"
+              value={boolLabel(aiSummary.hasPrimaryCategory)}
+              bg="var(--accent-mint-100)"
+              tone="var(--accent-mint-600)"
+            />
+            <MetricStripItem
+              label="Review signals"
+              value={boolLabel(aiSummary.hasReviewSignals)}
+              bg="var(--success-soft)"
+              tone="var(--success)"
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
+          <section>
+            <SectionLabel>What to fix first</SectionLabel>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              The clearest next AI visibility move
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+              Start with the main identity or trust problem first. Once the
+              business name, category, and trust signals are clear, later AI
+              visibility guidance becomes more grounded.
+            </p>
+
+            <div className="mt-6">
+              {[
+                {
+                  title: nextActionTitle,
+                  detail: nextActionReason,
+                },
+                {
+                  title: topIssue,
+                  detail: whyItMatters,
+                },
+                {
+                  title: "Keep the business identity consistent everywhere",
+                  detail:
+                    "Use the same business naming, category wording, and supporting trust signals across the website, project settings, and GBP-facing work.",
+                },
+              ].map((item, index) => (
+                <article
+                  key={item.title}
+                  className={`grid gap-4 py-6 md:grid-cols-[56px_1fr] md:items-start ${
+                    index === 2 ? "" : "border-b border-[var(--border)]"
+                  }`}
+                >
+                  <div className="flex items-center md:justify-center">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
+                      style={{
+                        backgroundColor:
+                          index === 0
+                            ? "var(--brand-700)"
+                            : "var(--reference-soft)",
+                        color: index === 0 ? "#ffffff" : "var(--text-strong)",
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                  </div>
+
+                  <div className="max-w-3xl">
+                    <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                      {item.title}
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                      {item.detail}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>AI evidence</SectionLabel>
+
+              <div className="mt-4">
+                <DetailRow
+                  label="AI read"
+                  value={aiLabel}
+                  helper={plainLanguageSummary}
+                />
+                <DetailRow
+                  label="Top issue"
+                  value={topIssue}
+                  helper={whyItMatters}
+                />
+                <DetailRow
+                  label="GBP business name"
+                  value={businessName}
+                />
+                <DetailRow
+                  label="GBP primary category"
+                  value={primaryCategory}
+                />
+                <DetailRow
+                  label="Review trust signals"
+                  value={reviewSignals}
+                />
+                <DetailRow
+                  label="Project brand name"
+                  value={targetBrandName}
+                />
+                <DetailRow
+                  label="Project category"
+                  value={projectCategory}
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>AI navigation</SectionLabel>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/projects/${projectId}/owner`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  Back to owner page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/website`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View website page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/actions`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View actions page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/authority`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View authority page
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <aside className="space-y-8">
+            <section>
+              <SectionLabel>What this tells you now</SectionLabel>
+              <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                {(evidence.length > 0 ? evidence : ["No AI evidence is available yet."]).map(
+                  (item, index) => (
+                    <EvidenceBullet
+                      key={`${index}-${item}`}
+                      text={item}
+                      color={
+                        index === 0
+                          ? "var(--brand-600)"
+                          : index === 1
+                            ? "var(--accent-blue-600)"
+                            : index === 2
+                              ? "var(--success)"
+                              : index === 3
+                                ? "var(--warning)"
+                                : "var(--accent-mint-600)"
+                      }
+                    />
+                  ),
+                )}
+              </ul>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Plain-English read</SectionLabel>
+
+              <div className="mt-4">
+                <DetailRow
+                  label="Current read"
+                  value={aiLabel}
+                  helper="This is the owner-facing AI visibility read for the saved project and GBP identity data."
+                />
+                <DetailRow
+                  label="Next action owner"
+                  value={nextActionWho}
+                  helper="This is who should make the next AI identity or trust fix."
+                />
+                <DetailRow
+                  label="Difficulty"
+                  value={nextActionDifficulty}
+                  helper="This tells the owner how hard the next AI visibility move should be."
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Progress and proof</SectionLabel>
+
+              <div className="mt-4">
+                <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  {aiScore}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  AI visibility score for this project
+                </p>
+
+                <div className="mt-4 h-2 bg-[var(--reference-soft)]">
+                  <div
+                    className="h-2 bg-[var(--brand-600)]"
+                    style={{
+                      width: `${Math.max(0, Math.min(aiScore, 100))}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                  <HeaderMeta
+                    label="Business name saved"
+                    value={boolLabel(aiSummary.hasBusinessName)}
+                  />
+                  <HeaderMeta
+                    label="Category saved"
+                    value={boolLabel(aiSummary.hasPrimaryCategory)}
+                  />
+                  <HeaderMeta
+                    label="Review signals"
+                    value={boolLabel(aiSummary.hasReviewSignals)}
+                  />
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </div>
+    </main>
+  );
+}
