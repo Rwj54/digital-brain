@@ -1,0 +1,640 @@
+"use client";
+
+import Link from "next/link";
+import { type ReactNode } from "react";
+
+import { useProjectReviewsPageState } from "@/lib/reviews/useProjectReviewsPageState";
+
+type PageProps = {
+  params: Promise<{
+    projectId: string;
+  }>;
+};
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatCount(value: number | null | undefined) {
+  return typeof value === "number" ? value.toLocaleString("en-US") : "Not set";
+}
+
+function formatRating(value: number | null | undefined) {
+  return typeof value === "number" ? value.toFixed(1) : "Not set";
+}
+
+function boolLabel(value: boolean | null | undefined) {
+  return value ? "Yes" : "No";
+}
+
+function numericValue(value: number | null | undefined) {
+  return typeof value === "number" ? `${value}` : "Not set";
+}
+
+function textValue(value: string | null | undefined, fallback = "Not set") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function HeaderMeta({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-medium text-[var(--text-strong)]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function MetricStripItem({
+  label,
+  value,
+  bg,
+  tone,
+}: {
+  label: string;
+  value: string;
+  bg: string;
+  tone: string;
+}) {
+  return (
+    <div className="px-4 py-4" style={{ backgroundColor: bg }}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p
+        className="mt-2 text-3xl font-semibold tracking-tight"
+        style={{ color: tone }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function InlineTag({
+  children,
+  tone,
+  bg,
+  border,
+}: {
+  children: ReactNode;
+  tone?: string;
+  bg?: string;
+  border?: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center border px-2.5 py-1 text-xs font-semibold"
+      style={{
+        color: tone ?? "var(--text-body)",
+        backgroundColor: bg ?? "transparent",
+        borderColor: border ?? "var(--border)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border)] py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      <p className="mt-2 text-lg font-semibold text-[var(--text-strong)]">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+          {helper}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function EvidenceBullet({
+  text,
+  color,
+}: {
+  text: string;
+  color: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className="mt-2 h-2.5 w-2.5 shrink-0"
+        style={{ backgroundColor: color }}
+      />
+      <span>{text}</span>
+    </li>
+  );
+}
+
+function dedupeEvidence(items: string[]) {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+
+  for (const item of items) {
+    const normalized = item.trim();
+
+    if (!normalized) {
+      continue;
+    }
+
+    const key = normalized.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(normalized);
+  }
+
+  return deduped;
+}
+
+export default function ProjectReviewsPage({ params }: PageProps) {
+  const { projectId, dashboardContext, aiSummary, loading, error } =
+    useProjectReviewsPageState(params);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-base text-[var(--text-body)]">
+            Loading reviews page...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !aiSummary) {
+    return (
+      <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="border-t-2 border-[var(--danger)] pt-5">
+            <p className="text-base font-medium text-[var(--danger)]">
+              {error || "Failed to load reviews page."}
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const totalReviews =
+    typeof aiSummary.totalReviews === "number" ? aiSummary.totalReviews : null;
+  const rating = typeof aiSummary.rating === "number" ? aiSummary.rating : null;
+  const hasReviewSignals =
+    typeof aiSummary.hasReviewSignals === "boolean"
+      ? aiSummary.hasReviewSignals
+      : false;
+
+  const reputationScore =
+    totalReviews !== null && rating !== null
+      ? Math.min(
+          100,
+          Math.round(Math.min(totalReviews, 100) * 0.55 + rating * 9),
+        )
+      : hasReviewSignals
+        ? 55
+        : 28;
+
+  const reputationLabel = hasReviewSignals
+    ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
+      ? "Good review footing"
+      : "Review footing is present but still thin"
+    : "Review footing is still weak";
+
+  const plainLanguageSummary = hasReviewSignals
+    ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
+      ? "The business has a usable review foundation, but keeping review growth active will strengthen trust over time."
+      : "The business has some review trust signals, but the review foundation is not yet strong enough to feel durable."
+    : "The business still needs more review trust signals before this reputation layer feels strong.";
+
+  const topIssue = hasReviewSignals
+    ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
+      ? "The review foundation exists, but it still needs steady maintenance."
+      : "Review trust signals are present, but the review footing is still thinner than it should be."
+    : "Review trust signals are still too limited.";
+
+  const whyItMatters = hasReviewSignals
+    ? "Reviews help reinforce that the business is real, trusted, and active. Stronger review footing improves trust for both people and machines."
+    : "Without stronger review signals, the business trust foundation remains weaker for owners, searchers, and machine-readiness systems.";
+
+  const nextActionTitle =
+    hasReviewSignals && totalReviews !== null && totalReviews >= 25
+      ? "Keep review growth steady and protect rating quality"
+      : "Strengthen review growth and trust signals";
+
+  const nextActionWho = "Owner or team member";
+  const nextActionDifficulty = hasReviewSignals ? "Medium" : "Easy";
+  const nextActionReason = hasReviewSignals
+    ? "A stronger and steadier review base helps reinforce trust, improves reputation resilience, and supports better future visibility guidance."
+    : "The fastest way to improve reputation footing is to grow review count and strengthen review quality in a steady, repeatable way.";
+
+  const evidence = dedupeEvidence([
+    ...(Array.isArray(aiSummary.evidence) ? aiSummary.evidence : []),
+    hasReviewSignals
+      ? `Review signals are present with ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`
+      : "Review signals are still missing or very thin.",
+    totalReviews !== null && totalReviews > 0
+      ? "Review count is now part of the saved trust foundation."
+      : "Review count is not yet giving the business a strong trust cushion.",
+    rating !== null
+      ? `Saved rating is ${formatRating(rating)}.`
+      : "Saved rating is not available yet.",
+  ]).slice(0, 8);
+
+  return (
+    <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-7xl">
+        <section className="border-b border-[var(--border)] pb-6">
+          <SectionLabel>Reviews and reputation center</SectionLabel>
+
+          <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
+            <div>
+              <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
+                See whether this business has enough review trust to support a
+                stronger reputation foundation.
+              </h1>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
+                This page gives the owner-facing review and reputation read. It
+                shows whether saved review count, rating, and review presence
+                are strong enough to support trust for the business.
+              </p>
+            </div>
+
+            <div className="xl:pl-8">
+              <SectionLabel>What to do now</SectionLabel>
+              <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
+                {nextActionTitle}
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                {nextActionReason}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag
+                  tone="var(--accent-blue-600)"
+                  bg="var(--accent-blue-100)"
+                  border="var(--accent-blue-600)"
+                >
+                  {reputationLabel}
+                </InlineTag>
+                <InlineTag>Who: {nextActionWho}</InlineTag>
+                <InlineTag>Difficulty: {nextActionDifficulty}</InlineTag>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Business"
+              value={dashboardContext?.projectDisplayName ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Domain"
+              value={dashboardContext?.domainDisplayValue ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Location / Market"
+              value={
+                dashboardContext?.projectLocationLabel ??
+                dashboardContext?.projectMetro ??
+                "Not set"
+              }
+            />
+            <HeaderMeta
+              label="Scope"
+              value={dashboardContext?.pageScopeLabel ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(dashboardContext?.capturedAt ?? null)}
+            />
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>Review markers</SectionLabel>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricStripItem
+              label="Review count"
+              value={formatCount(totalReviews)}
+              bg="var(--brand-100)"
+              tone="var(--brand-700)"
+            />
+            <MetricStripItem
+              label="Rating"
+              value={formatRating(rating)}
+              bg="var(--accent-blue-100)"
+              tone="var(--accent-blue-600)"
+            />
+            <MetricStripItem
+              label="Review signals present"
+              value={boolLabel(hasReviewSignals)}
+              bg="var(--accent-mint-100)"
+              tone="var(--accent-mint-600)"
+            />
+            <MetricStripItem
+              label="Reputation score"
+              value={numericValue(reputationScore)}
+              bg="var(--success-soft)"
+              tone="var(--success)"
+            />
+          </div>
+        </section>
+
+        <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
+          <section>
+            <SectionLabel>What to fix first</SectionLabel>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
+              The clearest next reputation move
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
+              Start with the biggest trust gap first. Stronger reviews help
+              reinforce that the business is trusted, active, and credible.
+            </p>
+
+            <div className="mt-6">
+              {[
+                {
+                  title: nextActionTitle,
+                  detail: nextActionReason,
+                },
+                {
+                  title: topIssue,
+                  detail: whyItMatters,
+                },
+                {
+                  title: "Keep review growth active and consistent",
+                  detail:
+                    "A steady review flow and strong rating quality create a more durable trust foundation than occasional review spikes.",
+                },
+              ].map((item, index) => (
+                <article
+                  key={item.title}
+                  className={`grid gap-4 py-6 md:grid-cols-[56px_1fr] md:items-start ${
+                    index === 2 ? "" : "border-b border-[var(--border)]"
+                  }`}
+                >
+                  <div className="flex items-center md:justify-center">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center text-sm font-semibold"
+                      style={{
+                        backgroundColor:
+                          index === 0
+                            ? "var(--brand-700)"
+                            : "var(--reference-soft)",
+                        color: index === 0 ? "#ffffff" : "var(--text-strong)",
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                  </div>
+
+                  <div className="max-w-3xl">
+                    <p className="text-lg font-semibold tracking-tight text-[var(--text-strong)]">
+                      {item.title}
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                      {item.detail}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Reviews evidence</SectionLabel>
+
+              <div className="mt-4">
+                <DetailRow
+                  label="Reputation read"
+                  value={reputationLabel}
+                  helper={plainLanguageSummary}
+                />
+                <DetailRow
+                  label="Top issue"
+                  value={topIssue}
+                  helper={whyItMatters}
+                />
+                <DetailRow
+                  label="Review count"
+                  value={formatCount(totalReviews)}
+                />
+                <DetailRow
+                  label="Rating"
+                  value={formatRating(rating)}
+                />
+                <DetailRow
+                  label="Review signals present"
+                  value={boolLabel(hasReviewSignals)}
+                />
+                <DetailRow
+                  label="GBP business name"
+                  value={textValue(
+                    typeof aiSummary.gbpName === "string"
+                      ? aiSummary.gbpName
+                      : null,
+                  )}
+                />
+                <DetailRow
+                  label="Primary category"
+                  value={textValue(
+                    typeof aiSummary.primaryCategory === "string"
+                      ? aiSummary.primaryCategory
+                      : null,
+                  )}
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Reviews navigation</SectionLabel>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={`/projects/${projectId}/owner`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  Back to owner page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/ai`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View AI page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/identity`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View identity page
+                </Link>
+                <Link
+                  href={`/projects/${projectId}/website`}
+                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  View website page
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          <aside className="space-y-8">
+            <section>
+              <SectionLabel>What this tells you now</SectionLabel>
+              <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
+                {(evidence.length > 0
+                  ? evidence
+                  : ["No review evidence is available yet."]).map(
+                  (item, index) => (
+                    <EvidenceBullet
+                      key={`${index}-${item}`}
+                      text={item}
+                      color={
+                        index === 0
+                          ? "var(--brand-600)"
+                          : index === 1
+                            ? "var(--accent-blue-600)"
+                            : index === 2
+                              ? "var(--success)"
+                              : index === 3
+                                ? "var(--warning)"
+                                : "var(--accent-mint-600)"
+                      }
+                    />
+                  ),
+                )}
+              </ul>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Plain-English read</SectionLabel>
+
+              <div className="mt-4">
+                <DetailRow
+                  label="Current read"
+                  value={reputationLabel}
+                  helper="This is the owner-facing review and reputation read based on saved review trust signals."
+                />
+                <DetailRow
+                  label="Next action owner"
+                  value={nextActionWho}
+                  helper="This is who should make the next review and reputation move."
+                />
+                <DetailRow
+                  label="Difficulty"
+                  value={nextActionDifficulty}
+                  helper="This tells the owner how hard the next reputation move should be."
+                />
+              </div>
+            </section>
+
+            <section className="border-t border-[var(--border)] pt-6">
+              <SectionLabel>Progress and proof</SectionLabel>
+
+              <div className="mt-4">
+                <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
+                  {numericValue(reputationScore)}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  reputation score for this project
+                </p>
+
+                <div className="mt-4 h-2 bg-[var(--reference-soft)]">
+                  <div
+                    className="h-2 bg-[var(--brand-600)]"
+                    style={{
+                      width: `${Math.max(0, Math.min(reputationScore, 100))}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+                  <HeaderMeta
+                    label="Review count"
+                    value={formatCount(totalReviews)}
+                  />
+                  <HeaderMeta
+                    label="Rating"
+                    value={formatRating(rating)}
+                  />
+                  <HeaderMeta
+                    label="Review signals present"
+                    value={boolLabel(hasReviewSignals)}
+                  />
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </div>
+    </main>
+  );
+}
