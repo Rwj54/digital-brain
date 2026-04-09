@@ -65,7 +65,9 @@ export function OwnerHeroSection({
               reviews page to check whether the business has enough review trust
               to support a stronger reputation foundation. Open the visibility
               page to see whether the business has real local ranking footing in
-              the market that matters most.
+              the market that matters most. Open the outcomes page to see
+              whether visibility work is starting to connect to real business
+              results.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Link
@@ -97,6 +99,16 @@ export function OwnerHeroSection({
                 }}
               >
                 Open visibility page
+              </Link>
+              <Link
+                href={`/projects/${dashboard.projectId}/outcomes`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open outcomes page
               </Link>
             </div>
           </div>
