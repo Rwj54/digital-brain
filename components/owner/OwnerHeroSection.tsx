@@ -44,7 +44,8 @@ export function OwnerHeroSection({
             {primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
           </p>
           <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-            {primaryStep?.reason ?? dashboard.dashboard.progress.nextLikelyImprovement}
+            {primaryStep?.reason ??
+              dashboard.dashboard.progress.nextLikelyImprovement}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <InlineTag>Who: {primaryStep?.who ?? "Owner"}</InlineTag>
@@ -56,12 +57,13 @@ export function OwnerHeroSection({
 
           <div className="mt-5 border-t border-[var(--border)] pt-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Business identity center
+              Business foundation
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
               Open the identity page to see whether the business name,
-              category, website, and domain anchors line up clearly across the
-              project.
+              category, website, and domain anchors line up clearly. Open the
+              reviews page to check whether the business has enough review trust
+              to support a stronger reputation foundation.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Link
@@ -73,6 +75,16 @@ export function OwnerHeroSection({
                 }}
               >
                 Open business identity page
+              </Link>
+              <Link
+                href={`/projects/${dashboard.projectId}/reviews`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open reviews page
               </Link>
             </div>
           </div>
