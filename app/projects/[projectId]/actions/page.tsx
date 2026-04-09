@@ -101,6 +101,42 @@ function getCategoryTone(category: string) {
   };
 }
 
+function getActionDestinationHref(projectId: string, category: string) {
+  if (category === "reviews") {
+    return `/projects/${projectId}/reviews`;
+  }
+
+  if (category === "competition" || category === "rank") {
+    return `/projects/${projectId}/visibility`;
+  }
+
+  return `/projects/${projectId}/owner`;
+}
+
+function getActionDestinationLabel(category: string) {
+  if (category === "reviews") {
+    return "Open reviews page";
+  }
+
+  if (category === "competition" || category === "rank") {
+    return "Open visibility page";
+  }
+
+  return "Open owner page";
+}
+
+function getActionDestinationHelper(category: string) {
+  if (category === "reviews") {
+    return "This action is most closely connected to the Reviews and Reputation Center.";
+  }
+
+  if (category === "competition" || category === "rank") {
+    return "This action is most closely connected to the Local Visibility Center.";
+  }
+
+  return "This action is best reviewed from the main owner dashboard first.";
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -206,11 +242,13 @@ function DetailRow({
 }
 
 function ActionGroup({
+  projectId,
   label,
   helper,
   groupKey,
   items,
 }: {
+  projectId: string;
   label: string;
   helper: string;
   groupKey: string;
@@ -230,7 +268,9 @@ function ActionGroup({
             <article
               key={`${groupKey}-${index}-${action.title}`}
               className={`grid gap-4 py-5 md:grid-cols-[1fr_auto] md:items-start ${
-                index === items.length - 1 ? "" : "border-b border-[var(--border)]"
+                index === items.length - 1
+                  ? ""
+                  : "border-b border-[var(--border)]"
               }`}
             >
               <div className="max-w-3xl">
@@ -256,6 +296,22 @@ function ActionGroup({
                     {categoryLabel(action.category)}
                   </InlineTag>
                 </div>
+                <p className="mt-3 text-sm leading-6 text-[var(--text-body)]">
+                  {getActionDestinationHelper(action.category)}
+                </p>
+              </div>
+
+              <div className="md:pl-6">
+                <Link
+                  href={getActionDestinationHref(projectId, action.category)}
+                  className="inline-flex px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{
+                    border: "1px solid var(--border)",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  {getActionDestinationLabel(action.category)}
+                </Link>
               </div>
             </article>
           );
@@ -287,7 +343,7 @@ export default function ActionsPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading actions page...
+            Loading action center...
           </p>
         </div>
       </main>
@@ -298,21 +354,28 @@ export default function ActionsPage({ params }: PageProps) {
     actionsRow?.captured_at ?? dashboardContext?.capturedAt ?? null,
   );
 
+  const nextMoves =
+    actionRead.nextMoves.length > 0
+      ? actionRead.nextMoves
+      : leadAction
+        ? [leadAction.title]
+        : [];
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
         <section className="border-b border-[var(--border)] pb-6">
-          <SectionLabel>Action center</SectionLabel>
+          <SectionLabel>Guided action center</SectionLabel>
 
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See the next actions to work on for this project.
+                See the next actions to work on for this business.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page organizes the current stored action set into a clear
-                working order so you can see what matters most right now without
-                digging through raw system output.
+                This page turns the stored action set into a plain-English
+                working order so the owner can see what matters now, where to
+                start, and which center to open next.
               </p>
             </div>
 
@@ -388,6 +451,49 @@ export default function ActionsPage({ params }: PageProps) {
               page will become more useful after the next successful
               action-generation cycle.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/projects/${projectId}/owner`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Back to owner page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/identity`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View identity page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/reviews`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View reviews page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/visibility`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View visibility page
+              </Link>
+            </div>
           </section>
         ) : null}
 
@@ -432,16 +538,16 @@ export default function ActionsPage({ params }: PageProps) {
                 </h2>
                 <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
                   Actions are grouped by priority so the page stays easy to
-                  scan. Start with high priority work first, then move down the
-                  list.
+                  scan. Start with the highest-priority move first, then work
+                  down the list.
                 </p>
 
                 <div className="mt-6">
-                  {actionRead.nextMoves.map((item, index) => (
+                  {nextMoves.map((item, index) => (
                     <article
                       key={item}
                       className={`grid gap-4 py-6 md:grid-cols-[56px_1fr] md:items-start ${
-                        index === actionRead.nextMoves.length - 1
+                        index === nextMoves.length - 1
                           ? ""
                           : "border-b border-[var(--border)]"
                       }`}
@@ -454,7 +560,8 @@ export default function ActionsPage({ params }: PageProps) {
                               index === 0
                                 ? "var(--brand-700)"
                                 : "var(--reference-soft)",
-                            color: index === 0 ? "#ffffff" : "var(--text-strong)",
+                            color:
+                              index === 0 ? "#ffffff" : "var(--text-strong)",
                           }}
                         >
                           {index + 1}
@@ -481,23 +588,23 @@ export default function ActionsPage({ params }: PageProps) {
                   {[
                     {
                       key: "high",
-                      label: "High priority",
+                      label: "Do these first",
                       helper:
-                        "Do these first because they carry the strongest weight right now.",
+                        "These carry the strongest weight right now and should be handled before the rest.",
                       items: groupedActions.high,
                     },
                     {
                       key: "medium",
-                      label: "Medium priority",
+                      label: "Do these next",
                       helper:
                         "Move to these after the highest-priority work is underway.",
                       items: groupedActions.medium,
                     },
                     {
                       key: "low",
-                      label: "Lower priority",
+                      label: "Do these after that",
                       helper:
-                        "These still help, but they matter less than the higher-priority items above.",
+                        "These still help, but they matter less than the work above.",
                       items: groupedActions.low,
                     },
                   ]
@@ -506,10 +613,13 @@ export default function ActionsPage({ params }: PageProps) {
                       <div
                         key={group.key}
                         className={`py-6 ${
-                          groupIndex === 0 ? "" : "border-t border-[var(--border)]"
+                          groupIndex === 0
+                            ? ""
+                            : "border-t border-[var(--border)]"
                         }`}
                       >
                         <ActionGroup
+                          projectId={projectId}
                           label={group.label}
                           helper={group.helper}
                           groupKey={group.key}
@@ -535,34 +645,64 @@ export default function ActionsPage({ params }: PageProps) {
                       Back to owner page
                     </Link>
                     <Link
-                      href={`/projects/${projectId}/rank`}
+                      href={`/projects/${projectId}/identity`}
                       className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
                       style={{
                         border: "1px solid var(--border)",
                         backgroundColor: "transparent",
                       }}
                     >
-                      View rank page
+                      View identity page
                     </Link>
                     <Link
-                      href={`/projects/${projectId}/authority`}
+                      href={`/projects/${projectId}/reviews`}
                       className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
                       style={{
                         border: "1px solid var(--border)",
                         backgroundColor: "transparent",
                       }}
                     >
-                      View authority page
+                      View reviews page
                     </Link>
                     <Link
-                      href={`/projects/${projectId}/competitors`}
+                      href={`/projects/${projectId}/visibility`}
                       className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
                       style={{
                         border: "1px solid var(--border)",
                         backgroundColor: "transparent",
                       }}
                     >
-                      View competitors page
+                      View visibility page
+                    </Link>
+                    <Link
+                      href={`/projects/${projectId}/website`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      View website page
+                    </Link>
+                    <Link
+                      href={`/projects/${projectId}/ai`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      View AI page
+                    </Link>
+                    <Link
+                      href={`/projects/${projectId}/outcomes`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      View outcomes page
                     </Link>
                   </div>
                 </section>
@@ -586,6 +726,13 @@ export default function ActionsPage({ params }: PageProps) {
                       value={leadAction?.title ?? "Not set"}
                       helper="This is the first stored action currently shown on the page."
                     />
+                    <DetailRow
+                      label="Primary category"
+                      value={
+                        leadAction ? categoryLabel(leadAction.category) : "Not set"
+                      }
+                      helper="This tells you which owner center is most likely to help with the first action."
+                    />
                   </div>
                 </section>
 
@@ -601,15 +748,15 @@ export default function ActionsPage({ params }: PageProps) {
                     </p>
 
                     <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
-                      <HeaderMeta
-                        label="High priority"
-                        value={String(highCount)}
-                      />
+                      <HeaderMeta label="High priority" value={String(highCount)} />
                       <HeaderMeta
                         label="Medium priority"
                         value={String(mediumCount)}
                       />
-                      <HeaderMeta label="Lower priority" value={String(lowCount)} />
+                      <HeaderMeta
+                        label="Lower priority"
+                        value={String(lowCount)}
+                      />
                     </div>
                   </div>
                 </section>
