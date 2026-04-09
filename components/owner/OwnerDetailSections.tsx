@@ -554,6 +554,16 @@ export function OwnerDetailSections({
                   >
                     Open business identity page
                   </Link>
+                  <Link
+                    href={`/projects/${dashboard.projectId}/reviews`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open reviews page
+                  </Link>
                 </div>
               </div>
             </div>
