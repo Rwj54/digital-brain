@@ -63,7 +63,9 @@ export function OwnerHeroSection({
               Open the identity page to see whether the business name,
               category, website, and domain anchors line up clearly. Open the
               reviews page to check whether the business has enough review trust
-              to support a stronger reputation foundation.
+              to support a stronger reputation foundation. Open the visibility
+              page to see whether the business has real local ranking footing in
+              the market that matters most.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Link
@@ -85,6 +87,16 @@ export function OwnerHeroSection({
                 }}
               >
                 Open reviews page
+              </Link>
+              <Link
+                href={`/projects/${dashboard.projectId}/visibility`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open visibility page
               </Link>
             </div>
           </div>
@@ -115,7 +127,9 @@ export function OwnerHeroSection({
       <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3">
         <SummaryStat
           label="Start here"
-          value={primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText}
+          value={
+            primaryStep?.title ?? dashboard.dashboard.hero.primaryActionText
+          }
         />
         <SummaryStat label="Open tasks" value={String(openTasks)} />
         <SummaryStat
