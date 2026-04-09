@@ -222,6 +222,29 @@ export function OwnerDetailSections({
                   ))}
                 </ul>
               </div>
+
+              <div className="border-t border-[var(--border)] py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Visibility navigation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  Open the full visibility page for the dedicated local ranking
+                  read, supporting evidence, and owner-facing visibility action
+                  guidance.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${dashboard.projectId}/visibility`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open full visibility page
+                  </Link>
+                </div>
+              </div>
             </div>
           </>
         ) : null}
