@@ -641,6 +641,29 @@ export function OwnerDetailSections({
                   />
                 </ul>
               </div>
+
+              <div className="border-t border-[var(--border)] py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Outcomes navigation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  Open the full outcomes page for the dedicated business-results
+                  read, supporting evidence, and owner-facing outcomes action
+                  guidance.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${dashboard.projectId}/outcomes`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open full outcomes page
+                  </Link>
+                </div>
+              </div>
             </div>
           </>
         ) : null}
