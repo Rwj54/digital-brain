@@ -1,7 +1,6 @@
-import {
-  formatDate,
-  formatPercent,
-} from "@/lib/owner/formatters";
+import Link from "next/link";
+
+import { formatDate, formatPercent } from "@/lib/owner/formatters";
 import {
   type OwnerPageDashboard,
   type RenderStep,
@@ -53,6 +52,29 @@ export function OwnerHeroSection({
             <InlineTag>
               Difficulty: {primaryStep?.difficulty ?? "Not set"}
             </InlineTag>
+          </div>
+
+          <div className="mt-5 border-t border-[var(--border)] pt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Business identity center
+            </p>
+            <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+              Open the identity page to see whether the business name,
+              category, website, and domain anchors line up clearly across the
+              project.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <Link
+                href={`/projects/${dashboard.projectId}/identity`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open business identity page
+              </Link>
+            </div>
           </div>
         </div>
       </div>
