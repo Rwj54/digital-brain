@@ -358,6 +358,16 @@ export function OwnerDetailSections({
                   >
                     Open full AI visibility page
                   </Link>
+                  <Link
+                    href={`/projects/${dashboard.projectId}/identity`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open business identity page
+                  </Link>
                 </div>
               </div>
             </div>
@@ -500,6 +510,16 @@ export function OwnerDetailSections({
                     }}
                   >
                     Open full website page
+                  </Link>
+                  <Link
+                    href={`/projects/${dashboard.projectId}/identity`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open business identity page
                   </Link>
                 </div>
               </div>
