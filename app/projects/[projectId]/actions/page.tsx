@@ -769,7 +769,7 @@ export default function ActionsPage({ params }: PageProps) {
                 </section>
 
                 <section className="border-t border-[var(--border)] pt-6">
-                  <SectionLabel>Progress and proof</SectionLabel>
+                  <SectionLabel>Progress so far</SectionLabel>
 
                   <div className="mt-4">
                     <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
