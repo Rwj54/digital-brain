@@ -776,7 +776,7 @@ export default function ActionsPage({ params }: PageProps) {
                       {totalActions}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                      stored actions currently available for this project
+                      actions currently available for this project
                     </p>
 
                     <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
