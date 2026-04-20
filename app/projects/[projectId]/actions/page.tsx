@@ -449,7 +449,8 @@ export default function ActionsPage({ params }: PageProps) {
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
               No stored growth actions were found for this project yet. This
               page will become more useful after the next successful
-              action-generation cycle.
+              action-generation cycle. Until then, the centers below are the
+              best places to understand what needs attention first.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -492,6 +493,36 @@ export default function ActionsPage({ params }: PageProps) {
                 }}
               >
                 View visibility page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/website`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View website page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/ai`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View AI page
+              </Link>
+              <Link
+                href={`/projects/${projectId}/outcomes`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                View outcomes page
               </Link>
             </div>
           </section>

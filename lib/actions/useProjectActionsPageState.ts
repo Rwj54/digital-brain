@@ -72,9 +72,9 @@ function buildActionRead(
 ): ActionRead {
   if (!leadAction || totalActions === 0) {
     return {
-      headline: "Get your first action set",
+      headline: "Get your first guided action plan",
       reason:
-        "This project does not yet have stored action guidance. Once the next action-generation cycle completes, the clearest next steps will appear here.",
+        "This project does not have a saved action plan yet. Once the next refresh completes, this page will turn into a clear working order for what to do first.",
       nextMoves: [
         "Run the workflows that generate project actions.",
         "Come back once a stored action set exists for this project.",
@@ -91,7 +91,7 @@ function buildActionRead(
       nextMoves: [
         "Complete the first high-priority action before moving down the list.",
         "Use category tags to understand whether the work is about reviews, rank, or competition.",
-        "Return to authority, rank, or competitors pages when you need more context.",
+        "Return to visibility, reviews, or the owner page when you need more context.",
       ],
     };
   }
