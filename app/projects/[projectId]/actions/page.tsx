@@ -746,17 +746,17 @@ export default function ActionsPage({ params }: PageProps) {
                     <DetailRow
                       label="Latest capture"
                       value={formatDate(actionsRow?.captured_at ?? null)}
-                      helper="This is the most recent action snapshot currently stored."
+                      helper="This is the most recent action snapshot currently available."
                     />
                     <DetailRow
                       label="Version"
                       value={actionsRow?.version ?? "Not set"}
-                      helper="This is the stored version label attached to the current action set."
+                      helper="This is the version label attached to the current action plan."
                     />
                     <DetailRow
                       label="Primary action"
                       value={leadAction?.title ?? "Not set"}
-                      helper="This is the first stored action currently shown on the page."
+                      helper="This is the first action currently shown on the page."
                     />
                     <DetailRow
                       label="Primary category"
