@@ -740,7 +740,7 @@ export default function ActionsPage({ params }: PageProps) {
                 </section>
 
                 <section className="border-t border-[var(--border)] pt-6">
-                  <SectionLabel>What this means</SectionLabel>
+                  <SectionLabel>What this tells you</SectionLabel>
 
                   <div className="mt-4">
                     <DetailRow
