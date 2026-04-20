@@ -370,10 +370,10 @@ export default function ActionsPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See the next actions to work on for this business.
+                See what to work on next for this business.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page turns the stored action set into a plain-English
+                This page turns the current action plan into a plain-English
                 working order so the owner can see what matters now, where to
                 start, and which center to open next.
               </p>
