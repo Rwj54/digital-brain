@@ -385,7 +385,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open business identity page
+                    Open identity page
                   </Link>
                   <Link
                     href={`/projects/${dashboard.projectId}/reviews`}
@@ -546,7 +546,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open business identity page
+                    Open identity page
                   </Link>
                   <Link
                     href={`/projects/${dashboard.projectId}/reviews`}
