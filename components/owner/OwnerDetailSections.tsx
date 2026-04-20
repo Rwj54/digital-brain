@@ -778,6 +778,29 @@ export function OwnerDetailSections({
                   />
                 </ul>
               </div>
+
+              <div className="border-t border-[var(--border)] py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Task navigation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                  Open the action center to move from explanation into execution.
+                  This is the fastest path from “why this matters” to the
+                  owner-facing working order.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${dashboard.projectId}/actions`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open action center
+                  </Link>
+                </div>
+              </div>
             </div>
           </>
         ) : null}
