@@ -228,9 +228,7 @@ export function OwnerDetailSections({
                   Visibility navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the full visibility page for the dedicated local ranking
-                  read, supporting evidence, and owner-facing visibility action
-                  guidance.
+                  Open the visibility page for the local ranking read, supporting evidence, and next visibility actions.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
@@ -366,9 +364,7 @@ export function OwnerDetailSections({
                   AI navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the full AI visibility page for the dedicated
-                  machine-readiness read, supporting evidence, and owner-facing
-                  AI action guidance.
+                  Open the AI page for the machine-readiness read, supporting evidence, and next AI actions.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
@@ -529,9 +525,7 @@ export function OwnerDetailSections({
                   Website navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the full website page for the dedicated website identity
-                  read, supporting evidence, and owner-facing website action
-                  guidance.
+                  Open the website page for the website and domain read, supporting evidence, and next website actions.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
@@ -647,9 +641,7 @@ export function OwnerDetailSections({
                   Outcomes navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the full outcomes page for the dedicated business-results
-                  read, supporting evidence, and owner-facing outcomes action
-                  guidance.
+                  Open the outcomes page for the business-results read, supporting evidence, and next outcomes actions.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
