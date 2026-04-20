@@ -473,7 +473,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View identity page
+                Open identity page
               </Link>
               <Link
                 href={`/projects/${projectId}/reviews`}
@@ -483,7 +483,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View reviews page
+                Open reviews page
               </Link>
               <Link
                 href={`/projects/${projectId}/visibility`}
@@ -493,7 +493,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View visibility page
+                Open visibility page
               </Link>
               <Link
                 href={`/projects/${projectId}/website`}
@@ -503,7 +503,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View website page
+                Open website page
               </Link>
               <Link
                 href={`/projects/${projectId}/ai`}
@@ -513,7 +513,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View AI page
+                Open AI page
               </Link>
               <Link
                 href={`/projects/${projectId}/outcomes`}
@@ -523,7 +523,7 @@ export default function ActionsPage({ params }: PageProps) {
                   backgroundColor: "transparent",
                 }}
               >
-                View outcomes page
+                Open outcomes page
               </Link>
             </div>
           </section>
@@ -684,7 +684,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View identity page
+                      Open identity page
                     </Link>
                     <Link
                       href={`/projects/${projectId}/reviews`}
@@ -694,7 +694,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View reviews page
+                      Open reviews page
                     </Link>
                     <Link
                       href={`/projects/${projectId}/visibility`}
@@ -704,7 +704,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View visibility page
+                      Open visibility page
                     </Link>
                     <Link
                       href={`/projects/${projectId}/website`}
@@ -714,7 +714,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View website page
+                      Open website page
                     </Link>
                     <Link
                       href={`/projects/${projectId}/ai`}
@@ -724,7 +724,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View AI page
+                      Open AI page
                     </Link>
                     <Link
                       href={`/projects/${projectId}/outcomes`}
@@ -734,7 +734,7 @@ export default function ActionsPage({ params }: PageProps) {
                         backgroundColor: "transparent",
                       }}
                     >
-                      View outcomes page
+                      Open outcomes page
                     </Link>
                   </div>
                 </section>
