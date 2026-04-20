@@ -343,7 +343,7 @@ export default function ActionsPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading action center...
+            Loading your action plan...
           </p>
         </div>
       </main>
