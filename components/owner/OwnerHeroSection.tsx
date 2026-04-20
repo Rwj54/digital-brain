@@ -95,6 +95,16 @@ export function OwnerHeroSection({
                 Open visibility page
               </Link>
               <Link
+                href={`/projects/${dashboard.projectId}/website`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open website page
+              </Link>
+              <Link
                 href={`/projects/${dashboard.projectId}/outcomes`}
                 className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
                 style={{
