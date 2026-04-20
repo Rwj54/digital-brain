@@ -606,7 +606,7 @@ export default function ActionsPage({ params }: PageProps) {
                         </p>
                         <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
                           {index === 0
-                            ? "This is the first move most likely to help you make progress with the current action set."
+                            ? "This is the first move most likely to help you make progress with the current action plan."
                             : "This supports the main action plan and helps you work through the current priorities in order."}
                         </p>
                       </div>
