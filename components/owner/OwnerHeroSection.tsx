@@ -57,19 +57,30 @@ export function OwnerHeroSection({
 
           <div className="mt-5 border-t border-[var(--border)] pt-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Business foundation
+              Next workspaces
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-              Open the identity page to see whether the business name,
-              category, website, and domain anchors line up clearly. Open the
-              reviews page to check whether the business has enough review trust
-              to support a stronger reputation foundation. Open the visibility
-              page to see whether the business has real local ranking footing in
-              the market that matters most. Open the outcomes page to see
-              whether visibility work is starting to connect to real business
-              results.
+              Open the action center to work through the current stored
+              priorities in a clearer order. Open the identity page to see
+              whether the business name, category, website, and domain anchors
+              line up clearly. Open the reviews page to check whether the
+              business has enough review trust to support a stronger reputation
+              foundation. Open the visibility page to see whether the business
+              has real local ranking footing in the market that matters most.
+              Open the outcomes page to see whether visibility work is starting
+              to connect to real business results.
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
+              <Link
+                href={`/projects/${dashboard.projectId}/actions`}
+                className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open action center
+              </Link>
               <Link
                 href={`/projects/${dashboard.projectId}/identity`}
                 className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
