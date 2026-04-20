@@ -664,7 +664,7 @@ export default function ActionsPage({ params }: PageProps) {
 
               <aside className="space-y-8">
                 <section>
-                  <SectionLabel>Navigation</SectionLabel>
+                  <SectionLabel>Open another center</SectionLabel>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <Link
                       href={`/projects/${projectId}/owner`}
