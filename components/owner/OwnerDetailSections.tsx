@@ -241,7 +241,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open full visibility page
+                    Open visibility page
                   </Link>
                 </div>
               </div>
@@ -379,7 +379,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open full AI visibility page
+                    Open AI page
                   </Link>
                   <Link
                     href={`/projects/${dashboard.projectId}/identity`}
@@ -542,7 +542,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open full website page
+                    Open website page
                   </Link>
                   <Link
                     href={`/projects/${dashboard.projectId}/identity`}
@@ -660,7 +660,7 @@ export function OwnerDetailSections({
                       backgroundColor: "transparent",
                     }}
                   >
-                    Open full outcomes page
+                    Open outcomes page
                   </Link>
                 </div>
               </div>
