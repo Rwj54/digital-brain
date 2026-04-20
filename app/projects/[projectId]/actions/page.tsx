@@ -447,9 +447,9 @@ export default function ActionsPage({ params }: PageProps) {
           <section className="border-b border-[var(--border)] py-6">
             <SectionLabel>No action set yet</SectionLabel>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
-              No stored growth actions were found for this project yet. This
-              page will become more useful after the next successful
-              action-generation cycle. Until then, the centers below are the
+              No saved action plan was found for this project yet. Once the
+              next refresh completes, this page will become a clearer working
+              order for what to do first. Until then, the centers below are the
               best places to understand what needs attention first.
             </p>
 
