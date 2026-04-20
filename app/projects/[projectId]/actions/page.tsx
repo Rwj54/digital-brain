@@ -449,8 +449,9 @@ export default function ActionsPage({ params }: PageProps) {
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
               No saved action plan was found for this project yet. Once the
               next refresh completes, this page will become a clearer working
-              order for what to do first. Until then, the centers below are the
-              best places to understand what needs attention first.
+              order for what to do first. Until then, use the centers below to
+              check identity clarity, reviews, local visibility, website and
+              domain footing, AI visibility readiness, and early outcomes.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
