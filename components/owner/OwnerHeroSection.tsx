@@ -49,8 +49,11 @@ export function OwnerHeroSection({
               business has enough review trust to support a stronger reputation
               foundation. Open the visibility page to see whether the business
               has real local ranking footing in the market that matters most.
-              Open the outcomes page to see whether visibility work is starting
-              to connect to real business results.
+              Open the website page to check the current website and domain
+              foundation. Open the AI page to see whether the business is
+              machine-readable enough to support stronger AI visibility. Open
+              the outcomes page to see whether visibility work is starting to
+              connect to real business results.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-3">
