@@ -445,7 +445,7 @@ export default function ActionsPage({ params }: PageProps) {
 
         {!error && actions.length === 0 ? (
           <section className="border-b border-[var(--border)] py-6">
-            <SectionLabel>No action set yet</SectionLabel>
+            <SectionLabel>Your first action plan is not ready yet</SectionLabel>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
               No saved action plan was found for this project yet. Once the
               next refresh completes, this page will become a clearer working
