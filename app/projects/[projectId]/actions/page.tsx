@@ -542,19 +542,19 @@ export default function ActionsPage({ params }: PageProps) {
                   tone="var(--text-strong)"
                 />
                 <MetricStripItem
-                  label="High priority"
+                  label="Do first"
                   value={String(highCount)}
                   bg="var(--danger-soft)"
                   tone="var(--danger)"
                 />
                 <MetricStripItem
-                  label="Medium priority"
+                  label="Do next"
                   value={String(mediumCount)}
                   bg="var(--warning-soft)"
                   tone="var(--warning)"
                 />
                 <MetricStripItem
-                  label="Lower priority"
+                  label="Do later"
                   value={String(lowCount)}
                   bg="var(--brand-100)"
                   tone="var(--brand-700)"
