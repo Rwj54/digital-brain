@@ -536,7 +536,7 @@ export default function ActionsPage({ params }: PageProps) {
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricStripItem
-                  label="Total actions"
+                  label="Actions ready now"
                   value={String(totalActions)}
                   bg="var(--reference-soft)"
                   tone="var(--text-strong)"
