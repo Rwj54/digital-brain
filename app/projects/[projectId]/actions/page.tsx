@@ -780,13 +780,13 @@ export default function ActionsPage({ params }: PageProps) {
                     </p>
 
                     <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
-                      <HeaderMeta label="High priority" value={String(highCount)} />
+                      <HeaderMeta label="Do first" value={String(highCount)} />
                       <HeaderMeta
-                        label="Medium priority"
+                        label="Do next"
                         value={String(mediumCount)}
                       />
                       <HeaderMeta
-                        label="Lower priority"
+                        label="Do later"
                         value={String(lowCount)}
                       />
                     </div>
