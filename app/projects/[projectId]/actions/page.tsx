@@ -532,7 +532,7 @@ export default function ActionsPage({ params }: PageProps) {
         {actions.length > 0 ? (
           <>
             <section className="border-b border-[var(--border)] py-6">
-              <SectionLabel>Action markers</SectionLabel>
+              <SectionLabel>Current action summary</SectionLabel>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricStripItem
