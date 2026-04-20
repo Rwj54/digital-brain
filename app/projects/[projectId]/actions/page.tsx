@@ -406,7 +406,7 @@ export default function ActionsPage({ params }: PageProps) {
                     </InlineTag>
                   </>
                 ) : (
-                  <InlineTag>No stored actions</InlineTag>
+                  <InlineTag>No action plan yet</InlineTag>
                 )}
               </div>
             </div>
@@ -607,7 +607,7 @@ export default function ActionsPage({ params }: PageProps) {
                         <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
                           {index === 0
                             ? "This is the first move most likely to help you make progress with the current action set."
-                            : "This supports the main action plan and helps you work through the stored priorities in order."}
+                            : "This supports the main action plan and helps you work through the current priorities in order."}
                         </p>
                       </div>
                     </article>
