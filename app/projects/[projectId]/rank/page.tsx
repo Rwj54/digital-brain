@@ -165,7 +165,7 @@ export default function RankPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading visibility page...
+            Loading rank read...
           </p>
         </div>
       </main>
@@ -248,7 +248,7 @@ export default function RankPage({ params }: PageProps) {
         ) : null}
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Visibility markers</SectionLabel>
+          <SectionLabel>Current rank summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -280,14 +280,14 @@ export default function RankPage({ params }: PageProps) {
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
           <section>
-            <SectionLabel>What to do next</SectionLabel>
+            <SectionLabel>Your next moves</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
               The clearest next visibility move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
               This keeps the decision simple. It shows the next practical goal
               for this keyword based on where the business is currently showing
-              up.
+              up in Google.
             </p>
 
             <div className="mt-6">
@@ -330,14 +330,14 @@ export default function RankPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Keyword focus</SectionLabel>
+              <SectionLabel>Keyword and refresh</SectionLabel>
               <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end">
                 <div>
                   <label
                     htmlFor="keyword-picker"
                     className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
                   >
-                    Selected keyword
+                    Active keyword
                   </label>
                   <select
                     id="keyword-picker"
@@ -395,12 +395,12 @@ export default function RankPage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>Recent checkpoints</SectionLabel>
+              <SectionLabel>Recent rank updates</SectionLabel>
 
               <div className="mt-4">
                 {recentSeries.length === 0 ? (
                   <p className="text-sm leading-7 text-[var(--text-body)]">
-                    No visibility checkpoints are available yet for this keyword.
+                    No rank updates are available yet for this keyword.
                   </p>
                 ) : (
                   recentSeries.map((point, index) => (
@@ -427,18 +427,18 @@ export default function RankPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>What this means</SectionLabel>
+              <SectionLabel>What this tells you</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
                   label="Visibility label"
                   value={visibilityLabel}
-                  helper="This is the plain-language read for the latest observed rank."
+                  helper="This is the current read for the latest observed rank."
                 />
                 <DetailRow
                   label="Trend line"
                   value={trendLine}
-                  helper="This compares the latest checkpoint to the one before it."
+                  helper="This compares the latest rank update to the one before it."
                 />
                 <DetailRow
                   label="Tracked days"
@@ -454,14 +454,14 @@ export default function RankPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {summary ? formatPercent(summary.top20PresenceRate) : "—"}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  top-20 presence rate for the selected keyword
+                  top-20 presence rate right now
                 </p>
 
                 <div className="mt-4 h-2 bg-[var(--reference-soft)]">
@@ -475,15 +475,15 @@ export default function RankPage({ params }: PageProps) {
 
                 <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
                   <HeaderMeta
-                    label="Latest captured"
+                    label="Last update"
                     value={formatDate(summary?.latestCapturedAt ?? null)}
                   />
                   <HeaderMeta
-                    label="Snapshots"
+                    label="Tracked days"
                     value={summary ? String(summary.snapshotCount) : "0"}
                   />
                   <HeaderMeta
-                    label="Found in latest"
+                    label="Found last time"
                     value={
                       summary
                         ? summary.targetFoundInLatestSnapshot
