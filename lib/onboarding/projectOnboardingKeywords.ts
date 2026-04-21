@@ -17,6 +17,96 @@ function normalizeKeywordValue(value: string | null | undefined): string {
   return normalizeString(value).toLowerCase();
 }
 
+export function buildProjectOnboardingKeywordCandidates(params: {
+  inputSeedKeywords: SeedRankKeywordInput[] | undefined;
+  inferredKeywordCandidates: string[] | undefined;
+  canonicalCategory: string | null;
+}): string[] {
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  function pushCandidate(value: string | null | undefined) {
+    const normalized = normalizeKeywordValue(value);
+
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    candidates.push(normalized);
+  }
+
+  const providedSeedKeywords = Array.isArray(params.inputSeedKeywords)
+    ? params.inputSeedKeywords
+    : [];
+
+  if (providedSeedKeywords.length > 0) {
+    for (const row of providedSeedKeywords) {
+      pushCandidate(row.keyword);
+    }
+
+    return candidates;
+  }
+
+  const inferredKeywordCandidates = Array.isArray(params.inferredKeywordCandidates)
+    ? params.inferredKeywordCandidates
+    : [];
+
+  for (const keyword of inferredKeywordCandidates) {
+    pushCandidate(keyword);
+  }
+
+  pushCandidate(params.canonicalCategory);
+
+  return candidates;
+}
+
+export function buildProjectOnboardingSeedKeywords(params: {
+  inputSeedKeywords: SeedRankKeywordInput[] | undefined;
+  discoveredKeywordCandidates: string[];
+  canonicalMetro: string | null;
+}): SeedRankKeywordInput[] {
+  const canonicalMetro = normalizeString(params.canonicalMetro);
+  const providedSeedKeywords = Array.isArray(params.inputSeedKeywords)
+    ? params.inputSeedKeywords
+    : [];
+
+  if (providedSeedKeywords.length > 0) {
+    return providedSeedKeywords
+      .map((row, index) => {
+        const keyword = normalizeKeywordValue(row.keyword);
+        const metro = normalizeString(row.metro) || canonicalMetro;
+
+        if (!keyword || !metro) {
+          return null;
+        }
+
+        return {
+          keyword,
+          metro,
+          priority:
+            typeof row.priority === "number" && Number.isFinite(row.priority)
+              ? Math.round(row.priority)
+              : index + 1,
+          isActive:
+            typeof row.isActive === "boolean" ? row.isActive : index === 0,
+        };
+      })
+      .filter((row): row is SeedRankKeywordInput => row !== null);
+  }
+
+  if (!canonicalMetro) {
+    return [];
+  }
+
+  return params.discoveredKeywordCandidates.map((keyword, index) => ({
+    keyword,
+    metro: canonicalMetro,
+    priority: index + 1,
+    isActive: index === 0,
+  }));
+}
+
 export async function upsertProjectOnboardingSeedKeywords(params: {
   projectId: string;
   seedKeywords: SeedRankKeywordInput[];

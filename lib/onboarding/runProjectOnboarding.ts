@@ -4,6 +4,8 @@ import { extractWebsiteOnboardingSignals } from "@/lib/onboarding/extractWebsite
 import { buildOnboardingNotes } from "@/lib/onboarding/buildOnboardingNotes";
 import { buildProjectOnboardingJobSuccessSummary } from "@/lib/onboarding/buildProjectOnboardingJobSuccessSummary";
 import {
+  buildProjectOnboardingKeywordCandidates,
+  buildProjectOnboardingSeedKeywords,
   normalizeProjectOnboardingRankKeywords,
   upsertProjectOnboardingSeedKeywords,
 } from "@/lib/onboarding/projectOnboardingKeywords";
@@ -36,6 +38,15 @@ export type RunProjectOnboardingInput = {
   seedKeywords?: SeedRankKeywordInput[];
 };
 
+export type ProjectOnboardingSetupStatus =
+  | "activated"
+  | "needs_confirmation"
+  | "blocked_missing_category"
+  | "blocked_missing_metro"
+  | "blocked_missing_category_and_metro";
+
+export type ProjectOnboardingBlockingField = "category" | "metro";
+
 export type RunProjectOnboardingResult =
   | {
       ok: true;
@@ -45,6 +56,12 @@ export type RunProjectOnboardingResult =
       capturedAt: string;
       seededKeywordCount: number;
       activeKeywordCount: number;
+      setupStatus: ProjectOnboardingSetupStatus;
+      blockingFields: ProjectOnboardingBlockingField[];
+      keywordDiscovery: {
+        candidateKeywords: string[];
+        recommendedPrimaryKeyword: string | null;
+      };
       identity: {
         canonicalSiteUrl: string | null;
         canonicalDomain: string | null;
@@ -125,34 +142,49 @@ function pickFirstPositiveInteger(
   return null;
 }
 
-function buildEffectiveSeedKeywords(params: {
-  inputSeedKeywords: SeedRankKeywordInput[] | undefined;
+function buildProjectOnboardingBlockingFields(params: {
   canonicalCategory: string | null;
   canonicalMetro: string | null;
-}): SeedRankKeywordInput[] {
-  const providedSeedKeywords = Array.isArray(params.inputSeedKeywords)
-    ? params.inputSeedKeywords
-    : [];
+}): ProjectOnboardingBlockingField[] {
+  const blockingFields: ProjectOnboardingBlockingField[] = [];
 
-  if (providedSeedKeywords.length > 0) {
-    return providedSeedKeywords;
+  if (!normalizeString(params.canonicalCategory)) {
+    blockingFields.push("category");
   }
 
-  const canonicalCategory = normalizeString(params.canonicalCategory);
-  const canonicalMetro = normalizeString(params.canonicalMetro);
-
-  if (!canonicalCategory || !canonicalMetro) {
-    return [];
+  if (!normalizeString(params.canonicalMetro)) {
+    blockingFields.push("metro");
   }
 
-  return [
-    {
-      keyword: canonicalCategory,
-      metro: canonicalMetro,
-      priority: 1,
-      isActive: true,
-    },
-  ];
+  return blockingFields;
+}
+
+function buildProjectOnboardingSetupStatus(params: {
+  blockingFields: ProjectOnboardingBlockingField[];
+  activeKeywordCount: number;
+}): ProjectOnboardingSetupStatus {
+  const { blockingFields, activeKeywordCount } = params;
+
+  const missingCategory = blockingFields.includes("category");
+  const missingMetro = blockingFields.includes("metro");
+
+  if (missingCategory && missingMetro) {
+    return "blocked_missing_category_and_metro";
+  }
+
+  if (missingCategory) {
+    return "blocked_missing_category";
+  }
+
+  if (missingMetro) {
+    return "blocked_missing_metro";
+  }
+
+  if (activeKeywordCount > 0) {
+    return "activated";
+  }
+
+  return "needs_confirmation";
 }
 
 export async function runProjectOnboarding(
@@ -237,9 +269,16 @@ export async function runProjectOnboarding(
       mapsLocationCode: project.maps_location_code,
     });
 
-    const effectiveSeedKeywords = buildEffectiveSeedKeywords({
+    const discoveredKeywordCandidates =
+      buildProjectOnboardingKeywordCandidates({
+        inputSeedKeywords: input.seedKeywords,
+        inferredKeywordCandidates: websiteSignals.inferredKeywordCandidates,
+        canonicalCategory: identity.canonicalCategory,
+      });
+
+    const effectiveSeedKeywords = buildProjectOnboardingSeedKeywords({
       inputSeedKeywords: input.seedKeywords,
-      canonicalCategory: identity.canonicalCategory,
+      discoveredKeywordCandidates,
       canonicalMetro: identity.canonicalMetro,
     });
 
@@ -318,6 +357,16 @@ export async function runProjectOnboarding(
       metro: row.metro,
       priority: row.priority,
     }));
+
+    const blockingFields = buildProjectOnboardingBlockingFields({
+      canonicalCategory: identity.canonicalCategory,
+      canonicalMetro: identity.canonicalMetro,
+    });
+
+    const setupStatus = buildProjectOnboardingSetupStatus({
+      blockingFields,
+      activeKeywordCount: refreshedActiveKeywords.length,
+    });
 
     const baselineRankDiscovery = await runBaselineRankDiscovery({
       projectId,
@@ -405,6 +454,12 @@ export async function runProjectOnboarding(
       capturedAt,
       seededKeywordCount,
       activeKeywordCount: refreshedActiveKeywords.length,
+      setupStatus,
+      blockingFields,
+      keywordDiscovery: {
+        candidateKeywords: discoveredKeywordCandidates,
+        recommendedPrimaryKeyword: discoveredKeywordCandidates[0] ?? null,
+      },
       identity: {
         canonicalSiteUrl: identity.canonicalSiteUrl,
         canonicalDomain: identity.canonicalDomain,

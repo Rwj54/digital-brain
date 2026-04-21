@@ -6,6 +6,7 @@ export type WebsiteOnboardingSignals = {
   inferredCategory: string | null;
   inferredMetro: string | null;
   inferredRadiusMiles: number | null;
+  inferredKeywordCandidates: string[];
   notes: string[];
 };
 
@@ -62,6 +63,44 @@ const CATEGORY_PRIORITY_RULES: Array<{
     ],
   },
 ];
+
+const STARTER_KEYWORD_CANDIDATES_BY_CATEGORY: Record<string, string[]> = {
+  Landscaper: [
+    "landscaper",
+    "landscape company",
+    "landscape contractor",
+    "landscape design",
+    "lawn care",
+  ],
+  "Hardscape Contractor": [
+    "hardscape contractor",
+    "patio contractor",
+    "paver patio",
+    "retaining wall contractor",
+    "masonry contractor",
+  ],
+  "Tree Service": [
+    "tree service",
+    "tree removal",
+    "tree trimming",
+    "stump grinding",
+    "arborist",
+  ],
+  "Irrigation Contractor": [
+    "irrigation contractor",
+    "sprinkler repair",
+    "sprinkler installation",
+    "drainage contractor",
+    "irrigation service",
+  ],
+  "Concrete Contractor": [
+    "concrete contractor",
+    "concrete driveway",
+    "concrete patio",
+    "flatwork contractor",
+    "concrete company",
+  ],
+};
 
 const US_STATE_NAME_TO_ABBR: Record<string, string> = {
   alabama: "AL",
@@ -313,6 +352,44 @@ function inferCategoryFromText(value: string | null): string | null {
   return null;
 }
 
+function normalizeKeywordCandidateValue(value: string | null | undefined): string | null {
+  const normalized = normalizeTrimmedString(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.toLowerCase();
+}
+
+function buildKeywordCandidatesFromCategory(category: string | null): string[] {
+  const normalizedCategory = normalizeTrimmedString(category);
+
+  if (!normalizedCategory) {
+    return [];
+  }
+
+  const fromCategoryMap = STARTER_KEYWORD_CANDIDATES_BY_CATEGORY[normalizedCategory] ?? [
+    normalizedCategory,
+  ];
+
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  for (const candidate of fromCategoryMap) {
+    const normalizedCandidate = normalizeKeywordCandidateValue(candidate);
+
+    if (!normalizedCandidate || seen.has(normalizedCandidate)) {
+      continue;
+    }
+
+    seen.add(normalizedCandidate);
+    candidates.push(normalizedCandidate);
+  }
+
+  return candidates;
+}
+
 function normalizeMetroValue(value: string | null): string | null {
   const normalized = normalizeTrimmedString(value);
 
@@ -448,6 +525,7 @@ export async function extractWebsiteOnboardingSignals(
       inferredCategory: null,
       inferredMetro: null,
       inferredRadiusMiles: 25,
+      inferredKeywordCandidates: [],
       notes: [
         "Website signal inference was skipped because the site URL was missing or invalid.",
         "Using the default onboarding radius of 25 miles.",
@@ -472,6 +550,7 @@ export async function extractWebsiteOnboardingSignals(
         inferredCategory: null,
         inferredMetro: null,
         inferredRadiusMiles: 25,
+        inferredKeywordCandidates: [],
         notes: [
           ...notes,
           `Website signal inference could not read the homepage successfully (${response.status}).`,
@@ -509,6 +588,9 @@ export async function extractWebsiteOnboardingSignals(
       inferCategoryFromText(schemaTextCorpus) ??
       inferCategoryFromText(pageTextCorpus);
 
+    const inferredKeywordCandidates =
+      buildKeywordCandidatesFromCategory(inferredCategory);
+
     let inferredMetro: string | null = null;
 
     for (const node of jsonLdNodes) {
@@ -535,6 +617,16 @@ export async function extractWebsiteOnboardingSignals(
       );
     }
 
+    if (inferredKeywordCandidates.length > 0) {
+      notes.push(
+        `Built ${inferredKeywordCandidates.length} starter keyword candidates from the inferred category.`,
+      );
+    } else {
+      notes.push(
+        "Keyword candidate discovery is still blocked because no confident category was inferred.",
+      );
+    }
+
     if (inferredMetro) {
       notes.push(`Inferred website metro: ${inferredMetro}.`);
     } else {
@@ -549,6 +641,7 @@ export async function extractWebsiteOnboardingSignals(
       inferredCategory,
       inferredMetro,
       inferredRadiusMiles: 25,
+      inferredKeywordCandidates,
       notes,
     };
   } catch (error) {
@@ -559,6 +652,7 @@ export async function extractWebsiteOnboardingSignals(
       inferredCategory: null,
       inferredMetro: null,
       inferredRadiusMiles: 25,
+      inferredKeywordCandidates: [],
       notes: [
         ...notes,
         `Website signal inference failed while fetching the homepage: ${message}`,
