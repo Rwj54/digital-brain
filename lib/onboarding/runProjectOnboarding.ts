@@ -209,6 +209,101 @@ function buildProjectOnboardingSetupStatus(params: {
   return "needs_confirmation";
 }
 
+const CATEGORY_PLACEHOLDERS = new Set([
+  "real category",
+  "actual category",
+  "category",
+]);
+
+const METRO_PLACEHOLDERS = new Set([
+  "city, st",
+  "actual city, st",
+  "real metro",
+  "real metro, st",
+  "metro, st",
+]);
+
+function isValidCityStateMetro(value: string): boolean {
+  return /^[A-Za-z][A-Za-z'.-]*(?: [A-Za-z][A-Za-z'.-]*)*, [A-Z]{2}$/.test(value);
+}
+
+function validateProjectOnboardingClarificationInputs(
+  input: RunProjectOnboardingInput,
+):
+  | {
+      status: number;
+      error: string;
+    }
+  | null {
+  const confirmedCategory = normalizeString(input.confirmedCategory);
+  const confirmedMetro = normalizeString(input.confirmedMetro);
+
+  if (confirmedCategory && CATEGORY_PLACEHOLDERS.has(confirmedCategory.toLowerCase())) {
+    return {
+      status: 400,
+      error:
+        'confirmed category must be a real business category, not a placeholder.',
+    };
+  }
+
+  if (confirmedMetro) {
+    const normalizedMetro = confirmedMetro.toLowerCase();
+
+    if (METRO_PLACEHOLDERS.has(normalizedMetro)) {
+      return {
+        status: 400,
+        error:
+          'confirmed metro must be a real city and state abbreviation, not a placeholder. Example: "Omaha, NE".',
+      };
+    }
+
+    if (!isValidCityStateMetro(confirmedMetro)) {
+      return {
+        status: 400,
+        error: `confirmed metro must be in "City, ST" format. Got: "${confirmedMetro}"`,
+      };
+    }
+  }
+
+  const explicitSeedKeywords = Array.isArray(input.seedKeywords)
+    ? input.seedKeywords
+    : [];
+
+  for (const row of explicitSeedKeywords) {
+    const keyword = normalizeString(row.keyword);
+    const metro = normalizeString(row.metro);
+
+    if (keyword && CATEGORY_PLACEHOLDERS.has(keyword.toLowerCase())) {
+      return {
+        status: 400,
+        error:
+          'seed keyword values must be real business keywords, not placeholders.',
+      };
+    }
+
+    if (metro) {
+      const normalizedMetro = metro.toLowerCase();
+
+      if (METRO_PLACEHOLDERS.has(normalizedMetro)) {
+        return {
+          status: 400,
+          error:
+            'seed keyword metro values must be real city and state abbreviations, not placeholders. Example: "Omaha, NE".',
+        };
+      }
+
+      if (!isValidCityStateMetro(metro)) {
+        return {
+          status: 400,
+          error: `seed keyword metro must be in "City, ST" format. Got: "${metro}"`,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function runProjectOnboarding(
   input: RunProjectOnboardingInput,
 ): Promise<RunProjectOnboardingResult> {
@@ -224,6 +319,19 @@ export async function runProjectOnboarding(
       mode,
       status: 400,
       error: "Missing projectId.",
+    };
+  }
+
+  const clarificationValidationError =
+    validateProjectOnboardingClarificationInputs(input);
+
+  if (clarificationValidationError) {
+    return {
+      ok: false,
+      projectId,
+      mode,
+      status: clarificationValidationError.status,
+      error: clarificationValidationError.error,
     };
   }
 
@@ -306,12 +414,6 @@ export async function runProjectOnboarding(
       canonicalMetro: identity.canonicalMetro,
     });
 
-    const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
-      projectId,
-      seedKeywords: effectiveSeedKeywords,
-      canonicalMetro: identity.canonicalMetro,
-    });
-
     const persistedIdentity = await persistProjectOnboardingIdentityFields({
       projectId,
       currentTargetDomain: project.target_domain,
@@ -334,6 +436,12 @@ export async function runProjectOnboarding(
         canonicalMetro: identity.canonicalMetro,
         canonicalRadiusMiles: identity.canonicalRadiusMiles,
       });
+
+    const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
+      projectId,
+      seedKeywords: effectiveSeedKeywords,
+      canonicalMetro: identity.canonicalMetro,
+    });
 
     const effectiveCanonicalDomain =
       normalizeString(identity.canonicalDomain).toLowerCase() ||
