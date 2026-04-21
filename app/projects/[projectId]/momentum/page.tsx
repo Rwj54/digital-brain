@@ -462,7 +462,7 @@ export default function ProjectMomentumPage() {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-base text-[var(--text-body)]">Loading momentum page...</p>
+          <p className="text-base text-[var(--text-body)]">Loading momentum read...</p>
         </div>
       </main>
     );
@@ -472,7 +472,7 @@ export default function ProjectMomentumPage() {
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
         <section className="border-b border-[var(--border)] pb-6">
-          <SectionLabel>Momentum intelligence</SectionLabel>
+          <SectionLabel>Momentum center</SectionLabel>
 
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
             <div>
@@ -509,7 +509,7 @@ export default function ProjectMomentumPage() {
             </div>
 
             <div className="xl:pl-8">
-              <SectionLabel>Actions</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
@@ -517,7 +517,7 @@ export default function ProjectMomentumPage() {
                   className="border px-4 py-2 text-sm font-semibold text-[var(--text-strong)]"
                   style={{ borderColor: "var(--border)" }}
                 >
-                  Back to Authority
+                  Open authority page
                 </Link>
 
                 <button
@@ -544,7 +544,7 @@ export default function ProjectMomentumPage() {
                     borderColor: "var(--text-strong)",
                   }}
                 >
-                  {trendLoading ? "Refreshing…" : "Refresh Momentum"}
+                  {trendLoading ? "Refreshing…" : "Refresh momentum"}
                 </button>
               </div>
 
@@ -614,9 +614,9 @@ export default function ProjectMomentumPage() {
           <>
             <section className="grid gap-10 border-b border-[var(--border)] py-8 xl:grid-cols-[1.08fr_0.92fr]">
               <section>
-                <SectionLabel>Current footing</SectionLabel>
+                <SectionLabel>Current momentum summary</SectionLabel>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-                  What the latest momentum record says
+                  What the latest momentum read says
                 </h2>
                 <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
                   These are the inputs behind the current momentum reading. The
@@ -690,7 +690,7 @@ export default function ProjectMomentumPage() {
               </section>
 
               <aside>
-                <SectionLabel>Plain-English read</SectionLabel>
+                <SectionLabel>Momentum read</SectionLabel>
 
                 <div
                   className="mt-4 border-l-4 pl-4"
@@ -707,7 +707,7 @@ export default function ProjectMomentumPage() {
                 </div>
 
                 <div className="mt-8 border-t border-[var(--border)] pt-5">
-                  <SectionLabel>What this page is for</SectionLabel>
+                  <SectionLabel>What this tells you</SectionLabel>
 
                   <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                     <li className="flex gap-3">
@@ -741,7 +741,7 @@ export default function ProjectMomentumPage() {
                 </div>
 
                 <div className="mt-8 border-t border-[var(--border)] pt-5">
-                  <SectionLabel>How to interpret momentum</SectionLabel>
+                  <SectionLabel>How to read momentum</SectionLabel>
 
                   <div className="mt-4 space-y-4 text-sm leading-7 text-[var(--text-body)]">
                     <p>
@@ -762,9 +762,9 @@ export default function ProjectMomentumPage() {
             </section>
 
             <section className="border-b border-[var(--border)] py-8">
-              <SectionLabel>Trend history</SectionLabel>
+              <SectionLabel>Recent momentum trend</SectionLabel>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-                How momentum is moving across available history
+                How momentum is moving over time
               </h2>
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
                 This section shows the recent direction of authority and momentum
@@ -813,7 +813,7 @@ export default function ProjectMomentumPage() {
                   ) : null}
 
                   <div className="mt-8 border-t border-[var(--border)] pt-5">
-                    <SectionLabel>Daily points</SectionLabel>
+                    <SectionLabel>Recent daily points</SectionLabel>
 
                     <div className="mt-4 divide-y divide-[var(--border)]">
                       {trendDeduped
@@ -906,12 +906,12 @@ export default function ProjectMomentumPage() {
             <section className="py-8">
               <SectionLabel>Details below the fold</SectionLabel>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-                Raw input reference
+                Raw momentum inputs
               </h2>
               <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                This keeps the machine-facing input visible without letting it take
-                over the page. The owner story stays above; the raw reference stays
-                below.
+                This keeps the machine-facing inputs visible without letting them
+                take over the page. The owner story stays above and the raw
+                reference stays below.
               </p>
 
               <div className="mt-6 border-t border-[var(--border)] pt-5">
