@@ -21,6 +21,11 @@ type DashboardActionsArgs = {
   setStatus: (value: string | null) => void;
 };
 
+type RunOnboardingClarificationInput = {
+  category: string;
+  metro: string;
+};
+
 export function createProjectDashboardActions({
   clientId,
   projectId,
@@ -113,10 +118,50 @@ export function createProjectDashboardActions({
     await loadAll();
   }
 
+  async function runOnboardingClarification(
+    input: RunOnboardingClarificationInput,
+  ) {
+    setStatus(null);
+
+    const response = await fetch(`/api/projects/${projectId}/onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        category: input.category,
+        metro: input.metro,
+      }),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          ok?: boolean;
+          error?: string;
+          setupStatus?: string;
+        }
+      | null;
+
+    if (!response.ok || !payload?.ok) {
+      setStatus(payload?.error ?? "Onboarding clarification failed.");
+      return;
+    }
+
+    await loadAll();
+
+    if (payload.setupStatus === "activated") {
+      setStatus("Saved onboarding clarification and activated project onboarding.");
+      return;
+    }
+
+    setStatus("Saved onboarding clarification.");
+  }
+
   return {
     saveProjectReviewCapacity,
     saveGbpProfile,
     addOrUpdateCompetitor,
     deleteCompetitor,
+    runOnboardingClarification,
   };
 }

@@ -28,6 +28,15 @@ function formatRadius(radiusMiles: number | null | undefined): string {
   return `${radiusMiles} mi`;
 }
 
+function formatTextValue(value: string | null | undefined): string {
+  if (typeof value !== "string") {
+    return "Not set";
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "Not set";
+}
+
 function ProjectMetaItem({
   label,
   value,
@@ -131,11 +140,11 @@ export default function ProjectDashboard() {
                 />
                 <ProjectMetaItem
                   label="Category"
-                  value={dashboard.project?.category ?? "Not set"}
+                  value={formatTextValue(dashboard.project?.category)}
                 />
                 <ProjectMetaItem
                   label="Metro"
-                  value={dashboard.project?.metro ?? "Not set"}
+                  value={formatTextValue(dashboard.project?.metro)}
                 />
                 <ProjectMetaItem
                   label="Radius"
@@ -222,6 +231,8 @@ export default function ProjectDashboard() {
                 projectRadiusMiles={dashboard.project?.radius_miles ?? null}
                 targetDomain={dashboard.project?.target_domain ?? null}
                 targetBrandName={dashboard.project?.target_brand_name ?? null}
+                onboardingCategory={dashboard.onboardingCategory}
+                onboardingMetro={dashboard.onboardingMetro}
                 labelPlural={dashboard.labelPlural}
                 preset={dashboard.preset}
                 presetOptions={dashboard.presetOptions}
@@ -248,6 +259,9 @@ export default function ProjectDashboard() {
                 onSaveGbpProfile={dashboard.saveGbpProfile}
                 onAddOrUpdateCompetitor={dashboard.addOrUpdateCompetitor}
                 onDeleteCompetitor={dashboard.deleteCompetitor}
+                onRunOnboardingClarification={dashboard.runOnboardingClarification}
+                setOnboardingCategory={dashboard.setOnboardingCategory}
+                setOnboardingMetro={dashboard.setOnboardingMetro}
                 setVolumePreset={dashboard.setVolumePreset}
                 setShowAdvancedLabels={dashboard.setShowAdvancedLabels}
                 setEventLabelSingular={dashboard.setEventLabelSingular}

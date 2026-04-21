@@ -14,6 +14,8 @@ type SettingsTabProps = {
   projectRadiusMiles: number | null;
   targetDomain: string | null;
   targetBrandName: string | null;
+  onboardingCategory: string;
+  onboardingMetro: string;
   labelPlural: string;
   preset: VolumePresetOption;
   presetOptions: VolumePresetOption[];
@@ -44,6 +46,12 @@ type SettingsTabProps = {
     e: React.FormEvent<HTMLFormElement>,
   ) => Promise<void>;
   onDeleteCompetitor: (id: string) => Promise<void>;
+  onRunOnboardingClarification: (input: {
+    category: string;
+    metro: string;
+  }) => Promise<void>;
+  setOnboardingCategory: React.Dispatch<React.SetStateAction<string>>;
+  setOnboardingMetro: React.Dispatch<React.SetStateAction<string>>;
   setVolumePreset: React.Dispatch<React.SetStateAction<string>>;
   setShowAdvancedLabels: React.Dispatch<React.SetStateAction<boolean>>;
   setEventLabelSingular: React.Dispatch<React.SetStateAction<string>>;
@@ -64,6 +72,10 @@ type SettingsTabProps = {
   setCompReviews: React.Dispatch<React.SetStateAction<string>>;
 };
 
+function hasValue(value: string | null | undefined): boolean {
+  return typeof value === "string" ? value.trim().length > 0 : false;
+}
+
 export function SettingsTab({
   siteUrl,
   projectCategory,
@@ -71,6 +83,8 @@ export function SettingsTab({
   projectRadiusMiles,
   targetDomain,
   targetBrandName,
+  onboardingCategory,
+  onboardingMetro,
   labelPlural,
   preset,
   presetOptions,
@@ -97,6 +111,9 @@ export function SettingsTab({
   onSaveGbpProfile,
   onAddOrUpdateCompetitor,
   onDeleteCompetitor,
+  onRunOnboardingClarification,
+  setOnboardingCategory,
+  setOnboardingMetro,
   setVolumePreset,
   setShowAdvancedLabels,
   setEventLabelSingular,
@@ -116,8 +133,83 @@ export function SettingsTab({
   setCompRating,
   setCompReviews,
 }: SettingsTabProps) {
+  const needsOnboardingClarification =
+    !hasValue(projectCategory) || !hasValue(projectMetro);
+
+  async function handleOnboardingClarification(
+    e: React.FormEvent<HTMLFormElement>,
+  ) {
+    e.preventDefault();
+
+    await onRunOnboardingClarification({
+      category: onboardingCategory,
+      metro: onboardingMetro,
+    });
+  }
+
   return (
     <div className="grid gap-4">
+      {needsOnboardingClarification ? (
+        <section aria-label="Onboarding clarification">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--brand-700)]">
+              Onboarding clarification
+            </p>
+
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
+              Fill in the missing setup fields
+            </h3>
+
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+              Digital Brain could not confirm the business category and market
+              automatically for this website. Add the missing values here so the
+              project can finish onboarding and activate rank tracking.
+            </p>
+
+            <form className="mt-5 grid gap-4" onSubmit={handleOnboardingClarification}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[var(--text-strong)]">
+                    Business category
+                  </span>
+                  <input
+                    value={onboardingCategory}
+                    onChange={(e) => setOnboardingCategory(e.target.value)}
+                    placeholder="Wedding Planner"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-[var(--brand-600)]"
+                  />
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-[var(--text-strong)]">
+                    Metro
+                  </span>
+                  <input
+                    value={onboardingMetro}
+                    onChange={(e) => setOnboardingMetro(e.target.value)}
+                    placeholder="Omaha, NE"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-strong)] outline-none transition focus:border-[var(--brand-600)]"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  className="rounded-xl px-4 py-3 text-sm font-semibold text-white"
+                  style={{ backgroundColor: "var(--brand-700)" }}
+                >
+                  Continue onboarding
+                </button>
+                <p className="text-sm text-[var(--text-body)]">
+                  Use real values only. Metro must be in <span className="font-semibold text-[var(--text-strong)]">City, ST</span> format.
+                </p>
+              </div>
+            </form>
+          </div>
+        </section>
+      ) : null}
+
       <section aria-label="Project identity">
         <IdentityResolutionCard
           siteUrl={siteUrl}

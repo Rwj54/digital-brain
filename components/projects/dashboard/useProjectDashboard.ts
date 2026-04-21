@@ -26,6 +26,10 @@ type UseProjectDashboardArgs = {
   projectId: string;
 };
 
+function normalizeDraftValue(value: string | null | undefined): string {
+  return typeof value === "string" ? value : "";
+}
+
 export function useProjectDashboard({
   clientId,
   projectId,
@@ -40,6 +44,8 @@ export function useProjectDashboard({
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("overview");
+  const [onboardingCategory, setOnboardingCategory] = useState("");
+  const [onboardingMetro, setOnboardingMetro] = useState("");
 
   const form = useProjectDashboardFormState();
 
@@ -68,6 +74,8 @@ export function useProjectDashboard({
       setGbp(result.gbp);
       setCompetitors(result.competitors);
       form.applyLoadedFormState(result.formState);
+      setOnboardingCategory(normalizeDraftValue(result.project?.category));
+      setOnboardingMetro(normalizeDraftValue(result.project?.metro));
       setLoading(false);
     } catch (error: unknown) {
       const message =
@@ -151,6 +159,10 @@ export function useProjectDashboard({
     loading,
     tab,
     setTab,
+    onboardingCategory,
+    setOnboardingCategory,
+    onboardingMetro,
+    setOnboardingMetro,
     gbpName: form.gbpName,
     setGbpName: form.setGbpName,
     placeId: form.placeId,
@@ -196,6 +208,7 @@ export function useProjectDashboard({
     saveGbpProfile: actions.saveGbpProfile,
     addOrUpdateCompetitor: actions.addOrUpdateCompetitor,
     deleteCompetitor: actions.deleteCompetitor,
+    runOnboardingClarification: actions.runOnboardingClarification,
     gapReviews: derived.gapReviews,
     desiredTarget90d: derived.desiredTarget90d,
     maxReviews90d: derived.maxReviews90d,
