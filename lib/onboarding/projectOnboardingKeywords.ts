@@ -72,27 +72,29 @@ export function buildProjectOnboardingSeedKeywords(params: {
     : [];
 
   if (providedSeedKeywords.length > 0) {
-    return providedSeedKeywords
-      .map((row, index) => {
-        const keyword = normalizeKeywordValue(row.keyword);
-        const metro = normalizeString(row.metro) || canonicalMetro;
+    const normalizedRows: SeedRankKeywordInput[] = [];
 
-        if (!keyword || !metro) {
-          return null;
-        }
+    for (const [index, row] of providedSeedKeywords.entries()) {
+      const keyword = normalizeKeywordValue(row.keyword);
+      const metro = normalizeString(row.metro) || canonicalMetro;
 
-        return {
-          keyword,
-          metro,
-          priority:
-            typeof row.priority === "number" && Number.isFinite(row.priority)
-              ? Math.round(row.priority)
-              : index + 1,
-          isActive:
-            typeof row.isActive === "boolean" ? row.isActive : index === 0,
-        };
-      })
-      .filter((row): row is SeedRankKeywordInput => row !== null);
+      if (!keyword || !metro) {
+        continue;
+      }
+
+      normalizedRows.push({
+        keyword,
+        metro,
+        priority:
+          typeof row.priority === "number" && Number.isFinite(row.priority)
+            ? Math.round(row.priority)
+            : index + 1,
+        isActive:
+          typeof row.isActive === "boolean" ? row.isActive : index === 0,
+      });
+    }
+
+    return normalizedRows;
   }
 
   if (!canonicalMetro) {
