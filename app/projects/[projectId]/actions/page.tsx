@@ -127,14 +127,14 @@ function getActionDestinationLabel(category: string) {
 
 function getActionDestinationHelper(category: string) {
   if (category === "reviews") {
-    return "This action is most closely connected to the Reviews and Reputation Center.";
+    return "This action is best handled from the reviews page.";
   }
 
   if (category === "competition" || category === "rank") {
-    return "This action is most closely connected to the Local Visibility Center.";
+    return "This action is best handled from the visibility page.";
   }
 
-  return "This action is best reviewed from the main owner dashboard first.";
+  return "This action is best reviewed from the owner page first.";
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -447,7 +447,7 @@ export default function ActionsPage({ params }: PageProps) {
           <section className="border-b border-[var(--border)] py-6">
             <SectionLabel>Your first action plan is not ready yet</SectionLabel>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
-              No saved action plan was found for this project yet. Once the
+              This business does not have a saved action plan yet. Once the
               next refresh completes, this page will become a clearer working
               order for what to do first. Until then, use the centers below to
               check identity clarity, reviews, local visibility, website and
@@ -743,17 +743,17 @@ export default function ActionsPage({ params }: PageProps) {
 
                   <div className="mt-4">
                     <DetailRow
-                      label="Latest capture"
+                      label="Last update"
                       value={formatDate(actionsRow?.captured_at ?? null)}
-                      helper="This is the most recent action snapshot currently available."
+                      helper="This is the most recent action update currently available."
                     />
                     <DetailRow
                       label="Version"
                       value={actionsRow?.version ?? "Not set"}
-                      helper="This is the version label attached to the current action plan."
+                      helper="This is the version label for the current action plan."
                     />
                     <DetailRow
-                      label="Primary action"
+                      label="First action"
                       value={leadAction?.title ?? "Not set"}
                       helper="This is the first action currently shown on the page."
                     />
@@ -775,7 +775,7 @@ export default function ActionsPage({ params }: PageProps) {
                       {totalActions}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                      actions currently available for this project
+                      actions ready right now
                     </p>
 
                     <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
