@@ -569,9 +569,8 @@ export default function ActionsPage({ params }: PageProps) {
                   Start with these actions
                 </h2>
                 <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-                  Actions are grouped by priority so the page stays easy to
-                  scan. Start with the highest-priority move first, then work
-                  down the list.
+                  Actions are arranged in a clear order so the page stays easy
+                  to scan. Start with the first move, then work down the list.
                 </p>
 
                 <div className="mt-6">
