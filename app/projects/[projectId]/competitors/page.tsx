@@ -538,7 +538,7 @@ export default function CompetitorsPage() {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <p className="text-base text-[var(--text-body)]">Loading competitor page...</p>
+          <p className="text-base text-[var(--text-body)]">Loading competitor read...</p>
         </div>
       </main>
     );
@@ -597,7 +597,7 @@ export default function CompetitorsPage() {
         ) : null}
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Competitor markers</SectionLabel>
+          <SectionLabel>Current competitor summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -630,7 +630,7 @@ export default function CompetitorsPage() {
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
           <section>
-            <SectionLabel>What to do next</SectionLabel>
+            <SectionLabel>Your next moves</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
               Start with the current benchmark group
             </h2>
@@ -741,7 +741,7 @@ export default function CompetitorsPage() {
 
               {competitors.length === 0 ? (
                 <p className="mt-4 text-sm leading-7 text-[var(--text-body)]">
-                  No competitors found yet. Click run discovery to populate this page.
+                  No competitors found yet. Run discovery to populate this page.
                 </p>
               ) : (
                 <div className="mt-4 overflow-x-auto border border-[var(--border)]">
@@ -796,7 +796,7 @@ export default function CompetitorsPage() {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>Market velocity</SectionLabel>
+              <SectionLabel>Market pace</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
@@ -814,7 +814,7 @@ export default function CompetitorsPage() {
                   }
                 />
                 <DetailRow
-                  label="Benchmark competitor"
+                  label="Current benchmark"
                   value={
                     thresholdCompetitor
                       ? shortName(getDisplayName(thresholdCompetitor))
@@ -826,7 +826,7 @@ export default function CompetitorsPage() {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -846,7 +846,7 @@ export default function CompetitorsPage() {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View authority page
+                  Open authority page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/rank`}
@@ -856,7 +856,7 @@ export default function CompetitorsPage() {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View rank page
+                  Open rank page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/actions`}
@@ -866,7 +866,7 @@ export default function CompetitorsPage() {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View actions page
+                  Open actions page
                 </Link>
                 <button
                   onClick={() => {
@@ -886,14 +886,14 @@ export default function CompetitorsPage() {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {competitors.length}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  discovered competitors currently available for this project
+                  discovered competitors right now
                 </p>
 
                 <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
