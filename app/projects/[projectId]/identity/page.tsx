@@ -253,7 +253,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading identity page...
+            Loading identity read...
           </p>
         </div>
       </main>
@@ -469,7 +469,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                 GBP, website, and domain foundation.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page gives the owner-facing identity read. It shows whether
+                This page shows the identity read for this business. It shows whether
                 the business name, category, website, and domain anchors are
                 aligned enough for Digital Brain to trust the business
                 foundation clearly.
@@ -527,7 +527,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
         </section>
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Identity markers</SectionLabel>
+          <SectionLabel>Current identity summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -664,7 +664,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Identity navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -684,7 +684,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View AI page
+                  Open AI page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/website`}
@@ -694,7 +694,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View website page
+                  Open website page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/actions`}
@@ -704,7 +704,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View actions page
+                  Open actions page
                 </Link>
               </div>
             </div>
@@ -712,11 +712,11 @@ export default function ProjectIdentityPage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>What this tells you now</SectionLabel>
+              <SectionLabel>What this tells you</SectionLabel>
               <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                 {(combinedEvidence.length > 0
                   ? combinedEvidence
-                  : ["No identity evidence is available yet."]).map(
+                  : ["No identity details are available yet."]).map(
                   (item, index) => (
                     <EvidenceBullet
                       key={`${index}-${item}`}
@@ -739,36 +739,36 @@ export default function ProjectIdentityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Plain-English read</SectionLabel>
+              <SectionLabel>Identity read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
-                  label="Current read"
+                  label="Identity read"
                   value={identityRead}
-                  helper="This is the owner-facing identity foundation read across saved project, website, and GBP-alignment signals."
+                  helper="This is the current identity read across saved project, website, and GBP-alignment signals."
                 />
                 <DetailRow
-                  label="Next action owner"
+                  label="Who should do it"
                   value={nextActionWho}
-                  helper="This is who should make the next identity-alignment fix."
+                  helper="This is who should handle the next identity-alignment fix."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={nextActionDifficulty}
-                  helper="This tells the owner how hard the next identity move should be."
+                  helper="This shows how hard the next identity move should be."
                 />
               </div>
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {numericValue(identityScore)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  identity score for this project
+                  identity score right now
                 </p>
 
                 <div className="mt-4 h-2 bg-[var(--reference-soft)]">
