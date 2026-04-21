@@ -14,13 +14,11 @@ import {
 type Props = {
   dashboard: OwnerPageDashboard;
   primaryStep: RenderStep | null;
-  openTasks: number;
 };
 
 export function OwnerHeroSection({
   dashboard,
   primaryStep,
-  openTasks,
 }: Props) {
   return (
     <section className="border-b border-[var(--border)] pb-6">

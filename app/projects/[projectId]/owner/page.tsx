@@ -64,7 +64,6 @@ export default function OwnerDashboardPage({ params }: Props) {
         <OwnerHeroSection
           dashboard={dashboard}
           primaryStep={primaryStep}
-          openTasks={tasksData.summary.openTasks}
         />
 
         <OwnerHealthMarkersSection dashboard={dashboard} />
