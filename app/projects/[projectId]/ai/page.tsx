@@ -398,9 +398,9 @@ export default function ProjectAiPage({ params }: PageProps) {
               The clearest next AI visibility move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the main identity or trust problem first. Once the
+              Start with the main AI identity or trust problem first. Once the
               business name, category, and trust signals are clear, later AI
-              visibility guidance becomes more grounded.
+              visibility guidance becomes more reliable.
             </p>
 
             <div className="mt-6">
@@ -453,7 +453,7 @@ export default function ProjectAiPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>AI evidence</SectionLabel>
+              <SectionLabel>AI details</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
@@ -467,11 +467,11 @@ export default function ProjectAiPage({ params }: PageProps) {
                   helper={whyItMatters}
                 />
                 <DetailRow
-                  label="GBP business name"
+                  label="Business profile name"
                   value={businessName}
                 />
                 <DetailRow
-                  label="GBP primary category"
+                  label="Business profile category"
                   value={primaryCategory}
                 />
                 <DetailRow
@@ -479,11 +479,11 @@ export default function ProjectAiPage({ params }: PageProps) {
                   value={reviewSignals}
                 />
                 <DetailRow
-                  label="Project brand name"
+                  label="Saved brand name"
                   value={targetBrandName}
                 />
                 <DetailRow
-                  label="Project category"
+                  label="Saved category"
                   value={projectCategory}
                 />
               </div>
