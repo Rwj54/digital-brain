@@ -763,11 +763,7 @@ export function enrichProjectIdentity(
       keywordActivationReady,
       rankBaselineReady:
         keywordActivationReady && hasRankCoordinates,
-      competitorDiscoveryReady:
-        categoryConfidence === "high" &&
-        metroConfidence === "high" &&
-        hasCanonicalCategory &&
-        hasCanonicalMetro,
+      competitorDiscoveryReady: false,
     },
     notes,
   };
