@@ -11,7 +11,30 @@ export type ProjectIdentityInput = {
   rankLat: number | null;
   rankLng: number | null;
   mapsLocationCode: number | null;
+  confirmedCategory?: string | null;
+  confirmedMetro?: string | null;
+  websiteInferredCategory?: string | null;
+  websiteInferredMetro?: string | null;
+  gbpPrimaryCategory?: string | null;
+  gbpPlaceId?: string | null;
 };
+
+export type ProjectIdentityConfidence = "high" | "medium" | "low" | "missing";
+
+export type ProjectIdentityCategorySource =
+  | "gbp_primary_category"
+  | "stored_primary_category"
+  | "confirmed_category"
+  | "stored_category"
+  | "website_inference"
+  | "missing";
+
+export type ProjectIdentityMetroSource =
+  | "stored_target_metro"
+  | "confirmed_metro"
+  | "stored_metro"
+  | "website_inference"
+  | "missing";
 
 export type ProjectIdentityEnrichment = {
   canonicalSiteUrl: string | null;
@@ -19,9 +42,16 @@ export type ProjectIdentityEnrichment = {
   inferredBrandName: string | null;
   resolvedBusinessName: string | null;
   businessNameSource: "stored_target_brand_name" | "domain_inference" | "missing";
+  googlePrimaryCategory: string | null;
+  googlePlaceId: string | null;
   canonicalCategory: string | null;
   canonicalMetro: string | null;
   canonicalRadiusMiles: number | null;
+  categorySource: ProjectIdentityCategorySource;
+  categoryConfidence: ProjectIdentityConfidence;
+  metroSource: ProjectIdentityMetroSource;
+  metroConfidence: ProjectIdentityConfidence;
+  resolutionExplanation: string[];
   readiness: {
     hasResolvedBusinessName: boolean;
     hasCanonicalCategory: boolean;
@@ -30,6 +60,9 @@ export type ProjectIdentityEnrichment = {
     hasMapsLocationCode: boolean;
     hasTargetDomain: boolean;
     hasTargetBrandName: boolean;
+    hasGooglePrimaryCategoryEvidence: boolean;
+    automationPersistenceReady: boolean;
+    keywordActivationReady: boolean;
     rankBaselineReady: boolean;
     competitorDiscoveryReady: boolean;
   };
@@ -467,15 +500,93 @@ export function enrichProjectIdentity(
       ? "domain_inference"
       : "missing";
 
-  const storedPrimaryCategory = normalizeTrimmedString(input.primaryCategory);
-  const rawCategory = normalizeCategoryInput(input.category);
-  const inferredCategory = inferCanonicalCategoryFromRawCategory(rawCategory);
-  const canonicalCategory = storedPrimaryCategory ?? inferredCategory.canonicalCategory;
+  const storedPrimaryCategory = inferCanonicalCategoryFromRawCategory(
+    normalizeCategoryInput(input.primaryCategory)
+  ).canonicalCategory;
+  const storedProjectCategory = inferCanonicalCategoryFromRawCategory(
+    normalizeCategoryInput(input.category)
+  ).canonicalCategory;
+  const confirmedCategory = inferCanonicalCategoryFromRawCategory(
+    normalizeCategoryInput(input.confirmedCategory ?? null)
+  ).canonicalCategory;
+  const websiteInferredCategory = inferCanonicalCategoryFromRawCategory(
+    normalizeCategoryInput(input.websiteInferredCategory ?? null)
+  ).canonicalCategory;
+  const googlePrimaryCategory = inferCanonicalCategoryFromRawCategory(
+    normalizeCategoryInput(input.gbpPrimaryCategory ?? null)
+  ).canonicalCategory;
 
-  const canonicalMetro = normalizeMetroValue(
-    normalizeTrimmedString(input.targetMetro) ??
-      normalizeTrimmedString(input.metro)
+  const googlePlaceId = normalizeTrimmedString(input.gbpPlaceId ?? null);
+
+  let canonicalCategory: string | null = null;
+  let categorySource: ProjectIdentityCategorySource = "missing";
+  let categoryConfidence: ProjectIdentityConfidence = "missing";
+
+  if (googlePrimaryCategory) {
+    canonicalCategory = googlePrimaryCategory;
+    categorySource = "gbp_primary_category";
+    categoryConfidence = "high";
+  } else if (storedPrimaryCategory) {
+    canonicalCategory = storedPrimaryCategory;
+    categorySource = "stored_primary_category";
+    categoryConfidence = "medium";
+  } else if (confirmedCategory) {
+    canonicalCategory = confirmedCategory;
+    categorySource = "confirmed_category";
+    categoryConfidence = "low";
+  } else if (storedProjectCategory) {
+    canonicalCategory = storedProjectCategory;
+    categorySource = "stored_category";
+    categoryConfidence = "low";
+  } else if (websiteInferredCategory) {
+    canonicalCategory = websiteInferredCategory;
+    categorySource = "website_inference";
+    categoryConfidence = "low";
+  }
+
+  const storedTargetMetro = normalizeMetroValue(
+    normalizeTrimmedString(input.targetMetro)
   );
+  const storedProjectMetro = normalizeMetroValue(
+    normalizeTrimmedString(input.metro)
+  );
+  const confirmedMetro = normalizeMetroValue(
+    normalizeTrimmedString(input.confirmedMetro ?? null)
+  );
+  const websiteInferredMetro = normalizeMetroValue(
+    normalizeTrimmedString(input.websiteInferredMetro ?? null)
+  );
+
+  let canonicalMetro: string | null = null;
+  let metroSource: ProjectIdentityMetroSource = "missing";
+  let metroConfidence: ProjectIdentityConfidence = "missing";
+
+  const hasMapsLocationCode =
+    typeof input.mapsLocationCode === "number" &&
+    Number.isFinite(input.mapsLocationCode) &&
+    input.mapsLocationCode > 0;
+
+  if (storedTargetMetro && hasMapsLocationCode) {
+    canonicalMetro = storedTargetMetro;
+    metroSource = "stored_target_metro";
+    metroConfidence = "high";
+  } else if (storedTargetMetro) {
+    canonicalMetro = storedTargetMetro;
+    metroSource = "stored_target_metro";
+    metroConfidence = "medium";
+  } else if (confirmedMetro) {
+    canonicalMetro = confirmedMetro;
+    metroSource = "confirmed_metro";
+    metroConfidence = "low";
+  } else if (storedProjectMetro) {
+    canonicalMetro = storedProjectMetro;
+    metroSource = "stored_metro";
+    metroConfidence = "low";
+  } else if (websiteInferredMetro) {
+    canonicalMetro = websiteInferredMetro;
+    metroSource = "website_inference";
+    metroConfidence = "low";
+  }
 
   const canonicalRadiusMiles =
     normalizeRadius(input.targetRadiusMiles) ??
@@ -487,16 +598,74 @@ export function enrichProjectIdentity(
     typeof input.rankLng === "number" &&
     Number.isFinite(input.rankLng);
 
-  const hasMapsLocationCode =
-    typeof input.mapsLocationCode === "number" &&
-    Number.isFinite(input.mapsLocationCode) &&
-    input.mapsLocationCode > 0;
-
   const hasCanonicalCategory = Boolean(canonicalCategory);
   const hasCanonicalMetro = Boolean(canonicalMetro);
   const hasResolvedBusinessName = Boolean(resolvedBusinessName);
   const hasTargetDomain = Boolean(canonicalDomain);
   const hasTargetBrandName = Boolean(storedTargetBrandName);
+  const hasGooglePrimaryCategoryEvidence = Boolean(googlePrimaryCategory);
+
+  const automationPersistenceReady =
+    categoryConfidence === "high" &&
+    (metroConfidence === "high" || metroConfidence === "medium");
+
+  const keywordActivationReady =
+    categoryConfidence === "high" &&
+    (metroConfidence === "high" || metroConfidence === "medium");
+
+  const resolutionExplanation: string[] = [];
+
+  if (googlePrimaryCategory) {
+    resolutionExplanation.push(
+      `Google GBP category evidence is available: ${googlePrimaryCategory}.`
+    );
+  } else {
+    resolutionExplanation.push(
+      "Google GBP category evidence is not available yet."
+    );
+  }
+
+  if (
+    googlePrimaryCategory &&
+    confirmedCategory &&
+    googlePrimaryCategory !== confirmedCategory
+  ) {
+    resolutionExplanation.push(
+      `Manual category input (${confirmedCategory}) conflicts with Google GBP category (${googlePrimaryCategory}).`
+    );
+  }
+
+  if (
+    googlePrimaryCategory &&
+    storedPrimaryCategory &&
+    googlePrimaryCategory !== storedPrimaryCategory
+  ) {
+    resolutionExplanation.push(
+      `Stored primary_category (${storedPrimaryCategory}) conflicts with Google GBP category (${googlePrimaryCategory}).`
+    );
+  }
+
+  if (categorySource === "confirmed_category") {
+    resolutionExplanation.push(
+      "Manual category clarification is treated as a low-confidence override until Google evidence agrees."
+    );
+  }
+
+  if (metroSource === "confirmed_metro") {
+    resolutionExplanation.push(
+      "Manual metro clarification is treated as a low-confidence override until stronger market evidence exists."
+    );
+  }
+
+  if (!automationPersistenceReady) {
+    resolutionExplanation.push(
+      "Automatic category and market promotion is blocked because identity confidence is not strong enough yet."
+    );
+  } else {
+    resolutionExplanation.push(
+      "Automatic category and market promotion is allowed because identity confidence is strong enough."
+    );
+  }
 
   const notes: string[] = [];
 
@@ -521,21 +690,17 @@ export function enrichProjectIdentity(
   }
 
   if (canonicalCategory) {
-    if (storedPrimaryCategory) {
-      notes.push(`Canonical category resolved from stored primary_category: ${canonicalCategory}`);
-    } else if (rawCategory) {
-      notes.push(
-        `Canonical category inferred from raw category text: ${canonicalCategory} (${inferredCategory.source}).`
-      );
-    } else {
-      notes.push(`Canonical category resolved: ${canonicalCategory}`);
-    }
+    notes.push(
+      `Canonical category resolved: ${canonicalCategory} (${categorySource}, ${categoryConfidence} confidence).`
+    );
   } else {
     notes.push("Canonical category is still missing.");
   }
 
   if (canonicalMetro) {
-    notes.push(`Canonical metro resolved: ${canonicalMetro}`);
+    notes.push(
+      `Canonical metro resolved: ${canonicalMetro} (${metroSource}, ${metroConfidence} confidence).`
+    );
   } else {
     notes.push("Canonical metro is still missing.");
   }
@@ -558,15 +723,26 @@ export function enrichProjectIdentity(
     notes.push("Maps location code is still missing.");
   }
 
+  for (const explanation of resolutionExplanation) {
+    notes.push(explanation);
+  }
+
   return {
     canonicalSiteUrl,
     canonicalDomain,
     inferredBrandName,
     resolvedBusinessName,
     businessNameSource,
+    googlePrimaryCategory,
+    googlePlaceId,
     canonicalCategory,
     canonicalMetro,
     canonicalRadiusMiles,
+    categorySource,
+    categoryConfidence,
+    metroSource,
+    metroConfidence,
+    resolutionExplanation,
     readiness: {
       hasResolvedBusinessName,
       hasCanonicalCategory,
@@ -575,9 +751,15 @@ export function enrichProjectIdentity(
       hasMapsLocationCode,
       hasTargetDomain,
       hasTargetBrandName,
+      hasGooglePrimaryCategoryEvidence,
+      automationPersistenceReady,
+      keywordActivationReady,
       rankBaselineReady:
-        hasCanonicalCategory && hasCanonicalMetro && hasRankCoordinates,
-      competitorDiscoveryReady: hasCanonicalCategory && hasCanonicalMetro,
+        keywordActivationReady && hasRankCoordinates,
+      competitorDiscoveryReady:
+        categoryConfidence === "high" &&
+        hasCanonicalCategory &&
+        hasCanonicalMetro,
     },
     notes,
   };

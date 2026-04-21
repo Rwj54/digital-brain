@@ -26,9 +26,17 @@ export type ProjectOnboardingKeywordRow = {
   created_at: string;
 };
 
+export type ProjectOnboardingLatestGbpProfileRow = {
+  place_id: string | null;
+  gbp_name: string | null;
+  primary_category: string | null;
+  last_fetched_at: string | null;
+};
+
 export type ProjectOnboardingContext = {
   project: ProjectOnboardingRow;
   activeKeywords: ProjectOnboardingKeywordRow[];
+  latestGbpProfile: ProjectOnboardingLatestGbpProfileRow | null;
 };
 
 function isProjectOnboardingRow(value: unknown): value is ProjectOnboardingRow {
@@ -56,7 +64,7 @@ function isProjectOnboardingRow(value: unknown): value is ProjectOnboardingRow {
 }
 
 function isProjectOnboardingKeywordRow(
-  value: unknown
+  value: unknown,
 ): value is ProjectOnboardingKeywordRow {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -72,6 +80,23 @@ function isProjectOnboardingKeywordRow(
     typeof row.is_active === "boolean" &&
     typeof row.priority === "number" &&
     typeof row.created_at === "string"
+  );
+}
+
+function isProjectOnboardingLatestGbpProfileRow(
+  value: unknown,
+): value is ProjectOnboardingLatestGbpProfileRow {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+
+  return (
+    "place_id" in row &&
+    "gbp_name" in row &&
+    "primary_category" in row &&
+    "last_fetched_at" in row
   );
 }
 
@@ -95,7 +120,7 @@ async function loadProject(projectId: string): Promise<ProjectOnboardingRow> {
         "rank_lat",
         "rank_lng",
         "maps_location_code",
-      ].join(", ")
+      ].join(", "),
     )
     .eq("id", projectId)
     .maybeSingle();
@@ -116,7 +141,7 @@ async function loadProject(projectId: string): Promise<ProjectOnboardingRow> {
 }
 
 async function loadActiveKeywords(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectOnboardingKeywordRow[]> {
   const supabase = supabaseAdmin();
 
@@ -142,15 +167,44 @@ async function loadActiveKeywords(
 
   if (validRows.length !== rows.length) {
     throw new Error(
-      "One or more project rank keyword rows had an invalid shape."
+      "One or more project rank keyword rows had an invalid shape.",
     );
   }
 
   return validRows;
 }
 
+async function loadLatestGbpProfile(
+  projectId: string,
+): Promise<ProjectOnboardingLatestGbpProfileRow | null> {
+  const supabase = supabaseAdmin();
+
+  const { data, error } = await supabase
+    .from("gbp_profiles")
+    .select("place_id, gbp_name, primary_category, last_fetched_at")
+    .eq("project_id", projectId)
+    .order("last_fetched_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw new Error(`Failed to load latest GBP profile: ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? (data[0] ?? null) : null;
+
+  if (!row) {
+    return null;
+  }
+
+  if (!isProjectOnboardingLatestGbpProfileRow(row)) {
+    throw new Error("Latest GBP profile row shape is invalid.");
+  }
+
+  return row;
+}
+
 export async function loadProjectOnboardingContext(
-  projectId: string
+  projectId: string,
 ): Promise<ProjectOnboardingContext> {
   const normalizedProjectId =
     typeof projectId === "string" ? projectId.trim() : "";
@@ -161,9 +215,11 @@ export async function loadProjectOnboardingContext(
 
   const project = await loadProject(normalizedProjectId);
   const activeKeywords = await loadActiveKeywords(normalizedProjectId);
+  const latestGbpProfile = await loadLatestGbpProfile(normalizedProjectId);
 
   return {
     project,
     activeKeywords,
+    latestGbpProfile,
   };
 }

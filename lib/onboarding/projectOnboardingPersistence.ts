@@ -78,6 +78,8 @@ export async function persistProjectOnboardingAutomationFields(params: {
   canonicalCategory: string | null;
   canonicalMetro: string | null;
   canonicalRadiusMiles: number | null;
+  allowCategoryPersistence: boolean;
+  allowMetroPersistence: boolean;
 }): Promise<{
   categoryPersisted: boolean;
   metroPersisted: boolean;
@@ -104,7 +106,11 @@ export async function persistProjectOnboardingAutomationFields(params: {
 
   let resolvedMapsLocationCode: number | null = currentMapsLocationCode;
 
-  if (!resolvedMapsLocationCode && canonicalMetro) {
+  if (
+    params.allowMetroPersistence &&
+    !resolvedMapsLocationCode &&
+    canonicalMetro
+  ) {
     resolvedMapsLocationCode = await resolveDataForSeoUsLocationCode({
       metroCityState: canonicalMetro,
     });
@@ -120,11 +126,19 @@ export async function persistProjectOnboardingAutomationFields(params: {
     maps_location_code?: number;
   } = {};
 
-  if (canonicalCategory && currentCategory !== canonicalCategory) {
+  if (
+    params.allowCategoryPersistence &&
+    canonicalCategory &&
+    currentCategory !== canonicalCategory
+  ) {
     updates.category = canonicalCategory;
   }
 
-  if (canonicalMetro && currentMetro !== canonicalMetro) {
+  if (
+    params.allowMetroPersistence &&
+    canonicalMetro &&
+    currentMetro !== canonicalMetro
+  ) {
     updates.metro = canonicalMetro;
   }
 
@@ -132,11 +146,19 @@ export async function persistProjectOnboardingAutomationFields(params: {
     updates.radius_miles = canonicalRadiusMiles;
   }
 
-  if (!currentPrimaryCategory && canonicalCategory) {
+  if (
+    params.allowCategoryPersistence &&
+    canonicalCategory &&
+    currentPrimaryCategory !== canonicalCategory
+  ) {
     updates.primary_category = canonicalCategory;
   }
 
-  if (canonicalMetro && currentTargetMetro !== canonicalMetro) {
+  if (
+    params.allowMetroPersistence &&
+    canonicalMetro &&
+    currentTargetMetro !== canonicalMetro
+  ) {
     updates.target_metro = canonicalMetro;
   }
 
@@ -148,6 +170,7 @@ export async function persistProjectOnboardingAutomationFields(params: {
   }
 
   if (
+    params.allowMetroPersistence &&
     resolvedMapsLocationCode !== null &&
     currentMapsLocationCode !== resolvedMapsLocationCode
   ) {

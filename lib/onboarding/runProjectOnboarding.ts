@@ -73,9 +73,27 @@ export type RunProjectOnboardingResult =
           | "stored_target_brand_name"
           | "domain_inference"
           | "missing";
+        googlePrimaryCategory: string | null;
+        googlePlaceId: string | null;
         canonicalCategory: string | null;
         canonicalMetro: string | null;
         canonicalRadiusMiles: number | null;
+        categorySource:
+          | "gbp_primary_category"
+          | "stored_primary_category"
+          | "confirmed_category"
+          | "stored_category"
+          | "website_inference"
+          | "missing";
+        categoryConfidence: "high" | "medium" | "low" | "missing";
+        metroSource:
+          | "stored_target_metro"
+          | "confirmed_metro"
+          | "stored_metro"
+          | "website_inference"
+          | "missing";
+        metroConfidence: "high" | "medium" | "low" | "missing";
+        resolutionExplanation: string[];
       };
       steps: {
         projectValidated: boolean;
@@ -184,8 +202,15 @@ function buildProjectOnboardingBlockingFields(params: {
 function buildProjectOnboardingSetupStatus(params: {
   blockingFields: ProjectOnboardingBlockingField[];
   activeKeywordCount: number;
+  categoryConfidence: "high" | "medium" | "low" | "missing";
+  metroConfidence: "high" | "medium" | "low" | "missing";
 }): ProjectOnboardingSetupStatus {
-  const { blockingFields, activeKeywordCount } = params;
+  const {
+    blockingFields,
+    activeKeywordCount,
+    categoryConfidence,
+    metroConfidence,
+  } = params;
 
   const missingCategory = blockingFields.includes("category");
   const missingMetro = blockingFields.includes("metro");
@@ -200,6 +225,10 @@ function buildProjectOnboardingSetupStatus(params: {
 
   if (missingMetro) {
     return "blocked_missing_metro";
+  }
+
+  if (categoryConfidence === "low" || metroConfidence === "low") {
+    return "needs_confirmation";
   }
 
   if (activeKeywordCount > 0) {
@@ -345,7 +374,7 @@ export async function runProjectOnboarding(
   });
 
   try {
-    const { project } = await loadProjectOnboardingContext(projectId);
+    const { project, latestGbpProfile } = await loadProjectOnboardingContext(projectId);
 
     const initialIdentity = enrichProjectIdentity({
       siteUrl: project.site_url,
@@ -366,20 +395,6 @@ export async function runProjectOnboarding(
       siteUrl: initialIdentity.canonicalSiteUrl ?? project.site_url,
     });
 
-    const effectiveCategory = pickFirstNonEmptyString(
-      input.confirmedCategory,
-      project.primary_category,
-      project.category,
-      websiteSignals.inferredCategory,
-    );
-
-    const effectiveMetro = pickFirstNonEmptyString(
-      input.confirmedMetro,
-      project.target_metro,
-      project.metro,
-      websiteSignals.inferredMetro,
-    );
-
     const effectiveRadiusMiles = pickFirstPositiveInteger(
       project.target_radius_miles,
       project.radius_miles,
@@ -388,17 +403,23 @@ export async function runProjectOnboarding(
 
     const identity = enrichProjectIdentity({
       siteUrl: project.site_url,
-      category: effectiveCategory,
-      metro: effectiveMetro,
+      category: project.category,
+      metro: project.metro,
       radiusMiles: effectiveRadiusMiles,
-      primaryCategory: effectiveCategory,
-      targetMetro: effectiveMetro,
+      primaryCategory: project.primary_category,
+      targetMetro: project.target_metro,
       targetRadiusMiles: effectiveRadiusMiles,
       targetDomain: project.target_domain,
       targetBrandName: project.target_brand_name,
       rankLat: project.rank_lat,
       rankLng: project.rank_lng,
       mapsLocationCode: project.maps_location_code,
+      confirmedCategory: input.confirmedCategory ?? null,
+      confirmedMetro: input.confirmedMetro ?? null,
+      websiteInferredCategory: websiteSignals.inferredCategory,
+      websiteInferredMetro: websiteSignals.inferredMetro,
+      gbpPrimaryCategory: latestGbpProfile?.primary_category ?? null,
+      gbpPlaceId: latestGbpProfile?.place_id ?? null,
     });
 
     const discoveredKeywordCandidates =
@@ -408,11 +429,13 @@ export async function runProjectOnboarding(
         canonicalCategory: identity.canonicalCategory,
       });
 
-    const effectiveSeedKeywords = buildProjectOnboardingSeedKeywords({
-      inputSeedKeywords: input.seedKeywords,
-      discoveredKeywordCandidates,
-      canonicalMetro: identity.canonicalMetro,
-    });
+    const effectiveSeedKeywords = identity.readiness.keywordActivationReady
+      ? buildProjectOnboardingSeedKeywords({
+          inputSeedKeywords: input.seedKeywords,
+          discoveredKeywordCandidates,
+          canonicalMetro: identity.canonicalMetro,
+        })
+      : [];
 
     const persistedIdentity = await persistProjectOnboardingIdentityFields({
       projectId,
@@ -435,6 +458,10 @@ export async function runProjectOnboarding(
         canonicalCategory: identity.canonicalCategory,
         canonicalMetro: identity.canonicalMetro,
         canonicalRadiusMiles: identity.canonicalRadiusMiles,
+        allowCategoryPersistence: identity.categoryConfidence === "high",
+        allowMetroPersistence:
+          identity.metroConfidence === "high" ||
+          identity.metroConfidence === "medium",
       });
 
     const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
@@ -498,6 +525,8 @@ export async function runProjectOnboarding(
     const setupStatus = buildProjectOnboardingSetupStatus({
       blockingFields,
       activeKeywordCount: refreshedActiveKeywords.length,
+      categoryConfidence: identity.categoryConfidence,
+      metroConfidence: identity.metroConfidence,
     });
 
     const baselineRankDiscovery = await runBaselineRankDiscovery({
@@ -604,9 +633,16 @@ export async function runProjectOnboarding(
         inferredBrandName: identity.inferredBrandName,
         resolvedBusinessName: identity.resolvedBusinessName,
         businessNameSource: identity.businessNameSource,
+        googlePrimaryCategory: identity.googlePrimaryCategory,
+        googlePlaceId: identity.googlePlaceId,
         canonicalCategory: identity.canonicalCategory,
         canonicalMetro: identity.canonicalMetro,
         canonicalRadiusMiles: identity.canonicalRadiusMiles,
+        categorySource: identity.categorySource,
+        categoryConfidence: identity.categoryConfidence,
+        metroSource: identity.metroSource,
+        metroConfidence: identity.metroConfidence,
+        resolutionExplanation: identity.resolutionExplanation,
       },
       steps: {
         projectValidated: true,
