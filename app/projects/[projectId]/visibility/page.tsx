@@ -181,7 +181,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading visibility page...
+            Loading visibility read...
           </p>
         </div>
       </main>
@@ -289,7 +289,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
         </section>
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Visibility markers</SectionLabel>
+          <SectionLabel>Current visibility summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -410,7 +410,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Visibility navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -430,7 +430,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View AI page
+                  Open AI page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/identity`}
@@ -440,7 +440,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View identity page
+                  Open identity page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/website`}
@@ -450,7 +450,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View website page
+                  Open website page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/reviews`}
@@ -460,7 +460,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View reviews page
+                  Open reviews page
                 </Link>
               </div>
             </div>
@@ -468,7 +468,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>What this tells you now</SectionLabel>
+              <SectionLabel>What this tells you</SectionLabel>
               <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                 {(visibilitySummary.evidence.length > 0
                   ? visibilitySummary.evidence
@@ -495,7 +495,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Plain-English read</SectionLabel>
+              <SectionLabel>Visibility read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
@@ -517,14 +517,14 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {numericValue(visibilityScore)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  visibility score for this project
+                  visibility score right now
                 </p>
 
                 <div className="mt-4 h-2 bg-[var(--reference-soft)]">
