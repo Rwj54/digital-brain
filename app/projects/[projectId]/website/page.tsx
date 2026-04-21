@@ -164,7 +164,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading website page...
+            Loading website read...
           </p>
         </div>
       </main>
@@ -198,7 +198,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
                 website.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page gives the owner-facing website identity read. It shows
+                This page shows the website read for this business. It shows
                 whether the website URL, domain, and brand name are clear enough
                 for Digital Brain to trust the website connection.
               </p>
@@ -259,7 +259,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
         </section>
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Website markers</SectionLabel>
+          <SectionLabel>Current website summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -296,8 +296,8 @@ export default function ProjectWebsitePage({ params }: PageProps) {
               The clearest next website move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the main identity problem first. Once the website,
-              domain, and brand anchor are clear, later website intelligence
+              Start with the main website identity problem first. Once the
+              website, domain, and brand anchor are clear, later website work
               becomes more trustworthy.
             </p>
 
@@ -384,7 +384,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Website navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -404,7 +404,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View actions page
+                  Open actions page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/rank`}
@@ -414,7 +414,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View rank page
+                  Open rank page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/authority`}
@@ -424,7 +424,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View authority page
+                  Open authority page
                 </Link>
               </div>
             </div>
@@ -432,7 +432,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>What this tells you now</SectionLabel>
+              <SectionLabel>What this tells you</SectionLabel>
               <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                 {websiteSummary.evidence.map((item, index) => (
                   <EvidenceBullet
@@ -455,36 +455,36 @@ export default function ProjectWebsitePage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Plain-English read</SectionLabel>
+              <SectionLabel>Website read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
-                  label="Current read"
+                  label="Website read"
                   value={websiteSummary.websiteReadinessLabel}
-                  helper="This is the owner-facing website identity read for the saved project data."
+                  helper="This is the current website read for the saved project data."
                 />
                 <DetailRow
-                  label="Next action owner"
+                  label="Who should do it"
                   value={websiteSummary.nextAction.whoShouldDoIt}
-                  helper="This is who should make the next website identity fix."
+                  helper="This is who should handle the next website fix."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={websiteSummary.nextAction.difficulty}
-                  helper="This tells the owner how hard the next website move should be."
+                  helper="This shows how hard the next website move should be."
                 />
               </div>
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {websiteSummary.websiteReadinessScore}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  website identity score for this project
+                  website identity score right now
                 </p>
 
                 <div className="mt-4 h-2 bg-[var(--reference-soft)]">
