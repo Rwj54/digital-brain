@@ -223,7 +223,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading authority page...
+            Loading authority read...
           </p>
         </div>
       </main>
@@ -328,7 +328,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
         ) : null}
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Authority markers</SectionLabel>
+          <SectionLabel>Current authority summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -360,7 +360,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
           <section>
-            <SectionLabel>Recommended next actions</SectionLabel>
+            <SectionLabel>What to do next</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
               Start with the strongest next moves
             </h2>
@@ -374,23 +374,23 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
               {[
                 {
                   key: "high",
-                  label: "High priority",
+                  label: "Do first",
                   helper:
-                    "Do these first because they carry the most weight right now.",
+                    "Do these first because they matter most right now.",
                   items: groupedActions.high,
                 },
                 {
                   key: "medium",
-                  label: "Medium priority",
+                  label: "Do next",
                   helper:
-                    "Do these after the highest-impact gaps are covered.",
+                    "Do these after the first actions are underway.",
                   items: groupedActions.medium,
                 },
                 {
                   key: "low",
-                  label: "Lower priority",
+                  label: "Do later",
                   helper:
-                    "These still help, but they matter less than the top items above.",
+                    "These still help, but they can wait until the work above is underway.",
                   items: groupedActions.low,
                 },
               ]
@@ -449,13 +449,13 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
 
               {actions.length === 0 ? (
                 <div className="border-t border-[var(--border)] pt-5 text-sm text-[var(--text-body)]">
-                  No authority-driven actions are available yet for this project.
+                  No authority actions are available yet for this project.
                 </div>
               ) : null}
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Authority navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -475,7 +475,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View actions page
+                  Open actions page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/rank`}
@@ -485,7 +485,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View rank page
+                  Open rank page
                 </Link>
                 <button
                   type="button"
@@ -507,12 +507,12 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>Recent authority checkpoints</SectionLabel>
+              <SectionLabel>Recent authority updates</SectionLabel>
 
               <div className="mt-4">
                 {historyRows.length === 0 ? (
                   <p className="text-sm leading-7 text-[var(--text-body)]">
-                    No authority checkpoints are available yet for this project.
+                    No authority updates are available yet for this project.
                   </p>
                 ) : (
                   historyRows.slice(0, 6).map((row, index) => (
@@ -539,23 +539,23 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Plain-English read</SectionLabel>
+              <SectionLabel>Authority read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
-                  label="Current read"
+                  label="Authority read"
                   value={authorityRead.headline}
-                  helper="This is the plain-language read for the latest authority snapshot."
+                  helper="This is the current authority read for the latest snapshot."
                 />
                 <DetailRow
                   label="Trend line"
                   value={authorityTrend}
-                  helper="This compares the latest authority checkpoint to the one before it."
+                  helper="This compares the latest authority update to the one before it."
                 />
                 <DetailRow
                   label="Action version"
                   value={actionsVersion ?? "Not set"}
-                  helper="This is the stored action-engine version behind the current recommendations."
+                  helper="This is the action-engine version behind the current recommendations."
                 />
                 <DetailRow
                   label="Actions captured"
@@ -566,14 +566,14 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {historyRows.length}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  authority checkpoints currently available for this project
+                  authority updates currently available for this project
                 </p>
 
                 <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
@@ -586,7 +586,7 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
                     value={formatMomentumLabel(latestRow?.momentum_label ?? null)}
                   />
                   <HeaderMeta
-                    label="Stored actions"
+                    label="Actions ready now"
                     value={String(actions.length)}
                   />
                 </div>
