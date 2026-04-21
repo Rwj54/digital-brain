@@ -209,7 +209,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-base text-[var(--text-body)]">
-            Loading reviews page...
+            Loading reviews read...
           </p>
         </div>
       </main>
@@ -307,7 +307,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                 stronger reputation foundation.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page gives the owner-facing review and reputation read. It
+                This page shows the reviews read for this business. It
                 shows whether saved review count, rating, and review presence
                 are strong enough to support trust for the business.
               </p>
@@ -364,7 +364,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
         </section>
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>Review markers</SectionLabel>
+          <SectionLabel>Current reviews summary</SectionLabel>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricStripItem
@@ -455,7 +455,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Reviews evidence</SectionLabel>
+              <SectionLabel>Review details</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
@@ -481,7 +481,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                   value={boolLabel(hasReviewSignals)}
                 />
                 <DetailRow
-                  label="GBP business name"
+                  label="Business profile name"
                   value={textValue(
                     typeof aiSummary.gbpName === "string"
                       ? aiSummary.gbpName
@@ -489,7 +489,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                   )}
                 />
                 <DetailRow
-                  label="Primary category"
+                  label="Business profile category"
                   value={textValue(
                     typeof aiSummary.primaryCategory === "string"
                       ? aiSummary.primaryCategory
@@ -500,7 +500,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>Reviews navigation</SectionLabel>
+              <SectionLabel>Open another center</SectionLabel>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/projects/${projectId}/owner`}
@@ -520,7 +520,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View AI page
+                  Open AI page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/identity`}
@@ -530,7 +530,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View identity page
+                  Open identity page
                 </Link>
                 <Link
                   href={`/projects/${projectId}/website`}
@@ -540,7 +540,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
                     backgroundColor: "transparent",
                   }}
                 >
-                  View website page
+                  Open website page
                 </Link>
               </div>
             </div>
@@ -548,11 +548,11 @@ export default function ProjectReviewsPage({ params }: PageProps) {
 
           <aside className="space-y-8">
             <section>
-              <SectionLabel>What this tells you now</SectionLabel>
+              <SectionLabel>What this tells you</SectionLabel>
               <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                 {(evidence.length > 0
                   ? evidence
-                  : ["No review evidence is available yet."]).map(
+                  : ["No review details are available yet."]).map(
                   (item, index) => (
                     <EvidenceBullet
                       key={`${index}-${item}`}
@@ -575,36 +575,36 @@ export default function ProjectReviewsPage({ params }: PageProps) {
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Plain-English read</SectionLabel>
+              <SectionLabel>Reviews read</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
-                  label="Current read"
+                  label="Reviews read"
                   value={reputationLabel}
-                  helper="This is the owner-facing review and reputation read based on saved review trust signals."
+                  helper="This is the current reviews read based on saved review trust signals."
                 />
                 <DetailRow
-                  label="Next action owner"
+                  label="Who should do it"
                   value={nextActionWho}
-                  helper="This is who should make the next review and reputation move."
+                  helper="This is who should handle the next review and reputation move."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={nextActionDifficulty}
-                  helper="This tells the owner how hard the next reputation move should be."
+                  helper="This shows how hard the next reputation move should be."
                 />
               </div>
             </section>
 
             <section className="border-t border-[var(--border)] pt-6">
-              <SectionLabel>Progress and proof</SectionLabel>
+              <SectionLabel>Progress so far</SectionLabel>
 
               <div className="mt-4">
                 <p className="text-5xl font-semibold tracking-tight text-[var(--text-strong)]">
                   {numericValue(reputationScore)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  reputation score for this project
+                  reputation score right now
                 </p>
 
                 <div className="mt-4 h-2 bg-[var(--reference-soft)]">
