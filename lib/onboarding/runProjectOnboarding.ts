@@ -35,6 +35,8 @@ export type RunProjectOnboardingInput = {
   projectId: string;
   mode?: "manual" | "nightly";
   userAgent?: string | null;
+  confirmedCategory?: string | null;
+  confirmedMetro?: string | null;
   seedKeywords?: SeedRankKeywordInput[];
 };
 
@@ -142,6 +144,26 @@ function pickFirstPositiveInteger(
   return null;
 }
 
+function buildProjectOnboardingConfirmationNotes(params: {
+  confirmedCategory?: string | null;
+  confirmedMetro?: string | null;
+}): string[] {
+  const notes: string[] = [];
+
+  const confirmedCategory = normalizeString(params.confirmedCategory);
+  const confirmedMetro = normalizeString(params.confirmedMetro);
+
+  if (confirmedCategory) {
+    notes.push(`Manual onboarding category confirmation provided: ${confirmedCategory}.`);
+  }
+
+  if (confirmedMetro) {
+    notes.push(`Manual onboarding metro confirmation provided: ${confirmedMetro}.`);
+  }
+
+  return notes;
+}
+
 function buildProjectOnboardingBlockingFields(params: {
   canonicalCategory: string | null;
   canonicalMetro: string | null;
@@ -237,12 +259,14 @@ export async function runProjectOnboarding(
     });
 
     const effectiveCategory = pickFirstNonEmptyString(
+      input.confirmedCategory,
       project.primary_category,
       project.category,
       websiteSignals.inferredCategory,
     );
 
     const effectiveMetro = pickFirstNonEmptyString(
+      input.confirmedMetro,
       project.target_metro,
       project.metro,
       websiteSignals.inferredMetro,
@@ -427,24 +451,30 @@ export async function runProjectOnboarding(
     const authorityBaselinePlanned =
       baselineRankPlanned && competitorDiscoveryStarted;
 
-    const notes = buildOnboardingNotes({
-      identity,
-      websiteSignalNotes: websiteSignals.notes,
-      persistedIdentity,
-      persistedAutomationFields,
-      persistedRankCoordinates,
-      normalizedKeywords,
-      normalizedRankSnapshots,
-      baselineRankDiscovery,
-      authorityBaseline,
-      seededKeywordCount,
-      refreshedActiveKeywords,
-      canonicalKeywordForSnapshots,
-      competitorDiscoveryStarted,
-      competitorDiscoveryFailureNote,
-      baselineRankPlanned,
-      authorityBaselinePlanned,
-    });
+    const notes = [
+      ...buildProjectOnboardingConfirmationNotes({
+        confirmedCategory: input.confirmedCategory,
+        confirmedMetro: input.confirmedMetro,
+      }),
+      ...buildOnboardingNotes({
+        identity,
+        websiteSignalNotes: websiteSignals.notes,
+        persistedIdentity,
+        persistedAutomationFields,
+        persistedRankCoordinates,
+        normalizedKeywords,
+        normalizedRankSnapshots,
+        baselineRankDiscovery,
+        authorityBaseline,
+        seededKeywordCount,
+        refreshedActiveKeywords,
+        canonicalKeywordForSnapshots,
+        competitorDiscoveryStarted,
+        competitorDiscoveryFailureNote,
+        baselineRankPlanned,
+        authorityBaselinePlanned,
+      }),
+    ];
 
     const result: RunProjectOnboardingResult = {
       ok: true,

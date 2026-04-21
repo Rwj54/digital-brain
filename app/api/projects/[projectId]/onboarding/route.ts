@@ -11,6 +11,8 @@ type RouteContext = {
 };
 
 type RequestBody = {
+  category?: string;
+  metro?: string;
   seedKeywords?: Array<{
     keyword?: string;
     metro?: string;
@@ -18,6 +20,15 @@ type RequestBody = {
     isActive?: boolean;
   }>;
 };
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 function normalizeSeedKeywords(
   input: RequestBody["seedKeywords"]
@@ -60,6 +71,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       projectId,
       mode: "manual",
       userAgent: request.headers.get("user-agent"),
+      confirmedCategory: normalizeOptionalString(body.category),
+      confirmedMetro: normalizeOptionalString(body.metro),
       seedKeywords: normalizeSeedKeywords(body.seedKeywords),
     });
 
