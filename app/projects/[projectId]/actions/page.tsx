@@ -621,21 +621,21 @@ export default function ActionsPage({ params }: PageProps) {
                       key: "high",
                       label: "Do these first",
                       helper:
-                        "These carry the strongest weight right now and should be handled before the rest.",
+                        "These matter most right now and should be handled before the rest.",
                       items: groupedActions.high,
                     },
                     {
                       key: "medium",
                       label: "Do these next",
                       helper:
-                        "Move to these after the highest-priority work is underway.",
+                        "Move to these after the first actions are underway.",
                       items: groupedActions.medium,
                     },
                     {
                       key: "low",
                       label: "Do these after that",
                       helper:
-                        "These still help, but they matter less than the work above.",
+                        "These still help, but they can wait until the work above is underway.",
                       items: groupedActions.low,
                     },
                   ]
