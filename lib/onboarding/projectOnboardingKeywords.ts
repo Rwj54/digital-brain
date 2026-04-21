@@ -17,6 +17,60 @@ function normalizeKeywordValue(value: string | null | undefined): string {
   return normalizeString(value).toLowerCase();
 }
 
+function buildKeywordRowKey(params: {
+  keyword: string;
+  metro: string;
+}): string {
+  return `${normalizeKeywordValue(params.keyword)}||${normalizeString(params.metro)}`;
+}
+
+function normalizeSeedKeywordRows(params: {
+  projectId: string;
+  seedKeywords: SeedRankKeywordInput[];
+  canonicalMetro?: string | null;
+}): Array<{
+  project_id: string;
+  keyword: string;
+  metro: string;
+  is_active: boolean;
+  priority: number;
+}> {
+  const canonicalMetro = normalizeString(params.canonicalMetro);
+
+  return params.seedKeywords
+    .map((row, index) => {
+      const keyword = normalizeKeywordValue(row.keyword);
+      const providedMetro = typeof row.metro === "string" ? row.metro.trim() : "";
+      const metro = canonicalMetro || providedMetro;
+
+      if (!keyword || !metro) {
+        return null;
+      }
+
+      return {
+        project_id: params.projectId,
+        keyword,
+        metro,
+        is_active: row.isActive ?? true,
+        priority:
+          typeof row.priority === "number" && Number.isFinite(row.priority)
+            ? Math.round(row.priority)
+            : index + 1,
+      };
+    })
+    .filter(
+      (
+        row,
+      ): row is {
+        project_id: string;
+        keyword: string;
+        metro: string;
+        is_active: boolean;
+        priority: number;
+      } => row !== null,
+    );
+}
+
 export function buildProjectOnboardingKeywordCandidates(params: {
   inputSeedKeywords: SeedRankKeywordInput[] | undefined;
   inferredKeywordCandidates: string[] | undefined;
@@ -115,54 +169,87 @@ export async function upsertProjectOnboardingSeedKeywords(params: {
   canonicalMetro?: string | null;
 }): Promise<number> {
   const supabase = supabaseAdmin();
-  const canonicalMetro = normalizeString(params.canonicalMetro);
 
-  const rows = params.seedKeywords
-    .map((row, index) => {
-      const keyword = normalizeKeywordValue(row.keyword);
-      const providedMetro = typeof row.metro === "string" ? row.metro.trim() : "";
-      const metro = canonicalMetro || providedMetro;
+  const desiredRows = normalizeSeedKeywordRows({
+    projectId: params.projectId,
+    seedKeywords: params.seedKeywords,
+    canonicalMetro: params.canonicalMetro,
+  });
 
-      if (!keyword || !metro) {
-        return null;
-      }
-
-      return {
-        project_id: params.projectId,
-        keyword,
-        metro,
-        is_active: row.isActive ?? true,
-        priority:
-          typeof row.priority === "number" && Number.isFinite(row.priority)
-            ? Math.round(row.priority)
-            : index + 1,
-      };
-    })
-    .filter(
-      (
-        row
-      ): row is {
-        project_id: string;
-        keyword: string;
-        metro: string;
-        is_active: boolean;
-        priority: number;
-      } => row !== null
-    );
-
-  if (rows.length === 0) {
+  if (desiredRows.length === 0) {
     return 0;
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("project_rank_keywords")
-    .upsert(rows, { onConflict: "project_id,keyword,metro" });
+    .select("id, keyword, metro, is_active, priority")
+    .eq("project_id", params.projectId);
 
   if (error) {
-    throw new Error(`Failed to upsert project_rank_keywords: ${error.message}`);
+    throw new Error(
+      `Failed to load existing project rank keywords for reconciliation: ${error.message}`,
+    );
   }
 
-  return rows.length;
+  const existingRows = ((data ?? []) as ProjectRankKeywordRow[]).filter(
+    (row) => normalizeString(row.keyword) && normalizeString(row.metro),
+  );
+
+  const desiredByKey = new Map(
+    desiredRows.map((row) => [
+      buildKeywordRowKey({ keyword: row.keyword, metro: row.metro }),
+      row,
+    ]),
+  );
+
+  const existingByKey = new Map(
+    existingRows.map((row) => [
+      buildKeywordRowKey({ keyword: row.keyword, metro: row.metro }),
+      row,
+    ]),
+  );
+
+  const sameRowCount = existingRows.length === desiredRows.length;
+
+  const sameShape =
+    sameRowCount &&
+    desiredRows.every((row) => {
+      const key = buildKeywordRowKey({ keyword: row.keyword, metro: row.metro });
+      const existing = existingByKey.get(key);
+
+      return (
+        Boolean(existing) &&
+        existing?.is_active === row.is_active &&
+        existing?.priority === row.priority
+      );
+    });
+
+  if (!sameShape) {
+    const { error: deleteError } = await supabase
+      .from("project_rank_keywords")
+      .delete()
+      .eq("project_id", params.projectId);
+
+    if (deleteError) {
+      throw new Error(
+        `Failed to clear stale onboarding keyword frame: ${deleteError.message}`,
+      );
+    }
+
+    const { error: insertError } = await supabase
+      .from("project_rank_keywords")
+      .insert(desiredRows);
+
+    if (insertError) {
+      throw new Error(
+        `Failed to insert reconciled onboarding keyword frame: ${insertError.message}`,
+      );
+    }
+
+    return desiredRows.length;
+  }
+
+  return desiredByKey.size;
 }
 
 export async function normalizeProjectOnboardingRankKeywords(params: {
@@ -188,12 +275,12 @@ export async function normalizeProjectOnboardingRankKeywords(params: {
 
   if (error) {
     throw new Error(
-      `Failed to load project rank keywords for normalization: ${error.message}`
+      `Failed to load project rank keywords for normalization: ${error.message}`,
     );
   }
 
   const rows = ((data ?? []) as ProjectRankKeywordRow[]).filter(
-    (row) => normalizeString(row.keyword) && normalizeString(row.metro)
+    (row) => normalizeString(row.keyword) && normalizeString(row.metro),
   );
 
   const rowsNeedingNormalization = rows.filter((row) => {
@@ -226,7 +313,7 @@ export async function normalizeProjectOnboardingRankKeywords(params: {
 
   if (upsertError) {
     throw new Error(
-      `Failed to normalize project rank keywords: ${upsertError.message}`
+      `Failed to normalize project rank keywords: ${upsertError.message}`,
     );
   }
 
@@ -242,7 +329,7 @@ export async function normalizeProjectOnboardingRankKeywords(params: {
 
     if (deleteError) {
       throw new Error(
-        `Failed to remove non-canonical project rank keywords: ${deleteError.message}`
+        `Failed to remove non-canonical project rank keywords: ${deleteError.message}`,
       );
     }
   }

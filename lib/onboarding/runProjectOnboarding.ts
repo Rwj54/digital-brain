@@ -136,19 +136,6 @@ function normalizeKeywordValue(value: string | null | undefined): string {
   return normalizeString(value).toLowerCase();
 }
 
-function pickFirstNonEmptyString(
-  ...values: Array<string | null | undefined>
-): string | null {
-  for (const value of values) {
-    const normalized = normalizeString(value);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return null;
-}
-
 function pickFirstPositiveInteger(
   ...values: Array<number | null | undefined>
 ): number | null {
