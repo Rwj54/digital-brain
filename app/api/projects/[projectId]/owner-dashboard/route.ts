@@ -267,13 +267,43 @@ function extractPriorityFlags(priorities: OwnerPriorityLite[]): PriorityFlags {
 function buildVisibilityMarker(input: {
   latestRank: number | null;
   activeKeyword: RankKeywordRow | null;
+  hasActiveKeyword: boolean;
 }): OwnerHealthMarker {
-  const { latestRank, activeKeyword } = input;
+  const { latestRank, activeKeyword, hasActiveKeyword } = input;
 
-  let score = 12;
+  const keywordLabel = activeKeyword?.keyword ?? "your main search";
+
+  if (!activeKeyword) {
+    const score = 12;
+
+    return {
+      label: "Visibility",
+      score,
+      statusLabel: buildMarkerStatusLabel(score),
+      explanation:
+        "Digital Brain does not have one tracked search phrase ready for this business yet.",
+      nextActionHint:
+        "Finish onboarding or seed one tracked keyword and market first.",
+    };
+  }
+
+  if (!hasActiveKeyword) {
+    const score = 22;
+
+    return {
+      label: "Visibility",
+      score,
+      statusLabel: buildMarkerStatusLabel(score),
+      explanation: `Digital Brain knows ${keywordLabel}, but this tracked search is not active yet.`,
+      nextActionHint:
+        "Finish onboarding or activate rank tracking so visibility updates can start.",
+    };
+  }
+
+  let score = 34;
 
   if (latestRank === null) {
-    score = activeKeyword ? 24 : 12;
+    score = 34;
   } else if (latestRank <= 3) {
     score = 88;
   } else if (latestRank <= 5) {
@@ -286,10 +316,10 @@ function buildVisibilityMarker(input: {
     score = 20;
   }
 
-  const keywordLabel = activeKeyword?.keyword ?? "your main search";
-
-  let explanation = "No tracked visibility data is available yet.";
-  let nextActionHint = "Set an active target search and capture baseline visibility.";
+  let explanation =
+    "Digital Brain knows what search to track, but it does not have a saved visibility snapshot yet.";
+  let nextActionHint =
+    "Run rank discovery to capture the first visibility snapshot.";
 
   if (latestRank !== null && latestRank <= 3) {
     explanation = `You are showing strongly for ${keywordLabel}.`;
@@ -510,6 +540,7 @@ function buildHero(input: {
   clarityMarker: OwnerHealthMarker;
   activityMarker: OwnerHealthMarker;
   activeKeyword: RankKeywordRow | null;
+  hasActiveKeyword: boolean;
   topPriority: OwnerPriorityLite | null;
 }): {
   headline: string;
@@ -522,7 +553,16 @@ function buildHero(input: {
   let supportLine =
     "Google can understand this business, and the next gains will come from focused trust, clarity, and activity improvements.";
 
-  if (
+  if (!input.activeKeyword) {
+    headline =
+      "This project still needs one tracked search before visibility can be read clearly.";
+    supportLine =
+      "Digital Brain cannot explain Google visibility for this business until one keyword and market are set.";
+  } else if (!input.hasActiveKeyword) {
+    headline =
+      "Digital Brain has a tracked search for this business, but rank setup is not finished yet.";
+    supportLine = `The tracked search for ${keywordLabel} exists, but it is not active yet, so the visibility story is still in setup mode.`;
+  } else if (
     input.visibilityMarker.score >= 75 &&
     (input.trustMarker.score < 65 || input.activityMarker.score < 65)
   ) {
@@ -588,7 +628,7 @@ export async function GET(_request: Request, context: RouteContext) {
         .from("project_rank_keywords")
         .select("keyword, metro, priority, is_active")
         .eq("project_id", projectId)
-        .eq("is_active", true)
+        .order("is_active", { ascending: false })
         .order("priority", { ascending: true })
         .limit(1)
         .returns<RankKeywordRow[]>(),
@@ -641,6 +681,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const completedTaskRate = toRate(completedTasks, totalTasks);
 
     const activeKeyword = keywords?.[0] ?? null;
+    const hasActiveKeyword = activeKeyword?.is_active === true;
 
     let latestRank: number | null = null;
     let bestRank: number | null = null;
@@ -686,6 +727,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const visibilityMarker = buildVisibilityMarker({
       latestRank,
       activeKeyword,
+      hasActiveKeyword,
     });
     const trustMarker = buildTrustMarker({
       gbpProfile,
@@ -735,6 +777,7 @@ export async function GET(_request: Request, context: RouteContext) {
       clarityMarker,
       activityMarker,
       activeKeyword,
+      hasActiveKeyword,
       topPriority: typedPriorities[0] ?? null,
     });
 
@@ -773,7 +816,7 @@ export async function GET(_request: Request, context: RouteContext) {
           completedTaskRate,
         },
         visibilitySummary: {
-          hasActiveKeyword: Boolean(activeKeyword),
+          hasActiveKeyword,
           keyword: activeKeyword?.keyword ?? null,
           metro: activeKeyword?.metro ?? null,
           latestRank,

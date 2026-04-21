@@ -134,24 +134,24 @@ function buildNoKeywordSummary(): VisibilitySummary {
     bestRank: null,
     latestCapturedAt: null,
     previousRank: null,
-    visibilityLabel: "No active keyword configured",
+    visibilityLabel: "No tracked search configured yet",
     visibilityReadinessScore: 18,
     plainLanguageSummary:
-      "Digital Brain does not have one clear tracked search phrase for this business yet.",
-    topIssue: "No tracked search phrase is active yet.",
+      "Digital Brain does not have a tracked search phrase for this business yet. This usually means onboarding or rank setup has not finished.",
+    topIssue: "No tracked search phrase is configured yet.",
     whyItMatters:
       "Without one tracked keyword and market, the owner cannot see a reliable visibility story.",
     nextAction: {
-      title: "Set one primary tracked search phrase",
+      title: "Finish tracked-search setup first",
       whoShouldDoIt: "Owner or marketing lead",
       difficulty: "Easy",
       reason:
         "Choose the main service search and market so Digital Brain can measure local visibility clearly.",
     },
     evidence: [
-      "No active keyword is saved yet.",
-      "No active metro is saved yet.",
-      "Digital Brain needs one tracked search phrase before it can explain visibility in owner language.",
+      "No tracked keyword is saved yet.",
+      "No tracked metro is saved yet.",
+      "This usually means onboarding or rank setup has not finished.",
     ],
   };
 }
@@ -159,6 +159,7 @@ function buildNoKeywordSummary(): VisibilitySummary {
 function buildVisibilitySummary(input: {
   keyword: string;
   metro: string;
+  hasActiveKeyword: boolean;
   latestRank: number | null;
   bestRank: number | null;
   latestCapturedAt: string | null;
@@ -167,11 +168,46 @@ function buildVisibilitySummary(input: {
   const {
     keyword,
     metro,
+    hasActiveKeyword,
     latestRank,
     bestRank,
     latestCapturedAt,
     previousRank,
   } = input;
+
+  if (!hasActiveKeyword) {
+    return {
+      hasActiveKeyword: false,
+      keyword,
+      metro,
+      latestRank,
+      bestRank,
+      latestCapturedAt,
+      previousRank,
+      visibilityLabel: "Tracked search exists, but setup is not active yet",
+      visibilityReadinessScore: latestRank === null ? 26 : 34,
+      plainLanguageSummary:
+        "Digital Brain knows what search to watch, but this tracked search is not active yet. This usually means onboarding or rank setup has not finished.",
+      topIssue: "The tracked search is saved, but it is not active yet.",
+      whyItMatters:
+        "Until tracking is active, the owner cannot rely on this section for a full visibility story.",
+      nextAction: {
+        title: "Finish rank setup for this tracked search",
+        whoShouldDoIt: "Owner or developer",
+        difficulty: "Easy",
+        reason:
+          "Activate this tracked search so Digital Brain can start giving reliable owner-facing visibility guidance.",
+      },
+      evidence: [
+        `Tracked keyword: ${keyword}.`,
+        `Tracked market: ${metro}.`,
+        "This tracked search is saved but not active yet.",
+        latestCapturedAt
+          ? `A saved visibility snapshot already exists from ${formatDate(latestCapturedAt)}.`
+          : "No saved rank position is available yet while setup is still inactive.",
+      ],
+    };
+  }
 
   if (latestRank === null) {
     return {
@@ -323,7 +359,7 @@ export async function GET(_request: Request, context: RouteContext) {
       .from("project_rank_keywords")
       .select("keyword, metro, priority, is_active")
       .eq("project_id", projectId)
-      .eq("is_active", true)
+      .order("is_active", { ascending: false })
       .order("priority", { ascending: true })
       .limit(1)
       .returns<RankKeywordRow[]>();
@@ -335,6 +371,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const activeKeyword = keywords?.[0] ?? null;
+    const hasActiveKeyword = activeKeyword?.is_active === true;
 
     if (!activeKeyword) {
       return NextResponse.json({
@@ -374,6 +411,7 @@ export async function GET(_request: Request, context: RouteContext) {
       summary: buildVisibilitySummary({
         keyword: activeKeyword.keyword,
         metro: activeKeyword.metro,
+        hasActiveKeyword,
         latestRank,
         bestRank,
         latestCapturedAt,
