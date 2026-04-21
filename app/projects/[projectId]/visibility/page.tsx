@@ -218,6 +218,39 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
   const nextActionDifficulty = visibilitySummary.nextAction.difficulty;
   const nextActionReason = visibilitySummary.nextAction.reason;
   const hasActiveKeyword = visibilitySummary.hasActiveKeyword;
+  const hasTrackedKeyword =
+    typeof visibilitySummary.keyword === "string" &&
+    visibilitySummary.keyword.trim().length > 0;
+  const isSetupBlocked = !hasTrackedKeyword;
+  const isTrackingInactive = hasTrackedKeyword && !hasActiveKeyword;
+
+  const heroHeadline = isSetupBlocked
+    ? "Set one tracked search before visibility can be measured clearly."
+    : isTrackingInactive
+      ? "Finish tracked-search activation before visibility can be measured clearly."
+      : "See whether this business has real local ranking footing in the market that matters most.";
+
+  const heroSupportLine = isSetupBlocked
+    ? "This business does not have a tracked keyword and market yet, so Digital Brain cannot build a reliable visibility read."
+    : isTrackingInactive
+      ? "This business has a saved tracked search, but tracking is not active yet, so the visibility read is still in setup mode."
+      : "This page shows the visibility read for this business. It shows the tracked keyword, current ranking footing, and the clearest next move to strengthen local visibility.";
+
+  const trackingStatus = isSetupBlocked
+    ? "Not configured"
+    : isTrackingInactive
+      ? "Saved but inactive"
+      : "Active";
+
+  const setupHeading = isSetupBlocked || isTrackingInactive
+    ? "Finish visibility setup first"
+    : "The clearest next visibility move";
+
+  const setupIntro = isSetupBlocked
+    ? "Start by choosing one real search phrase and market for this business. Visibility cannot be measured clearly until that tracked search exists."
+    : isTrackingInactive
+      ? "Start by activating the saved tracked search. Visibility cannot be measured clearly until tracking is active."
+      : "Start with the biggest visibility gap first. Stronger local footing begins with a real tracked search, a clear market, and a practical next action.";
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
@@ -228,13 +261,10 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether this business has real local ranking footing in the
-                market that matters most.
+                {heroHeadline}
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the visibility read for this business. It shows the
-                tracked keyword, current ranking footing, and the clearest next
-                move to strengthen local visibility.
+                {heroSupportLine}
               </p>
             </div>
 
@@ -299,8 +329,8 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
               tone="var(--brand-700)"
             />
             <MetricStripItem
-              label="Active keyword"
-              value={boolLabel(hasActiveKeyword)}
+              label="Tracking status"
+              value={trackingStatus}
               bg="var(--accent-blue-100)"
               tone="var(--accent-blue-600)"
             />
@@ -323,12 +353,10 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
           <section>
             <SectionLabel>What to fix first</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-              The clearest next visibility move
+              {setupHeading}
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the biggest visibility gap first. Stronger local
-              footing begins with a real tracked search, a clear market, and a
-              practical next action.
+              {setupIntro}
             </p>
 
             <div className="mt-6">
