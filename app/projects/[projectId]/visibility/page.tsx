@@ -232,7 +232,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                 market that matters most.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page gives the owner-facing visibility read. It shows the
+                This page shows the visibility read for this business. It shows the
                 tracked keyword, current ranking footing, and the clearest next
                 move to strengthen local visibility.
               </p>
@@ -326,7 +326,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
               The clearest next visibility move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the biggest local visibility gap first. Stronger local
+              Start with the biggest visibility gap first. Stronger local
               footing begins with a real tracked search, a clear market, and a
               practical next action.
             </p>
@@ -344,7 +344,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                 {
                   title: "Keep visibility tracking tied to the real market",
                   detail:
-                    "The keyword, metro, and saved ranking snapshots should reflect the market the owner actually cares about most.",
+                    "The keyword, metro, and ranking snapshots should reflect the market the owner actually cares about most.",
                 },
               ].map((item, index) => (
                 <article
@@ -403,7 +403,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                   value={formatRank(previousRank)}
                 />
                 <DetailRow
-                  label="Last captured"
+                  label="Last update"
                   value={formatDate(latestCapturedAt)}
                 />
               </div>
@@ -472,7 +472,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
               <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                 {(visibilitySummary.evidence.length > 0
                   ? visibilitySummary.evidence
-                  : ["No visibility evidence is available yet."]).map(
+                  : ["No visibility details are available yet."]).map(
                   (item, index) => (
                     <EvidenceBullet
                       key={`${index}-${item}`}
@@ -499,19 +499,19 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
 
               <div className="mt-4">
                 <DetailRow
-                  label="Current read"
+                  label="Visibility read"
                   value={visibilityRead}
-                  helper="This is the owner-facing local visibility read based on the saved tracked search and rank history."
+                  helper="This is the current local visibility read based on the tracked search and rank history."
                 />
                 <DetailRow
-                  label="Next action owner"
+                  label="Who should do it"
                   value={nextActionWho}
-                  helper="This is who should make the next local visibility move."
+                  helper="This is who should handle the next visibility move."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={nextActionDifficulty}
-                  helper="This tells the owner how hard the next visibility move should be."
+                  helper="This shows how hard the next visibility move should be."
                 />
               </div>
             </section>
