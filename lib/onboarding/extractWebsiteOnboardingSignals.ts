@@ -515,6 +515,120 @@ function inferMetroFromPageText(value: string | null): string | null {
   return normalizeMetroValue(`${match[1]}, ${match[2]}`);
 }
 
+type TextAssetFetchResult = {
+  status: number | null;
+  text: string | null;
+};
+
+async function fetchTextAsset(params: {
+  url: string;
+  accept: string;
+}): Promise<TextAssetFetchResult> {
+  try {
+    const response = await fetch(params.url, {
+      headers: {
+        "user-agent":
+          "Digital Brain Onboarding/1.0 (+https://digitalbrain.local)",
+        accept: params.accept,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return {
+        status: response.status,
+        text: null,
+      };
+    }
+
+    return {
+      status: response.status,
+      text: await response.text(),
+    };
+  } catch {
+    return {
+      status: null,
+      text: null,
+    };
+  }
+}
+
+function extractSitemapUrlsFromRobotsTxt(value: string | null): string[] {
+  const normalized = normalizeTrimmedString(value);
+
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^sitemap:/i.test(line))
+    .map((line) => line.replace(/^sitemap:\s*/i, "").trim())
+    .filter(Boolean);
+}
+
+function extractLocValuesFromXml(value: string | null): string[] {
+  const normalized = normalizeTrimmedString(value);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const matches = normalized.matchAll(/<loc>([\s\S]*?)<\/loc>/gi);
+  const urls: string[] = [];
+
+  for (const match of matches) {
+    const candidate = normalizeTrimmedString(decodeHtmlEntities(match[1] ?? ""));
+    if (candidate) {
+      urls.push(candidate);
+    }
+  }
+
+  return urls;
+}
+
+function buildSitemapCandidateUrls(siteUrl: string, robotsTxt: string | null): string[] {
+  const candidates = new Set<string>();
+
+  candidates.add(`${siteUrl}/sitemap.xml`);
+  candidates.add(`${siteUrl}/sitemap_index.xml`);
+
+  for (const candidate of extractSitemapUrlsFromRobotsTxt(robotsTxt)) {
+    const normalized = normalizeUrl(candidate);
+
+    if (normalized) {
+      candidates.add(normalized);
+    }
+  }
+
+  return [...candidates];
+}
+
+function buildUrlSlugInferenceCorpus(urls: string[]): string {
+  const values: string[] = [];
+
+  for (const rawUrl of urls.slice(0, 200)) {
+    try {
+      const url = new URL(rawUrl);
+      const decodedPath = decodeURIComponent(url.pathname);
+      const combined = `${url.hostname} ${decodedPath}`
+        .replace(/[-_/]+/g, " ")
+        .replace(/\.(xml|html|htm|php|aspx?)$/gi, " ");
+
+      const normalized = normalizeWhitespace(combined);
+
+      if (normalized) {
+        values.push(normalized);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return values.join(" | ");
+}
+
 export async function extractWebsiteOnboardingSignals(
   input: ExtractWebsiteOnboardingSignalsInput,
 ): Promise<WebsiteOnboardingSignals> {
@@ -536,39 +650,29 @@ export async function extractWebsiteOnboardingSignals(
   const notes: string[] = [`Fetched website signals from ${normalizedSiteUrl}.`];
 
   try {
-    const response = await fetch(normalizedSiteUrl, {
-      headers: {
-        "user-agent":
-          "Digital Brain Onboarding/1.0 (+https://digitalbrain.local)",
-        accept: "text/html,application/xhtml+xml",
-      },
-      cache: "no-store",
+    const homepageAsset = await fetchTextAsset({
+      url: normalizedSiteUrl,
+      accept: "text/html,application/xhtml+xml",
     });
 
-    if (!response.ok) {
-      return {
-        inferredCategory: null,
-        inferredMetro: null,
-        inferredRadiusMiles: 25,
-        inferredKeywordCandidates: [],
-        notes: [
-          ...notes,
-          `Website signal inference could not read the homepage successfully (${response.status}).`,
-          "Using the default onboarding radius of 25 miles.",
-        ],
-      };
+    const html = homepageAsset.text;
+
+    if (!html) {
+      notes.push(
+        `Website signal inference could not read the homepage successfully (${homepageAsset.status ?? "network_error"}).`,
+      );
     }
 
-    const html = await response.text();
+    const title = html ? extractTitle(html) : null;
+    const metaDescription = html ? extractMetaDescription(html) : null;
+    const h1 = html ? extractFirstH1(html) : null;
+    const bodySnippet = html ? extractBodySnippet(html) : null;
 
-    const title = extractTitle(html);
-    const metaDescription = extractMetaDescription(html);
-    const h1 = extractFirstH1(html);
-    const bodySnippet = extractBodySnippet(html);
-
-    const jsonLdNodes = extractJsonLdBlocks(html)
-      .map((block) => safeParseJsonLd(block))
-      .flatMap((value) => collectJsonLdNodes(value));
+    const jsonLdNodes = html
+      ? extractJsonLdBlocks(html)
+          .map((block) => safeParseJsonLd(block))
+          .flatMap((value) => collectJsonLdNodes(value))
+      : [];
 
     const schemaTextCorpus = jsonLdNodes
       .flatMap((node) => [
@@ -584,12 +688,12 @@ export async function extractWebsiteOnboardingSignals(
       .filter((value): value is string => Boolean(value))
       .join(" | ");
 
-    const inferredCategory =
+    let inferredCategory =
       inferCategoryFromText(schemaTextCorpus) ??
       inferCategoryFromText(pageTextCorpus);
 
-    const inferredKeywordCandidates =
-      buildKeywordCandidatesFromCategory(inferredCategory);
+    let inferredCategorySource: "homepage" | "sitemap" | null =
+      inferredCategory ? "homepage" : null;
 
     let inferredMetro: string | null = null;
 
@@ -609,11 +713,87 @@ export async function extractWebsiteOnboardingSignals(
       inferredMetro = inferMetroFromPageText(pageTextCorpus);
     }
 
+    let inferredMetroSource: "homepage" | "sitemap" | null =
+      inferredMetro ? "homepage" : null;
+
+    if (!inferredCategory || !inferredMetro) {
+      const robotsAsset = await fetchTextAsset({
+        url: `${normalizedSiteUrl}/robots.txt`,
+        accept: "text/plain",
+      });
+
+      if (robotsAsset.text) {
+        notes.push("Fetched robots.txt fallback signals.");
+      } else {
+        notes.push(
+          `robots.txt fallback was not available (${robotsAsset.status ?? "network_error"}).`,
+        );
+      }
+
+      const sitemapCandidateUrls = buildSitemapCandidateUrls(
+        normalizedSiteUrl,
+        robotsAsset.text,
+      ).slice(0, 4);
+
+      const sitemapPageUrls: string[] = [];
+
+      for (const sitemapUrl of sitemapCandidateUrls) {
+        const sitemapAsset = await fetchTextAsset({
+          url: sitemapUrl,
+          accept: "application/xml,text/xml,text/plain",
+        });
+
+        if (!sitemapAsset.text) {
+          continue;
+        }
+
+        const locValues = extractLocValuesFromXml(sitemapAsset.text);
+
+        if (locValues.length > 0) {
+          notes.push(`Read ${locValues.length} sitemap URLs from ${sitemapUrl}.`);
+          sitemapPageUrls.push(...locValues.slice(0, 150));
+        }
+      }
+
+      if (sitemapPageUrls.length > 0) {
+        const sitemapCorpus = buildUrlSlugInferenceCorpus(sitemapPageUrls);
+
+        if (!inferredCategory) {
+          const sitemapCategory = inferCategoryFromText(sitemapCorpus);
+
+          if (sitemapCategory) {
+            inferredCategory = sitemapCategory;
+            inferredCategorySource = "sitemap";
+          }
+        }
+
+        if (!inferredMetro) {
+          const sitemapMetro = inferMetroFromPageText(sitemapCorpus);
+
+          if (sitemapMetro) {
+            inferredMetro = sitemapMetro;
+            inferredMetroSource = "sitemap";
+          }
+        }
+      } else {
+        notes.push(
+          "Sitemap fallback did not yield usable URL slugs for category or metro discovery.",
+        );
+      }
+    }
+
+    const inferredKeywordCandidates =
+      buildKeywordCandidatesFromCategory(inferredCategory);
+
     if (inferredCategory) {
-      notes.push(`Inferred website category: ${inferredCategory}.`);
+      notes.push(
+        inferredCategorySource === "sitemap"
+          ? `Inferred website category from sitemap URLs: ${inferredCategory}.`
+          : `Inferred website category: ${inferredCategory}.`,
+      );
     } else {
       notes.push(
-        "Website signal inference could not determine a confident business category from the homepage.",
+        "Website signal inference could not determine a confident business category from the homepage or sitemap URLs.",
       );
     }
 
@@ -628,10 +808,14 @@ export async function extractWebsiteOnboardingSignals(
     }
 
     if (inferredMetro) {
-      notes.push(`Inferred website metro: ${inferredMetro}.`);
+      notes.push(
+        inferredMetroSource === "sitemap"
+          ? `Inferred website metro from sitemap URLs: ${inferredMetro}.`
+          : `Inferred website metro: ${inferredMetro}.`,
+      );
     } else {
       notes.push(
-        "Website signal inference could not determine a confident metro from the homepage.",
+        "Website signal inference could not determine a confident metro from the homepage or sitemap URLs.",
       );
     }
 
