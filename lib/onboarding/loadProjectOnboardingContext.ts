@@ -31,6 +31,7 @@ export type ProjectOnboardingLatestGbpProfileRow = {
   gbp_name: string | null;
   primary_category: string | null;
   last_fetched_at: string | null;
+  raw_provider: unknown | null;
 };
 
 export type ProjectOnboardingContext = {
@@ -96,7 +97,8 @@ function isProjectOnboardingLatestGbpProfileRow(
     "place_id" in row &&
     "gbp_name" in row &&
     "primary_category" in row &&
-    "last_fetched_at" in row
+    "last_fetched_at" in row &&
+    "raw_provider" in row
   );
 }
 
@@ -181,7 +183,7 @@ async function loadLatestGbpProfile(
 
   const { data, error } = await supabase
     .from("gbp_profiles")
-    .select("place_id, gbp_name, primary_category, last_fetched_at")
+    .select("place_id, gbp_name, primary_category, last_fetched_at, raw_provider")
     .eq("project_id", projectId)
     .order("last_fetched_at", { ascending: false })
     .limit(1);

@@ -87,6 +87,7 @@ export type RunProjectOnboardingResult =
           | "missing";
         categoryConfidence: "high" | "medium" | "low" | "missing";
         metroSource:
+          | "gbp_address"
           | "stored_target_metro"
           | "confirmed_metro"
           | "stored_metro"
@@ -407,6 +408,7 @@ export async function runProjectOnboarding(
       websiteInferredMetro: websiteSignals.inferredMetro,
       gbpPrimaryCategory: latestGbpProfile?.primary_category ?? null,
       gbpPlaceId: latestGbpProfile?.place_id ?? null,
+      gbpRawProvider: latestGbpProfile?.raw_provider ?? null,
     });
 
     const discoveredKeywordCandidates =

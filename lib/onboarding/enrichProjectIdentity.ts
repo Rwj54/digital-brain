@@ -17,6 +17,7 @@ export type ProjectIdentityInput = {
   websiteInferredMetro?: string | null;
   gbpPrimaryCategory?: string | null;
   gbpPlaceId?: string | null;
+  gbpRawProvider?: unknown;
 };
 
 export type ProjectIdentityConfidence = "high" | "medium" | "low" | "missing";
@@ -30,6 +31,7 @@ export type ProjectIdentityCategorySource =
   | "missing";
 
 export type ProjectIdentityMetroSource =
+  | "gbp_address"
   | "stored_target_metro"
   | "confirmed_metro"
   | "stored_metro"
@@ -477,6 +479,72 @@ function normalizeMetroValue(value: string | null): string | null {
   return `${city}, ${parts[1]}`;
 }
 
+function parseRawProviderObject(value: unknown): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return null;
+}
+
+function extractGoogleBackedMetroFromRawProvider(
+  rawProvider: unknown
+): string | null {
+  const provider = parseRawProviderObject(rawProvider);
+
+  if (!provider) {
+    return null;
+  }
+
+  const addressInfo = provider.address_info;
+
+  if (addressInfo && typeof addressInfo === "object" && !Array.isArray(addressInfo)) {
+    const row = addressInfo as Record<string, unknown>;
+    const city =
+      typeof row.city === "string" ? normalizeTrimmedString(row.city) : null;
+    const region =
+      typeof row.region === "string" ? normalizeTrimmedString(row.region) : null;
+
+    if (city && region) {
+      return normalizeMetroValue(`${city}, ${region}`);
+    }
+  }
+
+  const address =
+    typeof provider.address === "string"
+      ? normalizeTrimmedString(provider.address)
+      : null;
+
+  if (!address) {
+    return null;
+  }
+
+  const match = address.match(
+    /,\s*([^,]+),\s*([A-Za-z]{2}|[A-Za-z][A-Za-z ]+?)(?:\s+\d{5}(?:-\d{4})?)?$/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  return normalizeMetroValue(`${match[1]}, ${match[2]}`);
+}
+
 export function enrichProjectIdentity(
   input: ProjectIdentityInput
 ): ProjectIdentityEnrichment {
@@ -517,6 +585,9 @@ export function enrichProjectIdentity(
   ).canonicalCategory;
 
   const googlePlaceId = normalizeTrimmedString(input.gbpPlaceId ?? null);
+  const gbpAddressMetro = googlePlaceId
+    ? extractGoogleBackedMetroFromRawProvider(input.gbpRawProvider ?? null)
+    : null;
 
   let canonicalCategory: string | null = null;
   let categorySource: ProjectIdentityCategorySource = "missing";
@@ -566,7 +637,11 @@ export function enrichProjectIdentity(
     Number.isFinite(input.mapsLocationCode) &&
     input.mapsLocationCode > 0;
 
-  if (storedTargetMetro && hasMapsLocationCode) {
+  if (gbpAddressMetro) {
+    canonicalMetro = gbpAddressMetro;
+    metroSource = "gbp_address";
+    metroConfidence = "high";
+  } else if (storedTargetMetro && hasMapsLocationCode) {
     canonicalMetro = storedTargetMetro;
     metroSource = "stored_target_metro";
     metroConfidence = "medium";
@@ -606,9 +681,10 @@ export function enrichProjectIdentity(
   const hasGooglePrimaryCategoryEvidence = Boolean(googlePrimaryCategory);
 
   const automationPersistenceReady =
-    categoryConfidence === "high";
+    categoryConfidence === "high" && metroConfidence === "high";
 
-  const keywordActivationReady = false;
+  const keywordActivationReady =
+    categoryConfidence === "high" && metroConfidence === "high";
 
   const resolutionExplanation: string[] = [];
 
@@ -648,6 +724,12 @@ export function enrichProjectIdentity(
     );
   }
 
+  if (metroSource === "gbp_address") {
+    resolutionExplanation.push(
+      `Google GBP address evidence is available: ${canonicalMetro}.`
+    );
+  }
+
   if (metroSource === "confirmed_metro") {
     resolutionExplanation.push(
       "Manual metro clarification is treated as medium confidence, but downstream activation remains blocked until stronger market evidence exists."
@@ -660,9 +742,15 @@ export function enrichProjectIdentity(
     );
   }
 
-  resolutionExplanation.push(
-    "Automatic market promotion and downstream activation remain blocked until metro confidence is stronger."
-  );
+  if (metroConfidence === "high") {
+    resolutionExplanation.push(
+      "Automatic market promotion and downstream activation are allowed because Google-backed metro evidence is strong."
+    );
+  } else {
+    resolutionExplanation.push(
+      "Automatic market promotion and downstream activation remain blocked until metro confidence is stronger."
+    );
+  }
 
   if (categoryConfidence === "high") {
     resolutionExplanation.push(
@@ -762,8 +850,9 @@ export function enrichProjectIdentity(
       automationPersistenceReady,
       keywordActivationReady,
       rankBaselineReady:
-        keywordActivationReady && hasRankCoordinates,
-      competitorDiscoveryReady: false,
+        keywordActivationReady && hasRankCoordinates && hasCanonicalMetro,
+      competitorDiscoveryReady:
+        categoryConfidence === "high" && metroConfidence === "high",
     },
     notes,
   };
