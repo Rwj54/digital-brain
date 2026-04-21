@@ -606,10 +606,9 @@ export function enrichProjectIdentity(
   const hasGooglePrimaryCategoryEvidence = Boolean(googlePrimaryCategory);
 
   const automationPersistenceReady =
-    categoryConfidence === "high" || metroConfidence === "high";
+    categoryConfidence === "high";
 
-  const keywordActivationReady =
-    categoryConfidence === "high" && metroConfidence === "high";
+  const keywordActivationReady = false;
 
   const resolutionExplanation: string[] = [];
 
@@ -661,15 +660,9 @@ export function enrichProjectIdentity(
     );
   }
 
-  if (metroConfidence !== "high") {
-    resolutionExplanation.push(
-      "Automatic market promotion and downstream activation remain blocked until metro confidence is stronger."
-    );
-  } else {
-    resolutionExplanation.push(
-      "Automatic market promotion is allowed because metro confidence is strong enough."
-    );
-  }
+  resolutionExplanation.push(
+    "Automatic market promotion and downstream activation remain blocked until metro confidence is stronger."
+  );
 
   if (categoryConfidence === "high") {
     resolutionExplanation.push(
