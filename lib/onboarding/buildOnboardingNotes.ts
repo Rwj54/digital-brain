@@ -319,7 +319,7 @@ function appendCompetitorDiscoveryNotes(
 
   if (!identity.readiness.competitorDiscoveryReady) {
     notes.push(
-      "Competitor discovery was skipped because canonical category or canonical metro is still missing.",
+      "Competitor discovery was skipped because canonical market confidence is not strong enough yet.",
     );
   }
 }
@@ -369,7 +369,7 @@ function appendPlanningNotes(
     );
   } else {
     notes.push(
-      "Baseline rank discovery is not ready yet because rank coordinates or active keywords are still missing.",
+      "Baseline rank discovery is not ready yet because rank coordinates, keyword activation, or market confidence are not strong enough.",
     );
   }
 
@@ -383,7 +383,7 @@ function appendPlanningNotes(
     );
   } else {
     notes.push(
-      "Authority baseline is not ready yet because the rank baseline prerequisites are not fully satisfied.",
+      "Authority baseline is not ready yet because market confidence or rank baseline prerequisites are not fully satisfied.",
     );
   }
 }

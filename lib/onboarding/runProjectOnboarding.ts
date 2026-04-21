@@ -214,7 +214,7 @@ function buildProjectOnboardingSetupStatus(params: {
     return "blocked_missing_metro";
   }
 
-  if (categoryConfidence === "low" || metroConfidence === "low") {
+  if (categoryConfidence !== "high" || metroConfidence !== "high") {
     return "needs_confirmation";
   }
 
@@ -446,9 +446,7 @@ export async function runProjectOnboarding(
         canonicalMetro: identity.canonicalMetro,
         canonicalRadiusMiles: identity.canonicalRadiusMiles,
         allowCategoryPersistence: identity.categoryConfidence === "high",
-        allowMetroPersistence:
-          identity.metroConfidence === "high" ||
-          identity.metroConfidence === "medium",
+        allowMetroPersistence: identity.metroConfidence === "high",
       });
 
     const seededKeywordCount = await upsertProjectOnboardingSeedKeywords({
@@ -516,16 +514,6 @@ export async function runProjectOnboarding(
       metroConfidence: identity.metroConfidence,
     });
 
-    const baselineRankDiscovery = await runBaselineRankDiscovery({
-      projectId,
-      activeKeywords: refreshedActiveKeywords,
-      rankLat:
-        persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null,
-      rankLng:
-        persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null,
-      capturedAt,
-    });
-
     const hasActiveKeywords = refreshedActiveKeywords.length > 0;
     const hasRankCoordinates =
       (persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null) !==
@@ -533,7 +521,34 @@ export async function runProjectOnboarding(
       (persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null) !==
         null;
 
-    const baselineRankPlanned = hasRankCoordinates && hasActiveKeywords;
+    const baselineRankPlanned =
+      identity.readiness.rankBaselineReady && hasActiveKeywords;
+
+    const baselineRankDiscovery = baselineRankPlanned
+      ? await runBaselineRankDiscovery({
+          projectId,
+          activeKeywords: refreshedActiveKeywords,
+          rankLat:
+            persistedRankCoordinates.resolvedRankLat ?? project.rank_lat ?? null,
+          rankLng:
+            persistedRankCoordinates.resolvedRankLng ?? project.rank_lng ?? null,
+          capturedAt,
+        })
+      : {
+          executed: false,
+          candidateCount: 0,
+          storedCount: 0,
+          keyword: refreshedActiveKeywords[0]?.keyword ?? identity.canonicalCategory,
+          metro: refreshedActiveKeywords[0]?.metro ?? identity.canonicalMetro,
+          skippedReason:
+            identity.metroConfidence !== "high"
+              ? "Baseline rank discovery was skipped because metro confidence is not strong enough yet."
+              : "Baseline rank discovery was skipped because onboarding identity confidence is not strong enough yet.",
+          targetProfileHydrated: false,
+          targetProfilePlaceId: null,
+          targetProfileName: null,
+          targetProfileMatchedBy: null,
+        };
 
     let competitorDiscoveryStarted = false;
     let competitorDiscoveryFailureNote: string | null = null;
@@ -550,6 +565,9 @@ export async function runProjectOnboarding(
       } else {
         competitorDiscoveryFailureNote = `Competitor discovery did not start cleanly during onboarding: ${discoveryResult.error}`;
       }
+    } else if (identity.metroConfidence !== "high") {
+      competitorDiscoveryFailureNote =
+        "Competitor discovery was skipped because metro confidence is not strong enough yet.";
     }
 
     const authorityBaseline =
@@ -567,9 +585,11 @@ export async function runProjectOnboarding(
             momentumLabel: null,
             actionsCount: 0,
             skippedReason:
-              baselineRankDiscovery.executed && !competitorDiscoveryStarted
-                ? "Authority baseline was skipped because competitor discovery did not complete successfully."
-                : "Authority baseline was skipped because baseline rank discovery did not execute.",
+              identity.metroConfidence !== "high"
+                ? "Authority baseline was skipped because metro confidence is not strong enough yet."
+                : baselineRankDiscovery.executed && !competitorDiscoveryStarted
+                  ? "Authority baseline was skipped because competitor discovery did not complete successfully."
+                  : "Authority baseline was skipped because baseline rank discovery did not execute.",
           };
 
     const authorityBaselinePlanned =

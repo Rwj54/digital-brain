@@ -569,15 +569,15 @@ export function enrichProjectIdentity(
   if (storedTargetMetro && hasMapsLocationCode) {
     canonicalMetro = storedTargetMetro;
     metroSource = "stored_target_metro";
-    metroConfidence = "high";
+    metroConfidence = "medium";
   } else if (storedTargetMetro) {
     canonicalMetro = storedTargetMetro;
     metroSource = "stored_target_metro";
-    metroConfidence = "medium";
+    metroConfidence = "low";
   } else if (confirmedMetro) {
     canonicalMetro = confirmedMetro;
     metroSource = "confirmed_metro";
-    metroConfidence = "low";
+    metroConfidence = "medium";
   } else if (storedProjectMetro) {
     canonicalMetro = storedProjectMetro;
     metroSource = "stored_metro";
@@ -606,12 +606,10 @@ export function enrichProjectIdentity(
   const hasGooglePrimaryCategoryEvidence = Boolean(googlePrimaryCategory);
 
   const automationPersistenceReady =
-    categoryConfidence === "high" &&
-    (metroConfidence === "high" || metroConfidence === "medium");
+    categoryConfidence === "high" || metroConfidence === "high";
 
   const keywordActivationReady =
-    categoryConfidence === "high" &&
-    (metroConfidence === "high" || metroConfidence === "medium");
+    categoryConfidence === "high" && metroConfidence === "high";
 
   const resolutionExplanation: string[] = [];
 
@@ -653,17 +651,33 @@ export function enrichProjectIdentity(
 
   if (metroSource === "confirmed_metro") {
     resolutionExplanation.push(
-      "Manual metro clarification is treated as a low-confidence override until stronger market evidence exists."
+      "Manual metro clarification is treated as medium confidence, but downstream activation remains blocked until stronger market evidence exists."
     );
   }
 
-  if (!automationPersistenceReady) {
+  if (metroSource === "stored_target_metro") {
     resolutionExplanation.push(
-      "Automatic category and market promotion is blocked because identity confidence is not strong enough yet."
+      "Stored target_metro is treated as prior project state, not automatic Google market truth."
+    );
+  }
+
+  if (metroConfidence !== "high") {
+    resolutionExplanation.push(
+      "Automatic market promotion and downstream activation remain blocked until metro confidence is stronger."
     );
   } else {
     resolutionExplanation.push(
-      "Automatic category and market promotion is allowed because identity confidence is strong enough."
+      "Automatic market promotion is allowed because metro confidence is strong enough."
+    );
+  }
+
+  if (categoryConfidence === "high") {
+    resolutionExplanation.push(
+      "Automatic category promotion is allowed because Google category evidence is strong."
+    );
+  } else {
+    resolutionExplanation.push(
+      "Automatic category promotion remains blocked until category confidence is stronger."
     );
   }
 
@@ -758,6 +772,7 @@ export function enrichProjectIdentity(
         keywordActivationReady && hasRankCoordinates,
       competitorDiscoveryReady:
         categoryConfidence === "high" &&
+        metroConfidence === "high" &&
         hasCanonicalCategory &&
         hasCanonicalMetro,
     },
