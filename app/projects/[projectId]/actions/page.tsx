@@ -615,7 +615,7 @@ export default function ActionsPage({ params }: PageProps) {
                 </div>
 
                 <div className="mt-8 border-t border-[var(--border)] pt-6">
-                  <SectionLabel>Working order</SectionLabel>
+                  <SectionLabel>Action order</SectionLabel>
 
                   {[
                     {
