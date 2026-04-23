@@ -63,6 +63,12 @@ export function OwnerDetailSections({
   const aiWhyItMatters = getAiWhyItMatters(aiSummary);
   const aiNextAction = getAiNextAction(aiSummary);
   const aiEvidence = getAiEvidence(aiSummary);
+  const outcomesSetupHref = dashboard.clientId
+    ? `/clients/${dashboard.clientId}/projects/${dashboard.projectId}`
+    : null;
+  const showOutcomesSetupCta =
+    !dashboard.dashboard.outcomesSummary.hasMonthlyEvents ||
+    !dashboard.dashboard.outcomesSummary.hasConversionRate;
 
   return (
     <section className="border-t border-[var(--border)] py-8">
@@ -643,18 +649,50 @@ export function OwnerDetailSections({
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
                   Open the outcomes page for the business-results read, supporting evidence, and next outcomes actions.
                 </p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <Link
-                    href={`/projects/${dashboard.projectId}/outcomes`}
-                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
-                    style={{
-                      border: "1px solid var(--border)",
-                      backgroundColor: "transparent",
-                    }}
-                  >
-                    Open outcomes page
-                  </Link>
-                </div>
+
+                {showOutcomesSetupCta && outcomesSetupHref ? (
+                  <div className="mt-4">
+                    <p className="text-sm leading-6 text-[var(--text-body)]">
+                      This project is still missing the owner’s monthly event count or
+                      review conversion rate. Use the editable dashboard to add those
+                      inputs so the owner outcomes read becomes more useful.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <Link
+                        href={outcomesSetupHref}
+                        className="px-4 py-3 text-sm font-semibold text-white"
+                        style={{
+                          backgroundColor: "var(--brand-700)",
+                        }}
+                      >
+                        Open outcomes setup
+                      </Link>
+                      <Link
+                        href={`/projects/${dashboard.projectId}/outcomes`}
+                        className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                        style={{
+                          border: "1px solid var(--border)",
+                          backgroundColor: "transparent",
+                        }}
+                      >
+                        Open outcomes page
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Link
+                      href={`/projects/${dashboard.projectId}/outcomes`}
+                      className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                      style={{
+                        border: "1px solid var(--border)",
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      Open outcomes page
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </>
