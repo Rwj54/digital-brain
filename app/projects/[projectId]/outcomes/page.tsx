@@ -315,6 +315,11 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
       : "The project already has some event signals. The next step is turning that into a clearer outcomes story for the owner."
     : "The fastest path to a useful outcomes center is to connect real customer-event tracking first.";
 
+  const outcomesSetupHref = dashboardContext?.clientId
+    ? `/clients/${dashboardContext.clientId}/projects/${projectId}`
+    : null;
+  const showOutcomesSetupCta = !hasEventSignals || !hasConversionSignal;
+
   const evidence = dedupeEvidence([
     hasEventSignals
       ? `Monthly customer events are currently ${formatCount(monthlyCustomerEvents)}.`
@@ -369,6 +374,26 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
                 <InlineTag>Who: {nextActionWho}</InlineTag>
                 <InlineTag>Difficulty: {nextActionDifficulty}</InlineTag>
               </div>
+
+              {showOutcomesSetupCta && outcomesSetupHref ? (
+                <div className="mt-5">
+                  <Link
+                    href={outcomesSetupHref}
+                    className="inline-flex items-center px-4 py-3 text-sm font-semibold text-white"
+                    style={{
+                      backgroundColor: "var(--brand-700)",
+                    }}
+                  >
+                    Open outcomes setup
+                  </Link>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--text-body)]">
+                    This project is still missing the owner’s monthly event count or
+                    review conversion rate. Use the editable dashboard to add those
+                    inputs so this outcomes center can explain real business impact
+                    more clearly.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 

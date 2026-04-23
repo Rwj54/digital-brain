@@ -41,6 +41,7 @@ type ProjectWebsiteRow = {
 };
 
 type ProjectOutcomesRow = {
+  client_id: string | null;
   monthly_customer_events: number | null;
   review_conversion_rate: number | null;
   event_label_singular: string | null;
@@ -645,7 +646,7 @@ export async function GET(_request: Request, context: RouteContext) {
       supabase
         .from("projects")
         .select(
-          "monthly_customer_events, review_conversion_rate, event_label_singular, event_label_plural",
+          "client_id, monthly_customer_events, review_conversion_rate, event_label_singular, event_label_plural",
         )
         .eq("id", projectId)
         .single<ProjectOutcomesRow>(),
@@ -784,6 +785,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({
       ok: true,
       projectId,
+      clientId: projectOutcomes.client_id ?? null,
       projectDisplayName: buildProjectDisplayName(projectWebsite, gbpProfile),
       projectCategory: projectWebsite.category,
       projectMetro: projectWebsite.metro,

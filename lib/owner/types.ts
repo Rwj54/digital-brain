@@ -122,6 +122,7 @@ export type AiSummary = Record<string, unknown> & {
 export type OwnerDashboardResponse = {
   ok: boolean;
   projectId: string;
+  clientId: string | null;
   projectDisplayName: string | null;
   projectCategory: string | null;
   projectMetro: string | null;
