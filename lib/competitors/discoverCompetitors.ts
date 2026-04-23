@@ -185,6 +185,25 @@ async function upsertTargetBusinessProfile(args: {
   const posts30d = normalizePositiveInteger(args.item.posts_30d);
   const qaCount = normalizePositiveInteger(args.item.qa_count);
 
+  const { data: existingProfile, error: existingProfileError } = await supabase
+    .from("gbp_profiles")
+    .select("photos_count, posts_30d, qa_count")
+    .eq("project_id", args.projectId)
+    .maybeSingle();
+
+  if (existingProfileError) {
+    throw new Error(
+      `Failed to load existing gbp_profiles row: ${existingProfileError.message}`
+    );
+  }
+
+  const preservedPhotosCount =
+    photosCount ?? normalizePositiveInteger(existingProfile?.photos_count ?? null);
+  const preservedPosts30d =
+    posts30d ?? normalizePositiveInteger(existingProfile?.posts_30d ?? null);
+  const preservedQaCount =
+    qaCount ?? normalizePositiveInteger(existingProfile?.qa_count ?? null);
+
   const { error } = await supabase.from("gbp_profiles").upsert(
     [
       {
@@ -196,9 +215,9 @@ async function upsertTargetBusinessProfile(args: {
         additional_categories: additionalCategories,
         rating,
         total_reviews: totalReviews,
-        photos_count: photosCount,
-        posts_30d: posts30d,
-        qa_count: qaCount,
+        photos_count: preservedPhotosCount,
+        posts_30d: preservedPosts30d,
+        qa_count: preservedQaCount,
         last_fetched_at: args.fetchedAtIso,
       },
     ],

@@ -492,6 +492,34 @@ export async function hydrateTargetBusinessProfile(args: {
     }
   }
 
+  const rawProviderObject = asJsonObject(finalRawProvider);
+
+  const deriveCount = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      return Math.round(value);
+    }
+
+    if (
+      typeof value === "string" &&
+      value.trim() !== "" &&
+      Number.isFinite(Number(value)) &&
+      Number(value) >= 0
+    ) {
+      return Math.round(Number(value));
+    }
+
+    return null;
+  };
+
+  const derivedPhotosCount = deriveCount(rawProviderObject?.["total_photos"]);
+  const derivedPosts30d =
+    deriveCount(rawProviderObject?.["posts_30d"]) ??
+    deriveCount(rawProviderObject?.["posts_count_last_30_days"]) ??
+    deriveCount(rawProviderObject?.["posts_last_30_days"]);
+  const derivedQaCount =
+    deriveCount(rawProviderObject?.["questions_and_answers_count"]) ??
+    deriveCount(rawProviderObject?.["qa_count"]);
+
   const { error } = await supabase.from("gbp_profiles").upsert(
     {
       project_id: args.projectId,
@@ -502,9 +530,9 @@ export async function hydrateTargetBusinessProfile(args: {
       additional_categories: finalAdditionalCategories,
       rating: finalRating,
       total_reviews: finalTotalReviews,
-      photos_count: null,
-      posts_30d: null,
-      qa_count: null,
+      photos_count: derivedPhotosCount,
+      posts_30d: derivedPosts30d,
+      qa_count: derivedQaCount,
       raw_provider: finalRawProvider,
       last_fetched_at: new Date().toISOString(),
     },
