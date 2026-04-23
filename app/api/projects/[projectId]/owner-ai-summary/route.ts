@@ -61,18 +61,66 @@ function normalizeCompare(value: string | null | undefined): string | null {
     .trim();
 }
 
+function compactBrandCompare(value: string | null | undefined): string | null {
+  const normalized = normalizeCompare(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const withoutGenericWords = normalized
+    .replace(/\b(floral|florist|flowers|flower|shop|store|company|co|llc|inc)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!withoutGenericWords) {
+    return null;
+  }
+
+  return withoutGenericWords.replace(/\s+/g, "");
+}
+
+function buildComparableVariants(value: string | null | undefined): string[] {
+  const normalized = normalizeCompare(value);
+  const compact = compactBrandCompare(value);
+  const variants = new Set<string>();
+
+  if (normalized) {
+    variants.add(normalized);
+    variants.add(normalized.replace(/\s+/g, ""));
+  }
+
+  if (compact) {
+    variants.add(compact);
+
+    if (compact.length > 5 && compact.startsWith("e")) {
+      variants.add(compact.slice(1));
+    }
+  }
+
+  return Array.from(variants).filter(Boolean);
+}
+
 function valuesLooselyMatch(
   left: string | null | undefined,
   right: string | null | undefined,
 ): boolean {
-  const a = normalizeCompare(left);
-  const b = normalizeCompare(right);
+  const leftVariants = buildComparableVariants(left);
+  const rightVariants = buildComparableVariants(right);
 
-  if (!a || !b) {
+  if (leftVariants.length === 0 || rightVariants.length === 0) {
     return false;
   }
 
-  return a === b || a.includes(b) || b.includes(a);
+  for (const a of leftVariants) {
+    for (const b of rightVariants) {
+      if (a === b || a.includes(b) || b.includes(a)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function buildAiSummary(input: {
