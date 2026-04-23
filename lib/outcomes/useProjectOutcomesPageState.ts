@@ -28,6 +28,7 @@ type UseProjectOutcomesPageStateResult = {
   outcomesSummary: OutcomesSummary | null;
   loading: boolean;
   error: string | null;
+  reloadPage: () => void;
 };
 
 export function useProjectOutcomesPageState(
@@ -40,6 +41,7 @@ export function useProjectOutcomesPageState(
     useState<OutcomesSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,7 +119,7 @@ export function useProjectOutcomesPageState(
     return () => {
       isMounted = false;
     };
-  }, [params]);
+  }, [params, reloadKey]);
 
   return {
     projectId,
@@ -125,5 +127,6 @@ export function useProjectOutcomesPageState(
     outcomesSummary,
     loading,
     error,
+    reloadPage: () => setReloadKey((value) => value + 1),
   };
 }

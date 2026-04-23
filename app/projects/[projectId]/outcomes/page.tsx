@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
+import { saveProjectReviewCapacityData } from "@/components/projects/dashboard/writeData";
 import { useProjectOutcomesPageState } from "@/lib/outcomes/useProjectOutcomesPageState";
 
 type PageProps = {
@@ -209,8 +210,47 @@ function dedupeEvidence(items: string[]) {
 }
 
 export default function ProjectOutcomesPage({ params }: PageProps) {
-  const { projectId, dashboardContext, outcomesSummary, loading, error } =
-    useProjectOutcomesPageState(params);
+  const {
+    projectId,
+    dashboardContext,
+    outcomesSummary,
+    loading,
+    error,
+    reloadPage,
+  } = useProjectOutcomesPageState(params);
+
+  const [monthlyEventsInput, setMonthlyEventsInput] = useState("");
+  const [reviewConvRateInput, setReviewConvRateInput] = useState("");
+  const [eventLabelSingularInput, setEventLabelSingularInput] = useState("Event");
+  const [eventLabelPluralInput, setEventLabelPluralInput] = useState("Events");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!outcomesSummary) {
+      return;
+    }
+
+    setMonthlyEventsInput(
+      typeof outcomesSummary.monthlyCustomerEvents === "number"
+        ? String(outcomesSummary.monthlyCustomerEvents)
+        : ""
+    );
+    setReviewConvRateInput(
+      typeof outcomesSummary.reviewConversionRate === "number"
+        ? String(outcomesSummary.reviewConversionRate)
+        : ""
+    );
+    setEventLabelSingularInput(textValue(outcomesSummary.eventLabelSingular, "Event"));
+    setEventLabelPluralInput(textValue(outcomesSummary.eventLabelPlural, "Events"));
+  }, [
+    outcomesSummary,
+    outcomesSummary?.monthlyCustomerEvents,
+    outcomesSummary?.reviewConversionRate,
+    outcomesSummary?.eventLabelSingular,
+    outcomesSummary?.eventLabelPlural,
+  ]);
 
   if (loading) {
     return (
@@ -319,6 +359,51 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
     ? `/clients/${dashboardContext.clientId}/projects/${projectId}`
     : null;
   const showOutcomesSetupCta = !hasEventSignals || !hasConversionSignal;
+
+  async function handleSaveOutcomesSetup() {
+    if (!dashboardContext?.clientId) {
+      setSaveError("Missing client context for outcomes setup.");
+      setSaveMessage(null);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setSaveError(null);
+      setSaveMessage(null);
+
+      const result = await saveProjectReviewCapacityData({
+        clientId: dashboardContext.clientId,
+        projectId,
+        monthlyEvents: monthlyEventsInput,
+        reviewConvRate: reviewConvRateInput,
+        volumePreset: "custom",
+        eventLabelSingular: eventLabelSingularInput,
+        eventLabelPlural: eventLabelPluralInput,
+        preset: {
+          key: "custom",
+          label: "Custom",
+          helper: "",
+          singular: eventLabelSingularInput.trim() || "Event",
+          plural: eventLabelPluralInput.trim() || "Events",
+          example: "",
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      setSaveMessage("Outcomes inputs saved.");
+      reloadPage();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Failed to save outcomes inputs."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const evidence = dedupeEvidence([
     hasEventSignals
@@ -454,6 +539,113 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
               tone="var(--success)"
             />
           </div>
+
+          {showOutcomesSetupCta ? (
+            <div className="mt-6 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Quick setup</SectionLabel>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                Add the basic outcomes inputs here so this page can explain business
+                impact more clearly without sending the owner to another screen.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Monthly customer events
+                  </span>
+                  <input
+                    value={monthlyEventsInput}
+                    onChange={(event) => setMonthlyEventsInput(event.target.value)}
+                    inputMode="numeric"
+                    placeholder="40"
+                    className="mt-2 w-full border bg-transparent px-3 py-3 text-sm text-[var(--text-strong)] outline-none"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Review conversion rate
+                  </span>
+                  <input
+                    value={reviewConvRateInput}
+                    onChange={(event) => setReviewConvRateInput(event.target.value)}
+                    inputMode="decimal"
+                    placeholder="12"
+                    className="mt-2 w-full border bg-transparent px-3 py-3 text-sm text-[var(--text-strong)] outline-none"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Singular event label
+                  </span>
+                  <input
+                    value={eventLabelSingularInput}
+                    onChange={(event) =>
+                      setEventLabelSingularInput(event.target.value)
+                    }
+                    placeholder="Lead"
+                    className="mt-2 w-full border bg-transparent px-3 py-3 text-sm text-[var(--text-strong)] outline-none"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Plural event label
+                  </span>
+                  <input
+                    value={eventLabelPluralInput}
+                    onChange={(event) =>
+                      setEventLabelPluralInput(event.target.value)
+                    }
+                    placeholder="Leads"
+                    className="mt-2 w-full border bg-transparent px-3 py-3 text-sm text-[var(--text-strong)] outline-none"
+                    style={{ borderColor: "var(--border)" }}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleSaveOutcomesSetup()}
+                  disabled={saving || !dashboardContext?.clientId}
+                  className="inline-flex items-center px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: "var(--brand-700)" }}
+                >
+                  {saving ? "Saving..." : "Save outcomes inputs"}
+                </button>
+
+                {outcomesSetupHref ? (
+                  <Link
+                    href={outcomesSetupHref}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Open full dashboard setup
+                  </Link>
+                ) : null}
+              </div>
+
+              {saveMessage ? (
+                <p className="mt-3 text-sm leading-7 text-[var(--success)]">
+                  {saveMessage}
+                </p>
+              ) : null}
+
+              {saveError ? (
+                <p className="mt-3 text-sm leading-7 text-[var(--danger)]">
+                  {saveError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
