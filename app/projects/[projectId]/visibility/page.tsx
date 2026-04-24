@@ -88,6 +88,37 @@ function buildRankTrendSummary(input: {
   return `This business is holding the same saved position for ${searchLabel}.`;
 }
 
+function buildMarketFootingSummary(input: {
+  latestRank: number | null | undefined;
+  bestRank: number | null | undefined;
+  keyword: string;
+  metro: string;
+  visibilityRead: string;
+}) {
+  const { latestRank, bestRank, keyword, metro, visibilityRead } = input;
+  const searchLabel = `${keyword} in ${metro}`;
+
+  if (typeof latestRank !== "number") {
+    return `Digital Brain does not have enough saved rank data yet to describe this business's current footing for ${searchLabel}.`;
+  }
+
+  if (latestRank <= 3) {
+    return typeof bestRank === "number"
+      ? `This business currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank} and a best saved rank of #${bestRank}.`
+      : `This business currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank}.`;
+  }
+
+  if (latestRank <= 10) {
+    return typeof bestRank === "number"
+      ? `This business is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}, and the best saved rank is #${bestRank}.`
+      : `This business is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}.`;
+  }
+
+  return typeof bestRank === "number"
+    ? `This business still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, the best saved rank is #${bestRank}, and the current visibility read is ${visibilityRead}.`
+    : `This business still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, and the current visibility read is ${visibilityRead}.`;
+}
+
 function numericValue(value: number | null | undefined) {
   return typeof value === "number" ? `${value}` : "Not set";
 }
@@ -314,6 +345,13 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     keyword,
     metro,
   });
+  const marketFootingSummary = buildMarketFootingSummary({
+    latestRank,
+    bestRank,
+    keyword,
+    metro,
+    visibilityRead,
+  });
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
@@ -423,6 +461,19 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
                 {rankTrendSummary}
               </p>
+
+              <div className="mt-5 border-t border-[var(--border)] pt-5">
+                <SectionLabel>What this means in the tracked market</SectionLabel>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                  {marketFootingSummary}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InlineTag>Search: {keyword}</InlineTag>
+                  <InlineTag>Market: {metro}</InlineTag>
+                  <InlineTag>Visibility read: {visibilityRead}</InlineTag>
+                  <InlineTag>Saved trend: {rankMovement}</InlineTag>
+                </div>
+              </div>
             </div>
           ) : null}
         </section>
