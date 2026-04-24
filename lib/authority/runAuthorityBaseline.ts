@@ -165,6 +165,9 @@ function computeMomentum(args: {
   posts30d: number;
   photosCount: number;
   qaCount: number;
+  posts30dKnown: boolean;
+  photosCountKnown: boolean;
+  qaCountKnown: boolean;
   marketMedianReviews: number;
 }): MomentumOut {
   const authorityDelta =
@@ -175,9 +178,9 @@ function computeMomentum(args: {
       ? 0
       : clamp((args.gapYesterday - args.gapToday) / Math.max(10, args.gapYesterday), -1, 1);
 
-  const execPosts = clamp(args.posts30d / 12, 0, 1);
-  const execPhotos = clamp(args.photosCount / 200, 0, 1);
-  const execQA = clamp(args.qaCount / 50, 0, 1);
+  const execPosts = args.posts30dKnown ? clamp(args.posts30d / 12, 0, 1) : 0.5;
+  const execPhotos = args.photosCountKnown ? clamp(args.photosCount / 200, 0, 1) : 0.5;
+  const execQA = args.qaCountKnown ? clamp(args.qaCount / 50, 0, 1) : 0.5;
   const execution = clamp(0.5 * execPosts + 0.35 * execPhotos + 0.15 * execQA, 0, 1);
 
   const marketPressure = clamp(normalize01(args.marketMedianReviews, 300), 0, 1);
@@ -668,6 +671,9 @@ export async function runAuthorityBaseline(params: {
     posts30d: activitySignals.posts30d,
     photosCount: activitySignals.photosCount,
     qaCount: activitySignals.qaCount,
+    posts30dKnown: activitySignals.posts30dKnown,
+    photosCountKnown: activitySignals.photosCountKnown,
+    qaCountKnown: activitySignals.qaCountKnown,
     marketMedianReviews,
   });
 
