@@ -33,6 +33,61 @@ function formatRank(value: number | null | undefined) {
   return typeof value === "number" ? `#${value}` : "Not set";
 }
 
+function formatRankMovement(
+  latestRank: number | null | undefined,
+  previousRank: number | null | undefined,
+) {
+  if (typeof latestRank !== "number") {
+    return "Not set";
+  }
+
+  if (typeof previousRank !== "number") {
+    return "First snapshot";
+  }
+
+  if (latestRank < previousRank) {
+    const gain = previousRank - latestRank;
+    return `Up ${gain}`;
+  }
+
+  if (latestRank > previousRank) {
+    const loss = latestRank - previousRank;
+    return `Down ${loss}`;
+  }
+
+  return "No change";
+}
+
+function buildRankTrendSummary(input: {
+  latestRank: number | null | undefined;
+  previousRank: number | null | undefined;
+  keyword: string;
+  metro: string;
+}) {
+  const { latestRank, previousRank, keyword, metro } = input;
+  const searchLabel = `${keyword} in ${metro}`;
+
+  if (typeof latestRank !== "number") {
+    return `No saved ranking trend is available yet for ${searchLabel}.`;
+  }
+
+  if (typeof previousRank !== "number") {
+    return `This is the first saved visibility snapshot for ${searchLabel}.`;
+  }
+
+  if (latestRank < previousRank) {
+    const gain = previousRank - latestRank;
+    return `This business moved up ${gain} spot${gain === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
+  }
+
+  if (latestRank > previousRank) {
+    const loss = latestRank - previousRank;
+    return `This business moved down ${loss} spot${loss === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
+  }
+
+  return `This business is holding the same saved position for ${searchLabel}.`;
+}
+
 function numericValue(value: number | null | undefined) {
   return typeof value === "number" ? `${value}` : "Not set";
 }
@@ -252,6 +307,14 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
       ? "Start by activating the saved tracked search. Visibility cannot be measured clearly until tracking is active."
       : "Start with the biggest visibility gap first. Stronger local footing begins with a real tracked search, a clear market, and a practical next action.";
 
+  const rankMovement = formatRankMovement(latestRank, previousRank);
+  const rankTrendSummary = buildRankTrendSummary({
+    latestRank,
+    previousRank,
+    keyword,
+    metro,
+  });
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
@@ -321,7 +384,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
         <section className="border-b border-[var(--border)] py-6">
           <SectionLabel>Current visibility summary</SectionLabel>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <MetricStripItem
               label="Visibility score"
               value={numericValue(visibilityScore)}
@@ -346,7 +409,22 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
               bg="var(--success-soft)"
               tone="var(--success)"
             />
+            <MetricStripItem
+              label="Rank movement"
+              value={rankMovement}
+              bg="var(--reference-soft)"
+              tone="var(--text-strong)"
+            />
           </div>
+
+          {!isSetupBlocked ? (
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <SectionLabel>What the saved ranking trend shows</SectionLabel>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                {rankTrendSummary}
+              </p>
+            </div>
+          ) : null}
         </section>
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">
