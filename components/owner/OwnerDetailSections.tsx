@@ -69,6 +69,7 @@ export function OwnerDetailSections({
   const showOutcomesSetupCta =
     !dashboard.dashboard.outcomesSummary.hasMonthlyEvents ||
     !dashboard.dashboard.outcomesSummary.hasConversionRate;
+  const outcomesSummary = dashboard.dashboard.outcomesSummary;
 
   return (
     <section className="border-t border-[var(--border)] py-8">
@@ -588,17 +589,23 @@ export function OwnerDetailSections({
               <div className="mt-6">
                 <DetailRow
                   label="Monthly events"
-                  value={formatCount(
-                    dashboard.dashboard.outcomesSummary.monthlyCustomerEvents,
-                  )}
+                  value={formatCount(outcomesSummary.monthlyCustomerEvents)}
                   helper="How many tracked customer events are connected."
                 />
                 <DetailRow
                   label="Conversion rate"
-                  value={formatConversionRate(
-                    dashboard.dashboard.outcomesSummary.reviewConversionRate,
-                  )}
+                  value={formatConversionRate(outcomesSummary.reviewConversionRate)}
                   helper="Current review-to-customer conversion footing."
+                />
+                <DetailRow
+                  label="Current reviews"
+                  value={formatCount(outcomesSummary.currentReviews)}
+                  helper="Saved review count from the current GBP profile."
+                />
+                <DetailRow
+                  label="Realistic 90-day goal"
+                  value={formatCount(outcomesSummary.realisticTarget90d)}
+                  helper="A practical 90-day review target based on saved outcomes capacity."
                 />
               </div>
             </div>
@@ -606,21 +613,39 @@ export function OwnerDetailSections({
             <div>
               <DetailRow
                 label="Singular label"
-                value={
-                  dashboard.dashboard.outcomesSummary.eventLabelSingular ??
-                  "Not set"
-                }
+                value={outcomesSummary.eventLabelSingular ?? "Not set"}
               />
               <DetailRow
                 label="Plural label"
-                value={
-                  dashboard.dashboard.outcomesSummary.eventLabelPlural ??
-                  "Not set"
-                }
+                value={outcomesSummary.eventLabelPlural ?? "Not set"}
               />
               <DetailRow
                 label="Plain-English read"
-                value={dashboard.dashboard.outcomesSummary.outcomesReadinessLabel}
+                value={outcomesSummary.outcomesReadinessLabel}
+              />
+              <DetailRow
+                label="Top competitor"
+                value={
+                  outcomesSummary.topCompetitorName
+                    ? outcomesSummary.topCompetitorReviews !== null
+                      ? `${outcomesSummary.topCompetitorName} (${formatCount(
+                          outcomesSummary.topCompetitorReviews,
+                        )} reviews)`
+                      : outcomesSummary.topCompetitorName
+                    : "Not set"
+                }
+              />
+              <DetailRow
+                label="Review gap"
+                value={formatCount(outcomesSummary.gapReviews)}
+              />
+              <DetailRow
+                label="Weekly pace"
+                value={formatCount(outcomesSummary.perWeek)}
+              />
+              <DetailRow
+                label="Months to close gap"
+                value={formatCount(outcomesSummary.monthsToCloseGap)}
               />
               <div className="border-t border-[var(--border)] py-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
@@ -628,15 +653,33 @@ export function OwnerDetailSections({
                 </p>
                 <ul className="mt-3 space-y-3 text-sm leading-7 text-[var(--text-body)]">
                   <DetailBullet
-                    text="This is the beginning of the business-results layer, not the full outcome engine."
+                    text={
+                      outcomesSummary.gapReviews !== null
+                        ? `Current review gap is ${formatCount(
+                            outcomesSummary.gapReviews,
+                          )}.`
+                        : "A reliable review-gap read is not available yet."
+                    }
                     color={outcomesTone.solid}
                   />
                   <DetailBullet
-                    text="Once event and conversion data deepen, this section becomes much more valuable."
+                    text={
+                      outcomesSummary.realisticTarget90d !== null
+                        ? `A realistic 90-day review goal is ${formatCount(
+                            outcomesSummary.realisticTarget90d,
+                          )}.`
+                        : "A realistic 90-day review goal is not available yet."
+                    }
                     color="var(--brand-600)"
                   />
                   <DetailBullet
-                    text="Right now this helps owners see whether visibility work is being tied to real outcomes."
+                    text={
+                      outcomesSummary.perWeek !== null
+                        ? `That works out to about ${formatCount(
+                            outcomesSummary.perWeek,
+                          )} reviews per week.`
+                        : "Weekly review pace is not available yet."
+                    }
                     color="var(--accent-blue-600)"
                   />
                 </ul>

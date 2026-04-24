@@ -167,6 +167,15 @@ export type OwnerDashboardResponse = {
       hasMonthlyEvents: boolean;
       hasConversionRate: boolean;
       outcomesReadinessLabel: string;
+      currentReviews: number | null;
+      topCompetitorName: string | null;
+      topCompetitorReviews: number | null;
+      gapReviews: number | null;
+      desiredTarget90d: number | null;
+      maxReviews90d: number | null;
+      realisticTarget90d: number | null;
+      perWeek: number | null;
+      monthsToCloseGap: number | null;
     };
   };
 };

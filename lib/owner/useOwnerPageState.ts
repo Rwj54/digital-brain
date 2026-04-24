@@ -10,6 +10,12 @@ import {
   type Props,
 } from "@/lib/owner/types";
 
+type OwnerOutcomesSummaryResponse = {
+  ok?: boolean;
+  error?: string;
+  summary?: OwnerPageDashboard["dashboard"]["outcomesSummary"];
+};
+
 type UseOwnerPageStateResult = {
   dashboard: OwnerPageDashboard | null;
   tasksData: OwnerTasksResponse | null;
@@ -54,7 +60,33 @@ export function useOwnerPageState(
 
         const data = await loadOwnerPageData(resolvedProjectId);
 
-        setDashboard(data.dashboard);
+        let mergedDashboard = data.dashboard;
+
+        try {
+          const outcomesResponse = await fetch(
+            `/api/projects/${resolvedProjectId}/owner-outcomes-summary`,
+            {
+              cache: "no-store",
+            },
+          );
+
+          const outcomesJson =
+            (await outcomesResponse.json()) as OwnerOutcomesSummaryResponse;
+
+          if (outcomesResponse.ok && outcomesJson.ok && outcomesJson.summary) {
+            mergedDashboard = {
+              ...data.dashboard,
+              dashboard: {
+                ...data.dashboard.dashboard,
+                outcomesSummary: outcomesJson.summary,
+              },
+            };
+          }
+        } catch {
+          // Keep the owner page resilient; fall back to dashboard outcomes data.
+        }
+
+        setDashboard(mergedDashboard);
         setTasksData(data.tasksData);
       } catch (err) {
         setError(
