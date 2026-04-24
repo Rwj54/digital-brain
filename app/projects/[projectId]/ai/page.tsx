@@ -159,6 +159,43 @@ function scoreLabel(value: number | null | undefined) {
   return typeof value === "number" ? `${value}` : "Not set";
 }
 
+function buildAiIdentitySummary(input: {
+  businessName: string;
+  primaryCategory: string;
+  targetBrandName: string;
+  projectCategory: string;
+  reviewSignals: string;
+  aiLabel: string;
+}) {
+  const {
+    businessName,
+    primaryCategory,
+    targetBrandName,
+    projectCategory,
+    reviewSignals,
+    aiLabel,
+  } = input;
+
+  const hasBusinessName = businessName !== "Not set";
+  const hasPrimaryCategory = primaryCategory !== "Not set";
+  const hasTargetBrandName = targetBrandName !== "Not set";
+  const hasProjectCategory = projectCategory !== "Not set";
+
+  if (!hasBusinessName) {
+    return "The saved AI identity foundation is still missing the GBP business name, so machine understanding is still very limited.";
+  }
+
+  if (!hasPrimaryCategory) {
+    return "The saved business name exists, but the primary category is still missing, so category clarity for machine understanding is still weak.";
+  }
+
+  if (!hasTargetBrandName || !hasProjectCategory) {
+    return `The saved GBP identity signals are present, and review trust signals read as ${reviewSignals}, but the project-level identity anchors are still not fully complete. The current AI read is ${aiLabel}.`;
+  }
+
+  return `The saved business name, primary category, project brand, project category, and review trust signals are all present enough for a stronger early AI identity read. The current AI read is ${aiLabel}.`;
+}
+
 function textValue(value: string | null | undefined, fallback = "Not set") {
   if (typeof value !== "string") {
     return fallback;
@@ -290,6 +327,15 @@ export default function ProjectAiPage({ params }: PageProps) {
     typeof aiSummary.rating === "number" ? aiSummary.rating : null,
   );
 
+  const aiIdentitySummary = buildAiIdentitySummary({
+    businessName,
+    primaryCategory,
+    targetBrandName,
+    projectCategory,
+    reviewSignals,
+    aiLabel,
+  });
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
@@ -388,6 +434,21 @@ export default function ProjectAiPage({ params }: PageProps) {
               bg="var(--success-soft)"
               tone="var(--success)"
             />
+          </div>
+        </section>
+
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>What the saved AI identity signals show</SectionLabel>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+            {aiIdentitySummary}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <InlineTag>GBP name: {businessName}</InlineTag>
+            <InlineTag>Primary category: {primaryCategory}</InlineTag>
+            <InlineTag>Project brand: {targetBrandName}</InlineTag>
+            <InlineTag>Project category: {projectCategory}</InlineTag>
+            <InlineTag>Review trust: {reviewSignals}</InlineTag>
+            <InlineTag>AI read: {aiLabel}</InlineTag>
           </div>
         </section>
 
