@@ -155,6 +155,46 @@ function boolLabel(value: boolean) {
   return value ? "Yes" : "No";
 }
 
+function buildWebsiteAnchorSummary(input: {
+  siteUrl: string | null;
+  targetDomain: string | null;
+  derivedSiteDomain: string | null;
+  targetBrandName: string | null;
+  hasDomainAlignment: boolean;
+  websiteReadinessLabel: string;
+}) {
+  const {
+    siteUrl,
+    targetDomain,
+    derivedSiteDomain,
+    targetBrandName,
+    hasDomainAlignment,
+    websiteReadinessLabel,
+  } = input;
+
+  if (!siteUrl) {
+    return "Digital Brain does not have a saved website URL yet, so website identity is still missing its core anchor.";
+  }
+
+  if (siteUrl && !targetDomain && derivedSiteDomain) {
+    return `A website URL is saved and points to ${derivedSiteDomain}, but the target domain is not explicitly locked yet.`;
+  }
+
+  if (siteUrl && targetDomain && derivedSiteDomain && !hasDomainAlignment) {
+    return `The saved website URL points to ${derivedSiteDomain}, while the target domain is ${targetDomain}. Those two anchors still need to match exactly.`;
+  }
+
+  if (siteUrl && targetDomain && !targetBrandName) {
+    return `The website and domain anchor are mostly set, but the saved brand name is still missing. The current website read is ${websiteReadinessLabel}.`;
+  }
+
+  if (siteUrl && targetDomain && targetBrandName && hasDomainAlignment) {
+    return `The website URL, domain anchor, and brand name are all saved and aligned clearly enough for a strong website identity read.`;
+  }
+
+  return `The saved website anchor is partially set, and the current website read is ${websiteReadinessLabel}.`;
+}
+
 export default function ProjectWebsitePage({ params }: PageProps) {
   const { projectId, dashboardContext, websiteSummary, loading, error } =
     useProjectWebsitePageState(params);
@@ -184,6 +224,15 @@ export default function ProjectWebsitePage({ params }: PageProps) {
       </main>
     );
   }
+
+  const websiteAnchorSummary = buildWebsiteAnchorSummary({
+    siteUrl: websiteSummary.siteUrl,
+    targetDomain: websiteSummary.targetDomain,
+    derivedSiteDomain: websiteSummary.derivedSiteDomain,
+    targetBrandName: websiteSummary.targetBrandName,
+    hasDomainAlignment: websiteSummary.hasDomainAlignment,
+    websiteReadinessLabel: websiteSummary.websiteReadinessLabel,
+  });
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
@@ -261,7 +310,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
         <section className="border-b border-[var(--border)] py-6">
           <SectionLabel>Current website summary</SectionLabel>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <MetricStripItem
               label="Website score"
               value={`${websiteSummary.websiteReadinessScore}`}
@@ -281,11 +330,38 @@ export default function ProjectWebsitePage({ params }: PageProps) {
               tone="var(--accent-mint-600)"
             />
             <MetricStripItem
+              label="Brand name saved"
+              value={boolLabel(websiteSummary.hasBrandName)}
+              bg="var(--reference-soft)"
+              tone="var(--text-strong)"
+            />
+            <MetricStripItem
               label="Domain aligned"
               value={boolLabel(websiteSummary.hasDomainAlignment)}
               bg="var(--success-soft)"
               tone="var(--success)"
             />
+          </div>
+
+          <div className="mt-5 border-t border-[var(--border)] pt-5">
+            <SectionLabel>What the saved website anchor shows</SectionLabel>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+              {websiteAnchorSummary}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <InlineTag>
+                Website URL: {websiteSummary.siteUrl ?? "Not set"}
+              </InlineTag>
+              <InlineTag>
+                Target domain: {websiteSummary.targetDomain ?? "Not set"}
+              </InlineTag>
+              <InlineTag>
+                Domain from URL: {websiteSummary.derivedSiteDomain ?? "Not set"}
+              </InlineTag>
+              <InlineTag>
+                Read: {websiteSummary.websiteReadinessLabel}
+              </InlineTag>
+            </div>
           </div>
         </section>
 
