@@ -292,6 +292,39 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
     outcomesSummary.outcomesReadinessLabel,
     "Outcomes footing not set",
   );
+  const currentReviews =
+    typeof outcomesSummary.currentReviews === "number"
+      ? outcomesSummary.currentReviews
+      : null;
+  const topCompetitorName = outcomesSummary.topCompetitorName;
+  const topCompetitorReviews =
+    typeof outcomesSummary.topCompetitorReviews === "number"
+      ? outcomesSummary.topCompetitorReviews
+      : null;
+  const gapReviews =
+    typeof outcomesSummary.gapReviews === "number"
+      ? outcomesSummary.gapReviews
+      : null;
+  const desiredTarget90d =
+    typeof outcomesSummary.desiredTarget90d === "number"
+      ? outcomesSummary.desiredTarget90d
+      : null;
+  const maxReviews90d =
+    typeof outcomesSummary.maxReviews90d === "number"
+      ? outcomesSummary.maxReviews90d
+      : null;
+  const realisticTarget90d =
+    typeof outcomesSummary.realisticTarget90d === "number"
+      ? outcomesSummary.realisticTarget90d
+      : null;
+  const perWeek =
+    typeof outcomesSummary.perWeek === "number"
+      ? outcomesSummary.perWeek
+      : null;
+  const monthsToCloseGap =
+    typeof outcomesSummary.monthsToCloseGap === "number"
+      ? outcomesSummary.monthsToCloseGap
+      : null;
 
   const hasEventSignals =
     typeof monthlyCustomerEvents === "number" && monthlyCustomerEvents > 0;
@@ -412,6 +445,12 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
     hasConversionSignal
       ? `Review conversion rate is currently ${formatConversionRate(reviewConversionRate)}.`
       : "Conversion footing is still not clear enough.",
+    currentReviews !== null
+      ? `Current review count is ${formatCount(currentReviews)}.`
+      : "Current review count is not available yet.",
+    gapReviews !== null
+      ? `The current review gap to the strongest tracked competitor is ${formatCount(gapReviews)}.`
+      : "A reliable review-gap read is not available yet.",
     eventLabelSingular
       ? `Single event label is "${eventLabelSingular}".`
       : "A single customer-event label is not set yet.",
@@ -646,6 +685,93 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
               ) : null}
             </div>
           ) : null}
+        </section>
+
+        <section className="border-b border-[var(--border)] py-6">
+          <SectionLabel>Payoff math</SectionLabel>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricStripItem
+              label="Current reviews"
+              value={formatCount(currentReviews)}
+              bg="var(--reference-soft)"
+              tone="var(--text-strong)"
+            />
+            <MetricStripItem
+              label="Review gap"
+              value={formatCount(gapReviews)}
+              bg="var(--warning-soft)"
+              tone="var(--warning)"
+            />
+            <MetricStripItem
+              label="Max in 90 days"
+              value={formatCount(maxReviews90d)}
+              bg="var(--accent-blue-100)"
+              tone="var(--accent-blue-600)"
+            />
+            <MetricStripItem
+              label="Realistic 90-day goal"
+              value={formatCount(realisticTarget90d)}
+              bg="var(--brand-100)"
+              tone="var(--brand-700)"
+            />
+            <MetricStripItem
+              label="Weekly pace"
+              value={formatCount(perWeek)}
+              bg="var(--success-soft)"
+              tone="var(--success)"
+            />
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
+            <div>
+              <SectionLabel>What this means in practice</SectionLabel>
+              <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
+                {realisticTarget90d !== null && perWeek !== null
+                  ? `At the current ${textValue(eventLabelPlural, "Events")} volume and conversion rate, this business can likely generate about ${formatCount(realisticTarget90d)} reviews over the next 90 days, which is roughly ${formatCount(perWeek)} per week.`
+                  : "Once outcomes inputs are present, this section translates them into a practical review-growth pace the owner can actually follow."}
+              </p>
+              {topCompetitorName || topCompetitorReviews !== null || monthsToCloseGap !== null ? (
+                <p className="mt-4 text-sm leading-7 text-[var(--text-body)]">
+                  {topCompetitorName && topCompetitorReviews !== null && gapReviews !== null
+                    ? `${topCompetitorName} currently sits at ${formatCount(topCompetitorReviews)} reviews, leaving a gap of ${formatCount(gapReviews)}.`
+                    : "Competitor review-gap context is partially available but not complete yet."}{" "}
+                  {monthsToCloseGap !== null
+                    ? `At the current pace, closing that full gap would take about ${formatCount(monthsToCloseGap)} month${monthsToCloseGap === 1 ? "" : "s"}.`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <DetailRow
+                label="Current reviews"
+                value={formatCount(currentReviews)}
+              />
+              <DetailRow
+                label="Top competitor"
+                value={
+                  topCompetitorName
+                    ? topCompetitorReviews !== null
+                      ? `${topCompetitorName} (${formatCount(topCompetitorReviews)} reviews)`
+                      : topCompetitorName
+                    : "Not set"
+                }
+              />
+              <DetailRow
+                label="Suggested 90-day target"
+                value={formatCount(desiredTarget90d)}
+              />
+              <DetailRow
+                label="Realistic 90-day target"
+                value={formatCount(realisticTarget90d)}
+              />
+              <DetailRow
+                label="Months to close review gap"
+                value={formatCount(monthsToCloseGap)}
+              />
+            </div>
+          </div>
         </section>
 
         <section className="grid gap-10 py-8 xl:grid-cols-[1.18fr_0.82fr]">

@@ -14,6 +14,15 @@ type ProjectRow = {
   event_label_plural: string | null;
 };
 
+type GbpProfileRow = {
+  total_reviews: number | null;
+};
+
+type CompetitorMetricRow = {
+  competitor_name: string | null;
+  total_reviews: number | null;
+};
+
 function getEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -80,6 +89,75 @@ export async function GET(_request: Request, context: RouteContext) {
     const hasMonthlyEvents = data.monthly_customer_events !== null;
     const hasConversionRate = data.review_conversion_rate !== null;
 
+    const { data: gbpProfile, error: gbpError } = await supabase
+      .from("gbp_profiles")
+      .select("total_reviews")
+      .eq("project_id", projectId)
+      .maybeSingle<GbpProfileRow>();
+
+    if (gbpError) {
+      throw new Error(`Failed to load GBP profile outcomes data: ${gbpError.message}`);
+    }
+
+    const { data: topCompetitor, error: competitorError } = await supabase
+      .from("gbp_competitor_metrics")
+      .select("competitor_name, total_reviews")
+      .eq("project_id", projectId)
+      .order("total_reviews", { ascending: false })
+      .limit(1)
+      .maybeSingle<CompetitorMetricRow>();
+
+    if (competitorError) {
+      throw new Error(`Failed to load competitor outcomes data: ${competitorError.message}`);
+    }
+
+    const currentReviews = gbpProfile?.total_reviews ?? null;
+    const topCompetitorName = topCompetitor?.competitor_name ?? null;
+    const topCompetitorReviews = topCompetitor?.total_reviews ?? null;
+
+    const gapReviews =
+      currentReviews === null || topCompetitorReviews === null
+        ? null
+        : Math.max(0, Number(topCompetitorReviews) - Number(currentReviews));
+
+    const desiredTarget90d =
+      gapReviews === null
+        ? null
+        : gapReviews > 100
+          ? Math.ceil(gapReviews * 0.25)
+          : Math.ceil(gapReviews * 0.5);
+
+    const maxReviews90d =
+      data.monthly_customer_events === null || data.review_conversion_rate === null
+        ? null
+        : Math.floor(
+            data.monthly_customer_events * (data.review_conversion_rate / 100) * 3
+          );
+
+    const realisticTarget90d =
+      desiredTarget90d === null
+        ? null
+        : maxReviews90d === null
+          ? desiredTarget90d
+          : Math.min(desiredTarget90d, maxReviews90d);
+
+    const perWeek =
+      realisticTarget90d === null
+        ? null
+        : Math.max(0, Math.ceil(realisticTarget90d / 13));
+
+    const monthsToCloseGap =
+      gapReviews === null ||
+      data.monthly_customer_events === null ||
+      data.review_conversion_rate === null
+        ? null
+        : data.monthly_customer_events * (data.review_conversion_rate / 100) <= 0
+          ? null
+          : Math.ceil(
+              gapReviews /
+                (data.monthly_customer_events * (data.review_conversion_rate / 100))
+            );
+
     return NextResponse.json({
       ok: true,
       projectId,
@@ -94,6 +172,15 @@ export async function GET(_request: Request, context: RouteContext) {
           hasMonthlyEvents,
           hasConversionRate,
         }),
+        currentReviews,
+        topCompetitorName,
+        topCompetitorReviews,
+        gapReviews,
+        desiredTarget90d,
+        maxReviews90d,
+        realisticTarget90d,
+        perWeek,
+        monthsToCloseGap,
       },
     });
   } catch (error) {
