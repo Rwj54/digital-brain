@@ -28,7 +28,9 @@ export function OwnerHeroSection({
 
   const paceSummary =
     outcomesSummary.realisticTarget90d !== null && outcomesSummary.perWeek !== null
-      ? `At the current ${outcomesSummary.eventLabelPlural ?? "events"} pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in the next 90 days, or roughly ${outcomesSummary.perWeek} per week.`
+      ? outcomesSummary.gapReviews !== null
+        ? `At the current ${outcomesSummary.eventLabelPlural ?? "events"} pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in the next 90 days, or roughly ${outcomesSummary.perWeek} per week, against a current review gap of ${outcomesSummary.gapReviews}.`
+        : `At the current ${outcomesSummary.eventLabelPlural ?? "events"} pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in the next 90 days, or roughly ${outcomesSummary.perWeek} per week.`
       : outcomesSummary.gapReviews !== null
         ? `The current review gap is ${outcomesSummary.gapReviews}, but a realistic review pace is not fully available yet.`
         : "Add outcomes inputs to translate visibility work into a practical business-impact pace.";

@@ -32,6 +32,15 @@ export function OwnerActionPlanSection({
   onToggleTask,
 }: Props) {
   const outcomesSummary = dashboard.dashboard.outcomesSummary;
+  const firstStepImpactHint =
+    outcomesSummary.realisticTarget90d !== null &&
+    outcomesSummary.perWeek !== null
+      ? outcomesSummary.gapReviews !== null
+        ? `At the current pace, a realistic target is ${outcomesSummary.realisticTarget90d} reviews in 90 days, or about ${outcomesSummary.perWeek} per week, against a current gap of ${outcomesSummary.gapReviews}.`
+        : `At the current pace, a realistic target is ${outcomesSummary.realisticTarget90d} reviews in 90 days, or about ${outcomesSummary.perWeek} per week.`
+      : outcomesSummary.gapReviews !== null
+        ? `The current review gap is ${outcomesSummary.gapReviews}.`
+        : null;
 
   return (
     <section className="grid gap-10 py-8 xl:grid-cols-[1.22fr_0.78fr]">
@@ -117,6 +126,17 @@ export function OwnerActionPlanSection({
                       </dd>
                     </div>
                   </dl>
+
+                  {index === 0 && firstStepImpactHint ? (
+                    <div className="mt-4 border-t border-[var(--border)] pt-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                        Business impact target
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                        {firstStepImpactHint}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="md:min-w-[148px]">

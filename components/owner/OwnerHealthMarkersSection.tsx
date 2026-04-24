@@ -16,6 +16,14 @@ export function OwnerHealthMarkersSection({ dashboard }: Props) {
     outcomesSummary.perWeek !== null ||
     outcomesSummary.gapReviews !== null;
 
+  const outcomesSnapshotSummary =
+    outcomesSummary.realisticTarget90d !== null &&
+    outcomesSummary.perWeek !== null
+      ? outcomesSummary.gapReviews !== null
+        ? `At the current pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week, against a current gap of ${outcomesSummary.gapReviews}.`
+        : `At the current pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week.`
+      : "The owner now has a simple business-impact pace tied to current visibility work.";
+
   return (
     <section className="border-b border-[var(--border)] py-6">
       <SectionLabel>Health markers</SectionLabel>
@@ -29,7 +37,7 @@ export function OwnerHealthMarkersSection({ dashboard }: Props) {
         <div className="mt-5 border-t border-[var(--border)] pt-5">
           <SectionLabel>Outcomes snapshot</SectionLabel>
           <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-            The owner now has a simple business-impact pace tied to current visibility work.
+            {outcomesSnapshotSummary}
           </p>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
