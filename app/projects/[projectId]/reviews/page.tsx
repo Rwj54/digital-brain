@@ -200,6 +200,33 @@ function dedupeEvidence(items: string[]) {
   return deduped;
 }
 
+function buildReviewTrustSummary(input: {
+  totalReviews: number | null;
+  rating: number | null;
+  hasReviewSignals: boolean;
+  reputationLabel: string;
+}) {
+  const { totalReviews, rating, hasReviewSignals, reputationLabel } = input;
+
+  if (!hasReviewSignals) {
+    return "Saved review trust signals are still too thin for a stronger reputation footing.";
+  }
+
+  if (totalReviews !== null && rating !== null && totalReviews >= 25 && rating >= 4.2) {
+    return `Saved review count and rating already give this business a usable trust base. The current review read is ${reputationLabel}.`;
+  }
+
+  if (totalReviews !== null && rating !== null) {
+    return `This business has saved review signals, but the trust base is still thinner than it should be at ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`;
+  }
+
+  if (totalReviews !== null) {
+    return `This business has ${formatCount(totalReviews)} saved reviews, but rating quality is still not fully visible. The current review read is ${reputationLabel}.`;
+  }
+
+  return `Saved review trust signals are present, and the current review read is ${reputationLabel}.`;
+}
+
 export default function ProjectReviewsPage({ params }: PageProps) {
   const { projectId, dashboardContext, aiSummary, loading, error } =
     useProjectReviewsPageState(params);
@@ -294,6 +321,13 @@ export default function ProjectReviewsPage({ params }: PageProps) {
       : "Saved rating is not available yet.",
   ]).slice(0, 8);
 
+  const reviewTrustSummary = buildReviewTrustSummary({
+    totalReviews,
+    rating,
+    hasReviewSignals,
+    reputationLabel,
+  });
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
@@ -366,31 +400,50 @@ export default function ProjectReviewsPage({ params }: PageProps) {
         <section className="border-b border-[var(--border)] py-6">
           <SectionLabel>Current reviews summary</SectionLabel>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <MetricStripItem
-              label="Review count"
-              value={formatCount(totalReviews)}
+              label="Review score"
+              value={numericValue(reputationScore)}
               bg="var(--brand-100)"
               tone="var(--brand-700)"
             />
             <MetricStripItem
-              label="Rating"
-              value={formatRating(rating)}
+              label="Total reviews"
+              value={formatCount(totalReviews)}
               bg="var(--accent-blue-100)"
               tone="var(--accent-blue-600)"
             />
             <MetricStripItem
-              label="Review signals present"
-              value={boolLabel(hasReviewSignals)}
+              label="Rating"
+              value={formatRating(rating)}
               bg="var(--accent-mint-100)"
               tone="var(--accent-mint-600)"
             />
             <MetricStripItem
-              label="Reputation score"
-              value={numericValue(reputationScore)}
+              label="Review signals present"
+              value={boolLabel(hasReviewSignals)}
               bg="var(--success-soft)"
               tone="var(--success)"
             />
+            <MetricStripItem
+              label="Review read"
+              value={reputationLabel}
+              bg="var(--reference-soft)"
+              tone="var(--text-strong)"
+            />
+          </div>
+
+          <div className="mt-5 border-t border-[var(--border)] pt-5">
+            <SectionLabel>What the saved review trust signals show</SectionLabel>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+              {reviewTrustSummary}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <InlineTag>Total reviews: {formatCount(totalReviews)}</InlineTag>
+              <InlineTag>Rating: {formatRating(rating)}</InlineTag>
+              <InlineTag>Signals present: {boolLabel(hasReviewSignals)}</InlineTag>
+              <InlineTag>Review read: {reputationLabel}</InlineTag>
+            </div>
           </div>
         </section>
 
