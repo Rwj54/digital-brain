@@ -195,6 +195,54 @@ function buildWebsiteAnchorSummary(input: {
   return `The saved website anchor is partially set, and the current website read is ${websiteReadinessLabel}.`;
 }
 
+function buildWebsiteAlignmentSummary(input: {
+  hasSiteUrl: boolean;
+  hasTargetDomain: boolean;
+  hasBrandName: boolean;
+  hasDerivedSiteDomain: boolean;
+  hasDomainAlignment: boolean;
+  targetDomain: string | null;
+  derivedSiteDomain: string | null;
+  targetBrandName: string | null;
+  websiteReadinessLabel: string;
+}) {
+  const {
+    hasSiteUrl,
+    hasTargetDomain,
+    hasBrandName,
+    hasDerivedSiteDomain,
+    hasDomainAlignment,
+    targetDomain,
+    derivedSiteDomain,
+    targetBrandName,
+    websiteReadinessLabel,
+  } = input;
+
+  if (!hasSiteUrl) {
+    return "No website URL is saved yet, so there is no trustworthy website anchor to align against.";
+  }
+
+  if (hasSiteUrl && !hasTargetDomain && hasDerivedSiteDomain) {
+    return `Digital Brain can derive ${derivedSiteDomain} from the saved website URL, but the target domain still needs to be locked explicitly.`;
+  }
+
+  if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && !hasDomainAlignment) {
+    return `The saved website URL currently resolves to ${derivedSiteDomain}, while the saved target domain is ${targetDomain}. Those two identity anchors still disagree.`;
+  }
+
+  if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && hasDomainAlignment && !hasBrandName) {
+    return "The website URL and domain anchor now agree, but the business brand name still needs to be saved to complete the identity layer.";
+  }
+
+  if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && hasDomainAlignment && hasBrandName) {
+    return targetBrandName
+      ? `The website URL, target domain, and saved brand name (${targetBrandName}) are aligned clearly enough for a strong website identity footing.`
+      : "The website URL, target domain, and saved brand name are aligned clearly enough for a strong website identity footing.";
+  }
+
+  return `The saved website identity is partially anchored, and the current website read is ${websiteReadinessLabel}.`;
+}
+
 export default function ProjectWebsitePage({ params }: PageProps) {
   const { projectId, dashboardContext, websiteSummary, loading, error } =
     useProjectWebsitePageState(params);
@@ -231,6 +279,18 @@ export default function ProjectWebsitePage({ params }: PageProps) {
     derivedSiteDomain: websiteSummary.derivedSiteDomain,
     targetBrandName: websiteSummary.targetBrandName,
     hasDomainAlignment: websiteSummary.hasDomainAlignment,
+    websiteReadinessLabel: websiteSummary.websiteReadinessLabel,
+  });
+
+  const websiteAlignmentSummary = buildWebsiteAlignmentSummary({
+    hasSiteUrl: websiteSummary.hasSiteUrl,
+    hasTargetDomain: websiteSummary.hasTargetDomain,
+    hasBrandName: websiteSummary.hasBrandName,
+    hasDerivedSiteDomain: websiteSummary.hasDerivedSiteDomain,
+    hasDomainAlignment: websiteSummary.hasDomainAlignment,
+    targetDomain: websiteSummary.targetDomain,
+    derivedSiteDomain: websiteSummary.derivedSiteDomain,
+    targetBrandName: websiteSummary.targetBrandName,
     websiteReadinessLabel: websiteSummary.websiteReadinessLabel,
   });
 
@@ -361,6 +421,24 @@ export default function ProjectWebsitePage({ params }: PageProps) {
               <InlineTag>
                 Read: {websiteSummary.websiteReadinessLabel}
               </InlineTag>
+            </div>
+
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <SectionLabel>What the saved alignment signals show</SectionLabel>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                {websiteAlignmentSummary}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag>
+                  Brand name saved: {boolLabel(websiteSummary.hasBrandName)}
+                </InlineTag>
+                <InlineTag>
+                  Domain aligned: {boolLabel(websiteSummary.hasDomainAlignment)}
+                </InlineTag>
+                <InlineTag>
+                  Brand: {websiteSummary.targetBrandName ?? "Not set"}
+                </InlineTag>
+              </div>
             </div>
           </div>
         </section>
