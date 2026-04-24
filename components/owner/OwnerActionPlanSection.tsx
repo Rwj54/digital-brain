@@ -31,6 +31,8 @@ export function OwnerActionPlanSection({
   savingTaskId,
   onToggleTask,
 }: Props) {
+  const outcomesSummary = dashboard.dashboard.outcomesSummary;
+
   return (
     <section className="grid gap-10 py-8 xl:grid-cols-[1.22fr_0.78fr]">
       <section id="next-steps">
@@ -223,7 +225,7 @@ export function OwnerActionPlanSection({
               />
             </div>
 
-            <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-3 xl:grid-cols-1">
+            <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-1">
               <SummaryStat
                 label="Open now"
                 value={String(tasksSummary.openTasks)}
@@ -231,6 +233,14 @@ export function OwnerActionPlanSection({
               <SummaryStat
                 label="Current priorities"
                 value={String(dashboard.dashboard.summary.priorityCount)}
+              />
+              <SummaryStat
+                label="90-day review goal"
+                value={
+                  outcomesSummary.realisticTarget90d !== null
+                    ? `${outcomesSummary.realisticTarget90d} reviews`
+                    : "Not set"
+                }
               />
               <SummaryStat
                 label="Last updated"
