@@ -26,15 +26,6 @@ export function OwnerHeroSection({
     outcomesSummary.perWeek !== null ||
     outcomesSummary.gapReviews !== null;
 
-  const paceSummary =
-    outcomesSummary.realisticTarget90d !== null && outcomesSummary.perWeek !== null
-      ? outcomesSummary.gapReviews !== null
-        ? `At the current ${outcomesSummary.eventLabelPlural ?? "events"} pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in the next 90 days, or roughly ${outcomesSummary.perWeek} per week, against a current review gap of ${outcomesSummary.gapReviews}.`
-        : `At the current ${outcomesSummary.eventLabelPlural ?? "events"} pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in the next 90 days, or roughly ${outcomesSummary.perWeek} per week.`
-      : outcomesSummary.gapReviews !== null
-        ? `The current review gap is ${outcomesSummary.gapReviews}, but a realistic review pace is not fully available yet.`
-        : "Add outcomes inputs to translate visibility work into a practical business-impact pace.";
-
   return (
     <section className="border-b border-[var(--border)] pb-6">
       <SectionLabel>Owner dashboard</SectionLabel>
@@ -72,6 +63,39 @@ export function OwnerHeroSection({
               value={formatDate(dashboard.capturedAt)}
             />
           </div>
+
+          {hasOutcomePace ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
+              <InlineTag>
+                90-day goal:{" "}
+                {outcomesSummary.realisticTarget90d !== null
+                  ? String(outcomesSummary.realisticTarget90d)
+                  : "Not set"}
+              </InlineTag>
+              <InlineTag>
+                Weekly pace:{" "}
+                {outcomesSummary.perWeek !== null
+                  ? String(outcomesSummary.perWeek)
+                  : "Not set"}
+              </InlineTag>
+              <InlineTag>
+                Review gap:{" "}
+                {outcomesSummary.gapReviews !== null
+                  ? String(outcomesSummary.gapReviews)
+                  : "Not set"}
+              </InlineTag>
+              <Link
+                href={`/projects/${dashboard.projectId}/outcomes`}
+                className="px-3 py-2 text-sm font-semibold text-[var(--text-strong)]"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                Open outcomes page
+              </Link>
+            </div>
+          ) : null}
         </div>
 
         <div className="border-t border-[var(--border)] pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
@@ -115,46 +139,7 @@ export function OwnerHeroSection({
             </Link>
           </div>
 
-          {hasOutcomePace ? (
-            <div className="mt-5 border-t border-[var(--border)] pt-5">
-              <SectionLabel>Business impact at current pace</SectionLabel>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {paceSummary}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <InlineTag>
-                  90-day goal:{" "}
-                  {outcomesSummary.realisticTarget90d !== null
-                    ? String(outcomesSummary.realisticTarget90d)
-                    : "Not set"}
-                </InlineTag>
-                <InlineTag>
-                  Weekly pace:{" "}
-                  {outcomesSummary.perWeek !== null
-                    ? String(outcomesSummary.perWeek)
-                    : "Not set"}
-                </InlineTag>
-                <InlineTag>
-                  Review gap:{" "}
-                  {outcomesSummary.gapReviews !== null
-                    ? String(outcomesSummary.gapReviews)
-                    : "Not set"}
-                </InlineTag>
-              </div>
-              <div className="mt-4">
-                <Link
-                  href={`/projects/${dashboard.projectId}/outcomes`}
-                  className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
-                  style={{
-                    border: "1px solid var(--border)",
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  Open outcomes page
-                </Link>
-              </div>
-            </div>
-          ) : null}
+
         </div>
       </div>
 
