@@ -169,19 +169,56 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const body = (await request.json().catch(() => ({}))) as {
       status?: string;
+      completionProofNote?: string;
     };
 
     const nextStatus = body.status === "completed" ? "completed" : "open";
     const completedAt =
       nextStatus === "completed" ? new Date().toISOString() : null;
+    const completionProofNote =
+      typeof body.completionProofNote === "string"
+        ? body.completionProofNote.trim().slice(0, 500)
+        : "";
 
     const supabase = getServiceRoleSupabase();
+
+    const { data: existingTask, error: existingTaskError } = await supabase
+      .from("owner_tasks")
+      .select("task_data")
+      .eq("project_id", projectId)
+      .eq("id", taskId)
+      .single<Pick<OwnerTaskRow, "task_data">>();
+
+    if (existingTaskError) {
+      throw new Error(`Failed to load owner task proof data: ${existingTaskError.message}`);
+    }
+
+    const existingTaskData =
+      existingTask.task_data && typeof existingTask.task_data === "object"
+        ? existingTask.task_data
+        : {};
+
+    const nextTaskData =
+      nextStatus === "completed" && completionProofNote
+        ? {
+            ...existingTaskData,
+            completion_proof_note: completionProofNote,
+            completion_proof_captured_at: completedAt,
+          }
+        : nextStatus === "open"
+          ? {
+              ...existingTaskData,
+              completion_proof_note: null,
+              completion_proof_captured_at: null,
+            }
+          : existingTaskData;
 
     const { data: taskData, error: taskError } = await supabase
       .from("owner_tasks")
       .update({
         status: nextStatus,
         completed_at: completedAt,
+        task_data: nextTaskData,
       })
       .eq("project_id", projectId)
       .eq("id", taskId)
