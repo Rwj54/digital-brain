@@ -326,6 +326,20 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
       ? outcomesSummary.monthsToCloseGap
       : null;
 
+  const catchUpRealitySummary =
+    desiredTarget90d !== null && realisticTarget90d !== null
+      ? desiredTarget90d > realisticTarget90d
+        ? `Closing the full 90-day catch-up target would require about ${formatCount(desiredTarget90d)} reviews, but the current event volume supports a more realistic target of about ${formatCount(realisticTarget90d)}.`
+        : `The current event volume is strong enough to support the full 90-day catch-up target of about ${formatCount(desiredTarget90d)} reviews.`
+      : "Digital Brain needs both the catch-up target and realistic target before it can show how aggressive this review goal should be.";
+
+  const paceCeilingSummary =
+    maxReviews90d !== null && monthsToCloseGap !== null
+      ? `At the current pace ceiling, this business could add up to about ${formatCount(maxReviews90d)} reviews in 90 days, and closing the full gap would still take about ${formatCount(monthsToCloseGap)} month${monthsToCloseGap === 1 ? "" : "s"}.`
+      : maxReviews90d !== null
+        ? `At the current pace ceiling, this business could add up to about ${formatCount(maxReviews90d)} reviews in 90 days.`
+        : "Digital Brain does not yet have enough pace context to show the current ceiling clearly.";
+
   const hasEventSignals =
     typeof monthlyCustomerEvents === "number" && monthlyCustomerEvents > 0;
   const hasConversionSignal =
@@ -721,6 +735,30 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
               bg="var(--success-soft)"
               tone="var(--success)"
             />
+          </div>
+
+          <div className="mt-6 border-t border-[var(--border)] pt-6">
+            <SectionLabel>Reality check</SectionLabel>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+              {catchUpRealitySummary}
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+              {paceCeilingSummary}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <InlineTag>
+                Needed in 90 days: {formatCount(desiredTarget90d)}
+              </InlineTag>
+              <InlineTag>
+                Realistic in 90 days: {formatCount(realisticTarget90d)}
+              </InlineTag>
+              <InlineTag>
+                Ceiling in 90 days: {formatCount(maxReviews90d)}
+              </InlineTag>
+              <InlineTag>
+                Months to close: {formatCount(monthsToCloseGap)}
+              </InlineTag>
+            </div>
           </div>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
