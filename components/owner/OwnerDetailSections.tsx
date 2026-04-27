@@ -43,6 +43,16 @@ type Props = {
   onDetailTabChange: (tab: DetailTab) => void;
 };
 
+function getStepCompletionProofNote(step: RenderStep): string {
+  if (step.kind !== "task") {
+    return "";
+  }
+
+  const note = step.task.task_data?.completion_proof_note;
+
+  return typeof note === "string" ? note.trim() : "";
+}
+
 export function OwnerDetailSections({
   dashboard,
   tasksData,
@@ -811,6 +821,17 @@ export function OwnerDetailSections({
                         </dd>
                       </div>
                     </dl>
+
+                    {getStepCompletionProofNote(step) ? (
+                      <div className="mt-4 border-t border-[var(--border)] pt-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                          Completion proof
+                        </p>
+                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                          {getStepCompletionProofNote(step)}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>

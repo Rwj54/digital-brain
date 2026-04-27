@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import {
   formatPercent,
   formatStatus,
@@ -21,8 +23,14 @@ type Props = {
   steps: RenderStep[];
   tasksSummary: OwnerTasksResponse["summary"];
   savingTaskId: string | null;
-  onToggleTask: (task: OwnerTask) => void;
+  onToggleTask: (task: OwnerTask, completionProofNote?: string) => void;
 };
+
+function getCompletionProofNote(task: OwnerTask): string {
+  const note = task.task_data?.completion_proof_note;
+
+  return typeof note === "string" ? note.trim() : "";
+}
 
 function getOwnerWorkTypeLabel(taskType: string | null | undefined): string {
   if (taskType === "reviews") return "Review work";
@@ -43,6 +51,7 @@ export function OwnerActionPlanSection({
   savingTaskId,
   onToggleTask,
 }: Props) {
+  const [proofNotes, setProofNotes] = useState<Record<string, string>>({});
   const outcomesSummary = dashboard.dashboard.outcomesSummary;
   const firstStepImpactHint =
     outcomesSummary.realisticTarget90d !== null &&
@@ -77,6 +86,10 @@ export function OwnerActionPlanSection({
             const workTypeLabel = isTask
               ? getOwnerWorkTypeLabel(step.task.task_type)
               : "Suggested priority";
+            const completionProofNote = isTask
+              ? getCompletionProofNote(step.task)
+              : "";
+            const draftProofNote = isTask ? proofNotes[step.task.id] ?? "" : "";
 
             return (
               <article
@@ -143,6 +156,45 @@ export function OwnerActionPlanSection({
                     </div>
                   </dl>
 
+                  {isTask && !isCompleted ? (
+                    <div className="mt-4 border-t border-[var(--border)] pt-4">
+                      <label
+                        htmlFor={`proof-note-${step.task.id}`}
+                        className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]"
+                      >
+                        Optional completion proof
+                      </label>
+                      <textarea
+                        id={`proof-note-${step.task.id}`}
+                        value={draftProofNote}
+                        onChange={(event) =>
+                          setProofNotes((current) => ({
+                            ...current,
+                            [step.task.id]: event.target.value,
+                          }))
+                        }
+                        rows={2}
+                        maxLength={500}
+                        placeholder="Example: Sent the review request link to five recent customers."
+                        className="mt-2 w-full resize-none border border-[var(--border)] bg-white px-3 py-2 text-sm leading-6 text-[var(--text-strong)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--brand-600)]"
+                      />
+                      <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                        This gives the owner a simple record of what was done.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {isTask && isCompleted && completionProofNote ? (
+                    <div className="mt-4 border-t border-[var(--border)] pt-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                        Completion proof
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                        {completionProofNote}
+                      </p>
+                    </div>
+                  ) : null}
+
                   {index === 0 && firstStepImpactHint ? (
                     <div className="mt-4 border-t border-[var(--border)] pt-4">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
@@ -159,17 +211,26 @@ export function OwnerActionPlanSection({
                   {isTask ? (
                     <button
                       type="button"
-                      onClick={() => onToggleTask(step.task)}
+                      onClick={() => {
+                        onToggleTask(step.task, draftProofNote);
+
+                        if (!isCompleted) {
+                          setProofNotes((current) => ({
+                            ...current,
+                            [step.task.id]: "",
+                          }));
+                        }
+                      }}
                       disabled={isSaving}
-                      className="inline-flex w-full items-center justify-center px-4 py-3 text-sm font-semibold transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="inline-flex w-full items-center justify-center px-4 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
                       style={{
                         backgroundColor: isCompleted
-                          ? "var(--reference-soft)"
-                          : "var(--text-strong)",
-                        color: isCompleted ? "var(--text-strong)" : "#ffffff",
+                          ? "var(--success-soft)"
+                          : "var(--brand-700)",
+                        color: isCompleted ? "var(--success)" : "#ffffff",
                         border: isCompleted
-                          ? "1px solid var(--border)"
-                          : "1px solid var(--text-strong)",
+                          ? "1px solid var(--success)"
+                          : "1px solid var(--brand-700)",
                       }}
                     >
                       {isSaving

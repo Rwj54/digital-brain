@@ -22,7 +22,7 @@ type UseOwnerPageStateResult = {
   loading: boolean;
   savingTaskId: string | null;
   error: string;
-  toggleTask: (task: OwnerTask) => Promise<void>;
+  toggleTask: (task: OwnerTask, completionProofNote?: string) => Promise<void>;
 };
 
 export function useOwnerPageState(
@@ -108,7 +108,7 @@ export function useOwnerPageState(
   }, [projectId, refreshOwnerPageData]);
 
   const toggleTask = useCallback(
-    async (task: OwnerTask) => {
+    async (task: OwnerTask, completionProofNote?: string) => {
       if (!projectId) return;
 
       try {
@@ -124,7 +124,11 @@ export function useOwnerPageState(
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ status: nextStatus }),
+            body: JSON.stringify({
+              status: nextStatus,
+              completionProofNote:
+                nextStatus === "completed" ? completionProofNote : undefined,
+            }),
           },
         );
 
