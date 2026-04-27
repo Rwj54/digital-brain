@@ -24,6 +24,18 @@ type Props = {
   onToggleTask: (task: OwnerTask) => void;
 };
 
+function getOwnerWorkTypeLabel(taskType: string | null | undefined): string {
+  if (taskType === "reviews") return "Review work";
+  if (taskType === "activity") return "Profile activity";
+  if (taskType === "profile") return "Profile clarity";
+  if (taskType === "website") return "Website trust";
+  if (taskType === "visibility") return "Visibility work";
+  if (taskType === "authority") return "Authority work";
+  if (taskType === "competition") return "Competitive gap";
+
+  return "Owner priority";
+}
+
 export function OwnerActionPlanSection({
   dashboard,
   steps,
@@ -62,6 +74,9 @@ export function OwnerActionPlanSection({
             const isSaving = isTask && savingTaskId === step.task.id;
             const isCompleted = step.status === "completed";
             const isLast = index === steps.length - 1;
+            const workTypeLabel = isTask
+              ? getOwnerWorkTypeLabel(step.task.task_type)
+              : "Suggested priority";
 
             return (
               <article
@@ -88,6 +103,7 @@ export function OwnerActionPlanSection({
                       {step.title}
                     </h3>
                     <InlineTag tone={tone}>{formatStatus(step.status)}</InlineTag>
+                    <InlineTag>{workTypeLabel}</InlineTag>
                   </div>
 
                   <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
