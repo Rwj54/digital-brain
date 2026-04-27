@@ -177,28 +177,26 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const supabase = getServiceRoleSupabase();
 
-    const [{ data: taskData, error: taskError }, { data: allTasks, error: allTasksError }] =
-      await Promise.all([
-        supabase
-          .from("owner_tasks")
-          .update({
-            status: nextStatus,
-            completed_at: completedAt,
-          })
-          .eq("project_id", projectId)
-          .eq("id", taskId)
-          .select(TASK_SELECT)
-          .single<OwnerTaskRow>(),
-        supabase
-          .from("owner_tasks")
-          .select("id, status")
-          .eq("project_id", projectId)
-          .returns<OwnerTaskStatusRow[]>(),
-      ]);
+    const { data: taskData, error: taskError } = await supabase
+      .from("owner_tasks")
+      .update({
+        status: nextStatus,
+        completed_at: completedAt,
+      })
+      .eq("project_id", projectId)
+      .eq("id", taskId)
+      .select(TASK_SELECT)
+      .single<OwnerTaskRow>();
 
     if (taskError) {
       throw new Error(`Failed to update owner task: ${taskError.message}`);
     }
+
+    const { data: allTasks, error: allTasksError } = await supabase
+      .from("owner_tasks")
+      .select("id, status")
+      .eq("project_id", projectId)
+      .returns<OwnerTaskStatusRow[]>();
 
     if (allTasksError) {
       throw new Error(`Failed to load owner task counts: ${allTasksError.message}`);
