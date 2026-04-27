@@ -551,14 +551,6 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
                   value={topIssue}
                   helper={whyItMatters}
                 />
-                <DetailRow label="Keyword" value={keyword} />
-                <DetailRow label="Metro" value={metro} />
-                <DetailRow label="Latest rank" value={formatRank(latestRank)} />
-                <DetailRow label="Best rank" value={formatRank(bestRank)} />
-                <DetailRow
-                  label="Previous rank"
-                  value={formatRank(previousRank)}
-                />
                 <DetailRow
                   label="Last update"
                   value={formatDate(latestCapturedAt)}

@@ -49,6 +49,29 @@ export function OwnerHeroSection({
             {dashboard.dashboard.hero.supportLine}
           </p>
 
+          <div className="mt-5 grid gap-3 border-t border-[var(--border)] pt-5 sm:grid-cols-2 xl:grid-cols-5">
+            <HeaderMeta
+              label="Business"
+              value={dashboard.projectDisplayName ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Domain"
+              value={dashboard.domainDisplayValue ?? "Not set"}
+            />
+            <HeaderMeta
+              label="Location / Market"
+              value={
+                dashboard.projectLocationLabel ??
+                dashboard.projectMetro ??
+                "Not set"
+              }
+            />
+            <HeaderMeta label="Scope" value={dashboard.pageScopeLabel} />
+            <HeaderMeta
+              label="Snapshot"
+              value={formatDate(dashboard.capturedAt)}
+            />
+          </div>
         </div>
 
         <div className="border-t border-[var(--border)] pt-5 xl:border-l xl:border-t-0 xl:pl-8 xl:pt-0">
@@ -135,26 +158,6 @@ export function OwnerHeroSection({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2 xl:grid-cols-5">
-        <HeaderMeta
-          label="Business"
-          value={dashboard.projectDisplayName ?? "Not set"}
-        />
-        <HeaderMeta
-          label="Domain"
-          value={dashboard.domainDisplayValue ?? "Not set"}
-        />
-        <HeaderMeta
-          label="Location / Market"
-          value={
-            dashboard.projectLocationLabel ??
-            dashboard.projectMetro ??
-            "Not set"
-          }
-        />
-        <HeaderMeta label="Scope" value={dashboard.pageScopeLabel} />
-        <HeaderMeta label="Snapshot" value={formatDate(dashboard.capturedAt)} />
-      </div>
     </section>
   );
 }
