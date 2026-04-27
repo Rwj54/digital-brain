@@ -227,6 +227,34 @@ function buildReviewTrustSummary(input: {
   return `Saved review trust signals are present, and the current review read is ${reputationLabel}.`;
 }
 
+function buildReviewComparisonSummary(input: {
+  currentReviews: number | null;
+  topCompetitorName: string | null;
+  topCompetitorReviews: number | null;
+  gapReviews: number | null;
+}) {
+  const {
+    currentReviews,
+    topCompetitorName,
+    topCompetitorReviews,
+    gapReviews,
+  } = input;
+
+  if (currentReviews === null || topCompetitorReviews === null) {
+    return "Digital Brain does not yet have enough saved competitor review data to show a reliable local comparison.";
+  }
+
+  if (gapReviews === null || gapReviews <= 0) {
+    return topCompetitorName
+      ? `This business is already matching or exceeding ${topCompetitorName} on saved review count.`
+      : "This business is already matching or exceeding the strongest tracked competitor on saved review count.";
+  }
+
+  return topCompetitorName
+    ? `This business currently has ${formatCount(currentReviews)} reviews, while ${topCompetitorName} has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`
+    : `This business currently has ${formatCount(currentReviews)} reviews, while the strongest tracked competitor has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`;
+}
+
 export default function ProjectReviewsPage({ params }: PageProps) {
   const { projectId, dashboardContext, aiSummary, loading, error } =
     useProjectReviewsPageState(params);
@@ -321,11 +349,27 @@ export default function ProjectReviewsPage({ params }: PageProps) {
       : "Saved rating is not available yet.",
   ]).slice(0, 8);
 
+  const currentReviewsComparison =
+    dashboardContext?.dashboard.outcomesSummary.currentReviews ?? totalReviews ?? null;
+  const topCompetitorName =
+    dashboardContext?.dashboard.outcomesSummary.topCompetitorName ?? null;
+  const topCompetitorReviews =
+    dashboardContext?.dashboard.outcomesSummary.topCompetitorReviews ?? null;
+  const reviewGap =
+    dashboardContext?.dashboard.outcomesSummary.gapReviews ?? null;
+
   const reviewTrustSummary = buildReviewTrustSummary({
     totalReviews,
     rating,
     hasReviewSignals,
     reputationLabel,
+  });
+
+  const reviewComparisonSummary = buildReviewComparisonSummary({
+    currentReviews: currentReviewsComparison,
+    topCompetitorName,
+    topCompetitorReviews,
+    gapReviews: reviewGap,
   });
 
   return (
@@ -443,6 +487,29 @@ export default function ProjectReviewsPage({ params }: PageProps) {
               <InlineTag>Rating: {formatRating(rating)}</InlineTag>
               <InlineTag>Signals present: {boolLabel(hasReviewSignals)}</InlineTag>
               <InlineTag>Review read: {reputationLabel}</InlineTag>
+            </div>
+
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <SectionLabel>How this compares locally</SectionLabel>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                {reviewComparisonSummary}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <InlineTag>
+                  Your reviews: {formatCount(currentReviewsComparison)}
+                </InlineTag>
+                <InlineTag>
+                  Strongest competitor:{" "}
+                  {topCompetitorName
+                    ? topCompetitorReviews !== null
+                      ? `${topCompetitorName} (${formatCount(topCompetitorReviews)})`
+                      : topCompetitorName
+                    : "Not set"}
+                </InlineTag>
+                <InlineTag>
+                  Review gap: {formatCount(reviewGap)}
+                </InlineTag>
+              </div>
             </div>
           </div>
         </section>
