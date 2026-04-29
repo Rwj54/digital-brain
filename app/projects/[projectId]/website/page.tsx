@@ -303,23 +303,26 @@ export default function ProjectWebsitePage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether Google can clearly connect this business to its
-                website.
+                Make the website clearly match the business customers and Google
+                see.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the website read for this business. It shows
-                whether the website URL, domain, and brand name are clear enough
-                for Digital Brain to trust the website connection.
+                This page checks whether the website, domain, business name, and
+                location signals are clear enough to support local visibility and
+                customer trust.
               </p>
             </div>
 
             <div className="xl:pl-8">
               <SectionLabel>What to do now</SectionLabel>
               <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {websiteSummary.nextAction.title}
+                Check that the business name, service, location, and contact path
+                are easy to find.
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {websiteSummary.nextAction.reason}
+                The website should quickly tell customers and Google who the
+                business is, what it does, where it serves customers, and how to
+                take the next step.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <InlineTag
@@ -450,25 +453,27 @@ export default function ProjectWebsitePage({ params }: PageProps) {
               The clearest next website move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the main website identity problem first. Once the
-              website, domain, and brand anchor are clear, later website work
-              becomes more trustworthy.
+              Start by making sure the website clearly says who the business is,
+              what it does, where it serves customers, and how people can take
+              the next step.
             </p>
 
             <div className="mt-6">
               {[
                 {
-                  title: websiteSummary.nextAction.title,
-                  detail: websiteSummary.nextAction.reason,
-                },
-                {
-                  title: websiteSummary.topIssue,
-                  detail: websiteSummary.whyItMatters,
-                },
-                {
-                  title: "Keep website identity consistent everywhere",
+                  title: "Make the business identity obvious on the website",
                   detail:
-                    "Use the same website, brand naming, and domain anchor across the project, business profile, and website-facing work.",
+                    "The website should clearly show the business name, main service, location or market, and the best way for a customer to contact the business.",
+                },
+                {
+                  title: "Match the website to the Google Business Profile",
+                  detail:
+                    "The business name, website domain, service language, and location signals should agree with what Google sees in the Business Profile.",
+                },
+                {
+                  title: "Keep the contact path easy to find",
+                  detail:
+                    "Customers should not have to hunt for the phone number, contact form, address, service area, or next step.",
                 },
               ].map((item, index) => (
                 <article
@@ -502,6 +507,33 @@ export default function ProjectWebsitePage({ params }: PageProps) {
                   </div>
                 </article>
               ))}
+            </div>
+
+            <div className="mt-8 border-t border-[var(--border)] pt-6">
+              <SectionLabel>Website clarity checklist</SectionLabel>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+                These are the owner-friendly checks that make the website easier
+                for customers and Google to understand.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {[
+                  "Business name is easy to find.",
+                  "Main service is clear near the top of the page.",
+                  "City, market, or service area is visible.",
+                  "Phone number or contact path is obvious.",
+                  "Website wording matches the Google Business Profile.",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="border-t border-[var(--border)] pt-4"
+                  >
+                    <p className="text-sm font-semibold leading-6 text-[var(--text-strong)]">
+                      {item}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
