@@ -327,14 +327,14 @@ export default function ProjectReviewsPage({ params }: PageProps) {
 
   const nextActionTitle =
     hasReviewSignals && totalReviews !== null && totalReviews >= 25
-      ? "Keep review growth steady and protect rating quality"
-      : "Strengthen review growth and trust signals";
+      ? "Get consistent 5-star reviews"
+      : "Start asking happy customers for reviews";
 
   const nextActionWho = "Owner or team member";
   const nextActionDifficulty = hasReviewSignals ? "Medium" : "Easy";
   const nextActionReason = hasReviewSignals
-    ? "A stronger and steadier review base helps reinforce trust, improves reputation resilience, and supports better future visibility guidance."
-    : "The fastest way to improve reputation footing is to grow review count and strengthen review quality in a steady, repeatable way.";
+    ? "Consistent 5-star reviews protect the rating, build customer trust, and show Google this is an active, growing business."
+    : "The fastest way to improve reputation footing is to ask happy customers for reviews in a steady, repeatable way.";
 
   const evidence = dedupeEvidence([
     ...(Array.isArray(aiSummary.evidence) ? aiSummary.evidence : []),
@@ -365,6 +365,8 @@ export default function ProjectReviewsPage({ params }: PageProps) {
     reputationLabel,
   });
 
+  const hasReliableReviewComparison =
+    currentReviewsComparison !== null && topCompetitorReviews !== null;
   const reviewComparisonSummary = buildReviewComparisonSummary({
     currentReviews: currentReviewsComparison,
     topCompetitorName,
@@ -381,13 +383,13 @@ export default function ProjectReviewsPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether this business has enough review trust to support a
-                stronger reputation foundation.
+                Build steady 5-star review growth that strengthens trust with
+                customers and Google.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the reviews read for this business. It
-                shows whether saved review count, rating, and review presence
-                are strong enough to support trust for the business.
+                This page shows whether the business has enough review trust,
+                what review signals are already helping, and what to do next to
+                keep review growth active.
               </p>
             </div>
 
@@ -492,23 +494,95 @@ export default function ProjectReviewsPage({ params }: PageProps) {
             <div className="mt-5 border-t border-[var(--border)] pt-5">
               <SectionLabel>How this compares locally</SectionLabel>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
-                {reviewComparisonSummary}
+                {hasReliableReviewComparison
+                  ? reviewComparisonSummary
+                  : "Digital Brain has this business's saved review count, but it does not yet have enough reliable competitor review data to make a local review-gap comparison."}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <InlineTag>
-                  Your reviews: {formatCount(currentReviewsComparison)}
-                </InlineTag>
-                <InlineTag>
-                  Strongest competitor:{" "}
-                  {topCompetitorName
-                    ? topCompetitorReviews !== null
+              {hasReliableReviewComparison ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InlineTag>
+                    Your reviews: {formatCount(currentReviewsComparison)}
+                  </InlineTag>
+                  <InlineTag>
+                    Strongest competitor:{" "}
+                    {topCompetitorName
                       ? `${topCompetitorName} (${formatCount(topCompetitorReviews)})`
-                      : topCompetitorName
-                    : "Not set"}
-                </InlineTag>
-                <InlineTag>
-                  Review gap: {formatCount(reviewGap)}
-                </InlineTag>
+                      : formatCount(topCompetitorReviews)}
+                  </InlineTag>
+                  <InlineTag>
+                    Review gap: {formatCount(reviewGap)}
+                  </InlineTag>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <InlineTag>Your reviews: {formatCount(currentReviewsComparison)}</InlineTag>
+                  <InlineTag>Competitor review comparison: Not ready yet</InlineTag>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <SectionLabel>Review request starter plan</SectionLabel>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
+                Start with recent happy customers. Ask soon after the order,
+                make the review link easy to use, and track that the request
+                was sent. The goal is not a one-time spike. The goal is a steady
+                habit that creates fresh trust signals over time.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                <div className="border-t border-[var(--border)] pt-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Step 1
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                    Pick recent happy customers
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                    Start with people who already had a good experience and are
+                    most likely to respond.
+                  </p>
+                </div>
+
+                <div className="border-t border-[var(--border)] pt-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Step 2
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                    Send a simple review link
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                    Keep the request short, personal, and easy to complete from
+                    a phone.
+                  </p>
+                </div>
+
+                <div className="border-t border-[var(--border)] pt-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    Step 3
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                    Mark the task complete
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+                    Record what was sent in the owner task proof note so the
+                    business has a simple progress record.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href={`/projects/${projectId}/owner#next-steps`}
+                  className="px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  style={{
+                    border: "1px solid var(--text-strong)",
+                    backgroundColor: "var(--text-strong)",
+                    color: "#ffffff",
+                  }}
+                >
+                  Open owner action plan
+                </Link>
               </div>
             </div>
           </div>
@@ -528,17 +602,19 @@ export default function ProjectReviewsPage({ params }: PageProps) {
             <div className="mt-6">
               {[
                 {
-                  title: nextActionTitle,
-                  detail: nextActionReason,
-                },
-                {
-                  title: topIssue,
-                  detail: whyItMatters,
-                },
-                {
-                  title: "Keep review growth active and consistent",
+                  title: "Get consistent 5-star reviews",
                   detail:
-                    "A steady review flow and strong rating quality create a more durable trust foundation than occasional review spikes.",
+                    "Consistent 5-star reviews protect the rating, build customer trust, and show Google this is an active, growing business.",
+                },
+                {
+                  title: "Set up a simple review request program",
+                  detail:
+                    "Ask happy customers for a review soon after their order or visit. The goal is to make review requests a repeatable habit, not a one-time push.",
+                },
+                {
+                  title: "Build steady review momentum",
+                  detail:
+                    "Getting one or two new reviews every few days or each week builds stronger rating quality and shows customers that the business cares about their experience.",
                 },
               ].map((item, index) => (
                 <article
