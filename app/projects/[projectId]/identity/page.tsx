@@ -338,11 +338,8 @@ export default function ProjectIdentityPage({ params }: PageProps) {
   let topIssue = "No major identity mismatch is visible from the saved data.";
   let whyItMatters =
     "When business naming, category, and website identity line up, Digital Brain can trust the business foundation more confidently.";
-  let nextActionTitle = websiteSummary.nextAction.title;
   let nextActionWho = websiteSummary.nextAction.whoShouldDoIt;
   let nextActionDifficulty = websiteSummary.nextAction.difficulty;
-  let nextActionReason = websiteSummary.nextAction.reason;
-
   if (
     !websiteSummary.hasSiteUrl ||
     !websiteSummary.hasTargetDomain ||
@@ -354,10 +351,8 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       "The website and domain anchor still need attention before the identity foundation feels stable.";
     topIssue = websiteSummary.topIssue;
     whyItMatters = websiteSummary.whyItMatters;
-    nextActionTitle = websiteSummary.nextAction.title;
     nextActionWho = websiteSummary.nextAction.whoShouldDoIt;
     nextActionDifficulty = websiteSummary.nextAction.difficulty;
-    nextActionReason = websiteSummary.nextAction.reason;
   } else if (hasNamingInputs && namingAligned === false) {
     identityRead = "Identity foundation needs business-name alignment";
     plainLanguageSummary =
@@ -372,10 +367,6 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
         : "When names do not line up, machines can be less confident they are looking at the same business.";
-    nextActionTitle =
-      aiSummary.nextAction && typeof aiSummary.nextAction.title === "string"
-        ? aiSummary.nextAction.title
-        : "Align the business name across the project and GBP";
     nextActionWho =
       aiSummary.nextAction &&
       typeof aiSummary.nextAction.whoShouldDoIt === "string"
@@ -389,10 +380,6 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       typeof aiSummary.nextAction.difficulty === "string"
         ? aiSummary.nextAction.difficulty
         : "Easy";
-    nextActionReason =
-      aiSummary.nextAction && typeof aiSummary.nextAction.reason === "string"
-        ? aiSummary.nextAction.reason
-        : "Clear naming alignment reduces identity confusion.";
   } else if (hasCategoryInputs && categoryAligned === false) {
     identityRead = "Identity foundation needs category alignment";
     plainLanguageSummary =
@@ -407,10 +394,6 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
         : "Category inconsistency can weaken machine understanding of what the business actually does.";
-    nextActionTitle =
-      aiSummary.nextAction && typeof aiSummary.nextAction.title === "string"
-        ? aiSummary.nextAction.title
-        : "Review category wording across the project and GBP";
     nextActionWho =
       aiSummary.nextAction &&
       typeof aiSummary.nextAction.whoShouldDoIt === "string"
@@ -424,10 +407,6 @@ export default function ProjectIdentityPage({ params }: PageProps) {
       typeof aiSummary.nextAction.difficulty === "string"
         ? aiSummary.nextAction.difficulty
         : "Easy";
-    nextActionReason =
-      aiSummary.nextAction && typeof aiSummary.nextAction.reason === "string"
-        ? aiSummary.nextAction.reason
-        : "Consistent category wording gives Digital Brain a cleaner business identity anchor.";
   }
 
   const namingAlignmentLabel = alignmentLabel(
@@ -456,6 +435,11 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     ...websiteSummary.evidence,
   ]).slice(0, 8);
 
+  const identityHeadlineBusinessName =
+    textValue(gbpName) !== "Not set"
+      ? textValue(gbpName)
+      : dashboardContext?.projectDisplayName ?? "this business";
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
@@ -465,24 +449,25 @@ export default function ProjectIdentityPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether this business identity lines up across the project,
-                GBP, website, and domain foundation.
+                Make sure {identityHeadlineBusinessName} looks like the same
+                business everywhere.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the identity read for this business. It shows whether
-                the business name, category, website, and domain anchors are
-                aligned enough for Digital Brain to trust the business
-                foundation clearly.
+                This page checks whether the business name, category, website,
+                and Google Business Profile details match clearly enough for
+                customers, Google, and AI systems to trust the business.
               </p>
             </div>
 
             <div className="xl:pl-8">
               <SectionLabel>What to do now</SectionLabel>
               <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {nextActionTitle}
+                Check that the name, category, website, and Google profile all
+                match.
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {nextActionReason}
+                When the public details tell the same story, customers and
+                Google have less confusion about which business they are seeing.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <InlineTag
@@ -561,28 +546,30 @@ export default function ProjectIdentityPage({ params }: PageProps) {
           <section>
             <SectionLabel>What to fix first</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-              The clearest next identity move
+              The clearest next business identity move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
               Start with the biggest mismatch first. Once the business name,
-              category, website, and domain anchors line up, later guidance
-              becomes more trustworthy for owners.
+              category, website, and Google profile agree, the rest of the
+              guidance becomes easier to trust.
             </p>
 
             <div className="mt-6">
               {[
                 {
-                  title: nextActionTitle,
-                  detail: nextActionReason,
-                },
-                {
-                  title: topIssue,
-                  detail: whyItMatters,
-                },
-                {
-                  title: "Keep all business identity anchors consistent",
+                  title: "Make the business name match everywhere",
                   detail:
-                    "Use the same business naming, category wording, website URL, and domain references across the project, website, and GBP-related work.",
+                    "The name customers see on the website should match the name Google sees in the Business Profile and project settings.",
+                },
+                {
+                  title: "Make the category and service language clear",
+                  detail:
+                    "The business category and service wording should make it obvious what the business does and where it serves customers.",
+                },
+                {
+                  title: "Keep the website and Google profile connected",
+                  detail:
+                    "The website URL, domain, business name, and contact details should all point to the same business.",
                 },
               ].map((item, index) => (
                 <article
@@ -633,7 +620,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                   helper={whyItMatters}
                 />
                 <DetailRow
-                  label="GBP business name"
+                  label="Google business name"
                   value={textValue(gbpName)}
                 />
                 <DetailRow
@@ -641,7 +628,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                   value={textValue(projectBrandName)}
                 />
                 <DetailRow
-                  label="GBP primary category"
+                  label="Google primary category"
                   value={textValue(primaryCategory)}
                 />
                 <DetailRow
@@ -745,17 +732,17 @@ export default function ProjectIdentityPage({ params }: PageProps) {
                 <DetailRow
                   label="Identity read"
                   value={identityRead}
-                  helper="This is the current identity read across saved project, website, and GBP-alignment signals."
+                  helper="This is the current identity read across the saved project, website, and Google Business Profile details."
                 />
                 <DetailRow
                   label="Who should do it"
                   value={nextActionWho}
-                  helper="This is who should handle the next identity-alignment fix."
+                  helper="This is who should handle the next business identity fix."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={nextActionDifficulty}
-                  helper="This shows how hard the next identity move should be."
+                  helper="This shows how hard the next business identity move should be."
                 />
               </div>
             </section>
