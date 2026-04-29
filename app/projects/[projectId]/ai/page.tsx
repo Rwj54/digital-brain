@@ -273,11 +273,6 @@ export default function ProjectAiPage({ params }: PageProps) {
     "Machines need clear business identity and trust signals to understand this business well.",
   );
 
-  const nextActionTitle = textValue(
-    aiSummary.nextAction?.title,
-    "Review the AI identity foundation",
-  );
-
   const nextActionWho = textValue(
     aiSummary.nextAction?.whoShouldDoIt ?? aiSummary.nextAction?.who_should_do_it,
     "Owner or marketing lead",
@@ -286,11 +281,6 @@ export default function ProjectAiPage({ params }: PageProps) {
   const nextActionDifficulty = textValue(
     aiSummary.nextAction?.difficulty,
     "Easy",
-  );
-
-  const nextActionReason = textValue(
-    aiSummary.nextAction?.reason,
-    "Strengthening the business identity foundation improves machine understanding and later AI visibility guidance.",
   );
 
   const evidence = Array.isArray(aiSummary.evidence)
@@ -336,6 +326,11 @@ export default function ProjectAiPage({ params }: PageProps) {
     aiLabel,
   });
 
+  const aiHeadlineBusinessName =
+    businessName !== "Not set"
+      ? businessName
+      : dashboardContext?.projectDisplayName ?? "this business";
+
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
@@ -345,24 +340,26 @@ export default function ProjectAiPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether Digital Brain has enough identity and trust detail
-                to read this business clearly for machine understanding.
+                Help Google and AI systems clearly understand{" "}
+                {aiHeadlineBusinessName}.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the AI read for this business. It shows
-                whether the saved business identity, category clarity, and trust
-                signals are strong enough for a reliable early machine-readiness
-                view.
+                This page checks whether the business name, category, website,
+                and review trust signals are clear enough for search and AI
+                systems to understand who the business is and why customers can
+                trust it.
               </p>
             </div>
 
             <div className="xl:pl-8">
               <SectionLabel>What to do now</SectionLabel>
               <p className="mt-3 text-xl font-semibold leading-8 text-[var(--text-strong)]">
-                {nextActionTitle}
+                Check that the business name, category, website, and reviews all
+                tell the same story.
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                {nextActionReason}
+                Google and AI systems can understand the business more easily
+                when the public details are clear, consistent, and trustworthy.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <InlineTag
@@ -438,7 +435,7 @@ export default function ProjectAiPage({ params }: PageProps) {
         </section>
 
         <section className="border-b border-[var(--border)] py-6">
-          <SectionLabel>What the saved AI identity signals show</SectionLabel>
+          <SectionLabel>What the saved business signals show</SectionLabel>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
             {aiIdentitySummary}
           </p>
@@ -456,28 +453,30 @@ export default function ProjectAiPage({ params }: PageProps) {
           <section>
             <SectionLabel>What to fix first</SectionLabel>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-strong)]">
-              The clearest next AI visibility move
+              The clearest next AI readiness move
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
-              Start with the main AI identity or trust problem first. Once the
-              business name, category, and trust signals are clear, later AI
-              visibility guidance becomes more reliable.
+              Start with the clearest business identity or trust issue first.
+              When the business name, category, website, and reviews all agree,
+              search and AI systems have a stronger picture of the business.
             </p>
 
             <div className="mt-6">
               {[
                 {
-                  title: nextActionTitle,
-                  detail: nextActionReason,
-                },
-                {
-                  title: topIssue,
-                  detail: whyItMatters,
-                },
-                {
-                  title: "Keep the business identity consistent everywhere",
+                  title: "Make the business identity clear everywhere",
                   detail:
-                    "Use the same business naming, category wording, and supporting trust signals across the website, project settings, and GBP-facing work.",
+                    "Use the same business name, category, website, and location language across the Google Business Profile, website, and project settings.",
+                },
+                {
+                  title: "Strengthen trust signals customers can see",
+                  detail:
+                    "Reviews, rating quality, clear service language, and a matching website help customers, Google, and AI systems trust the business more easily.",
+                },
+                {
+                  title: "Keep website and Google profile language aligned",
+                  detail:
+                    "The website and Google Business Profile should describe the business in the same plain language so there is less confusion about what the business does.",
                 },
               ].map((item, index) => (
                 <article
@@ -514,7 +513,7 @@ export default function ProjectAiPage({ params }: PageProps) {
             </div>
 
             <div className="mt-8 border-t border-[var(--border)] pt-6">
-              <SectionLabel>AI details</SectionLabel>
+              <SectionLabel>AI readiness details</SectionLabel>
 
               <div className="mt-4">
                 <DetailRow
@@ -635,12 +634,12 @@ export default function ProjectAiPage({ params }: PageProps) {
                 <DetailRow
                   label="Who should do it"
                   value={nextActionWho}
-                  helper="This is who should handle the next AI identity or trust fix."
+                  helper="This is who should handle the next business clarity or trust fix."
                 />
                 <DetailRow
                   label="Difficulty"
                   value={nextActionDifficulty}
-                  helper="This shows how hard the next AI visibility move should be."
+                  helper="This shows how hard the next AI readiness move should be."
                 />
               </div>
             </section>
