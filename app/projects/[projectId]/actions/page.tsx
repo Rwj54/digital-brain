@@ -354,6 +354,9 @@ export default function ActionsPage({ params }: PageProps) {
     actionsRow?.captured_at ?? dashboardContext?.capturedAt ?? null,
   );
 
+  const actionsHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   const nextMoves =
     actionRead.nextMoves.length > 0
       ? actionRead.nextMoves
@@ -370,7 +373,7 @@ export default function ActionsPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See what to work on next for this business.
+                See what to work on next for {actionsHeadlineBusinessName}.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
                 This page turns the current action plan into a plain-English
