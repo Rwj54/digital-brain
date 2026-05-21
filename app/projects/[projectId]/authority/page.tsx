@@ -218,6 +218,9 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
     refreshPage,
   } = useProjectAuthorityPageState(params);
 
+  const authorityHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
@@ -239,12 +242,13 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See how strong this business looks to Google right now.
+                See how strong {authorityHeadlineBusinessName} looks to Google
+                right now.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
                 Authority shows how much trust, completeness, and competitive
-                strength this business has in the local market. Use this page to
-                see where the business stands and what to improve next.
+                strength the business has in the local market. Use this page to
+                see where it stands and what to improve next.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
