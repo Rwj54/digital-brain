@@ -309,18 +309,20 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     visibilitySummary.keyword.trim().length > 0;
   const isSetupBlocked = !hasTrackedKeyword;
   const isTrackingInactive = hasTrackedKeyword && !hasActiveKeyword;
+  const visibilityHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
 
   const heroHeadline = isSetupBlocked
-    ? "Set one tracked search before visibility can be measured clearly."
+    ? `Set one tracked search for ${visibilityHeadlineBusinessName} before visibility can be measured clearly.`
     : isTrackingInactive
-      ? "Finish tracked-search activation before visibility can be measured clearly."
-      : "See whether this business has real local ranking footing in the market that matters most.";
+      ? `Finish tracked-search activation for ${visibilityHeadlineBusinessName} before visibility can be measured clearly.`
+      : `See whether ${visibilityHeadlineBusinessName} has real local ranking footing in the market that matters most.`;
 
   const heroSupportLine = isSetupBlocked
-    ? "This business does not have a tracked keyword and market yet, so Digital Brain cannot build a reliable visibility read."
+    ? "This project does not have a tracked keyword and market yet, so Digital Brain cannot build a reliable visibility read."
     : isTrackingInactive
-      ? "This business has a saved tracked search, but tracking is not active yet, so the visibility read is still in setup mode."
-      : "This page shows the visibility read for this business. It shows the tracked keyword, current ranking footing, and the clearest next move to strengthen local visibility.";
+      ? "This project has a saved tracked search, but tracking is not active yet, so the visibility read is still in setup mode."
+      : "This page shows the tracked keyword, current ranking footing, and the clearest next move to strengthen local visibility.";
 
   const trackingStatus = isSetupBlocked
     ? "Not configured"
