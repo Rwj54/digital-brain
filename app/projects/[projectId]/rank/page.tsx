@@ -160,6 +160,9 @@ export default function RankPage({ params }: PageProps) {
     summary?.latestCapturedAt ?? dashboardContext?.capturedAt ?? null,
   );
 
+  const rankHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
@@ -181,7 +184,7 @@ export default function RankPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See where this business is showing up in Google.
+                See where {rankHeadlineBusinessName} is showing up in Google.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
                 This page turns ranking data into a plain-language visibility
