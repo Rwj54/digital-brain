@@ -11,6 +11,7 @@ type Props = {
 
 export function OwnerHealthMarkersSection({ dashboard }: Props) {
   const outcomesSummary = dashboard.dashboard.outcomesSummary;
+  const outcomesBusinessName = dashboard.projectDisplayName ?? "the business";
   const hasOutcomeSnapshot =
     outcomesSummary.realisticTarget90d !== null ||
     outcomesSummary.perWeek !== null ||
@@ -20,8 +21,8 @@ export function OwnerHealthMarkersSection({ dashboard }: Props) {
     outcomesSummary.realisticTarget90d !== null &&
     outcomesSummary.perWeek !== null
       ? outcomesSummary.gapReviews !== null
-        ? `At the current pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week, against a current gap of ${outcomesSummary.gapReviews}.`
-        : `At the current pace, this business can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week.`
+        ? `At the current pace, ${outcomesBusinessName} can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week, against a current gap of ${outcomesSummary.gapReviews}.`
+        : `At the current pace, ${outcomesBusinessName} can likely generate about ${outcomesSummary.realisticTarget90d} reviews in 90 days, or roughly ${outcomesSummary.perWeek} per week.`
       : "The owner now has a simple business-impact pace tied to current visibility work.";
 
   return (
