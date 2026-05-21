@@ -528,6 +528,8 @@ export default function CompetitorsPage() {
   }
 
   const businessValue = dashboardContext?.projectDisplayName ?? "Not set";
+  const competitorHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
   const domainValue = dashboardContext?.domainDisplayValue ?? "Not set";
   const locationValue =
     dashboardContext?.projectLocationLabel ?? project?.target_metro ?? "Not set";
@@ -553,11 +555,13 @@ export default function CompetitorsPage() {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See who is setting the pace in your market.
+                See who {competitorHeadlineBusinessName} is competing against in
+                this market.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows which local businesses appear strongest right now, which competitor
-                is setting the current benchmark, and how fast the market seems to be moving.
+                This page shows which local businesses appear strongest right now,
+                which competitor is setting the current benchmark, and how fast
+                the market seems to be moving.
               </p>
             </div>
 
