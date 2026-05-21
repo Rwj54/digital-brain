@@ -452,6 +452,9 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
     }
   }
 
+  const outcomesHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   const evidence = dedupeEvidence([
     hasEventSignals
       ? `Monthly customer events are currently ${formatCount(monthlyCustomerEvents)}.`
@@ -483,13 +486,12 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
           <div className="mt-4 grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
             <div>
               <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-[var(--text-strong)] sm:text-[3.1rem] sm:leading-[1.02]">
-                See whether visibility work is starting to connect to real
-                business outcomes.
+                See whether visibility work is starting to create real business
+                outcomes for {outcomesHeadlineBusinessName}.
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--text-body)] sm:text-[17px]">
-                This page shows the outcomes read for this business. It shows whether
-                customer-event and conversion signals are strong enough to help
-                explain business impact over time.
+                This page shows whether customer-event and conversion signals are
+                strong enough to help explain business impact over time.
               </p>
             </div>
 
