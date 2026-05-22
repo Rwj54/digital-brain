@@ -370,7 +370,7 @@ function buildAuthorityFallback(authority: AuthorityRow | null): OwnerPriority[]
       {
         title: "Review your top local SEO priorities",
         plain_language_reason:
-          "Digital Brain does not yet have enough owner-ready task data for this project.",
+          "Digital Brain needs enough owner-ready task data for this project.",
         why_now: "This project needs an initial owner priority snapshot.",
         expected_benefit: "A clearer next-step plan for improving local visibility.",
         who_should_do_it: "owner",
