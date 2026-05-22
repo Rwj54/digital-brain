@@ -210,7 +210,7 @@ function buildCompetitorRead(
         "The benchmark competitor is gaining reviews quickly, so this market likely needs faster trust-building and stronger ongoing activity.",
       nextMoves: [
         "Treat review growth as a near-term priority.",
-        "Compare your business against the benchmark group, not just one competitor.",
+        "Compare the target business against the benchmark group, not just one competitor.",
         "Re-check discovery often enough to catch fast market changes.",
       ],
     };
@@ -640,7 +640,7 @@ export default function CompetitorsPage() {
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
               These competitors define the current local standard. Use them to judge how much trust,
-              activity, and visibility work your business still needs.
+              activity, and visibility work {competitorHeadlineBusinessName} still needs.
             </p>
 
             <div className="mt-6">
