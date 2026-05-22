@@ -453,8 +453,8 @@ export default function ActionsPage({ params }: PageProps) {
               {actionsHeadlineBusinessName} does not have a saved action plan yet.
               Once the next refresh completes, this page will become a clearer working
               order for what to do first. Until then, use the centers below to
-              check identity clarity, reviews, local visibility, website and
-              domain footing, AI visibility readiness, and early outcomes.
+              check identity clarity, reviews, local visibility, website
+              strength, AI visibility, and early outcomes.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
