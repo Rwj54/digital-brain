@@ -288,7 +288,7 @@ export function OwnerDetailSections({
                       ? `${aiReadinessScore} / 100`
                       : "Not set"
                   }
-                  helper="Owner-facing machine-readiness footing based on saved GBP and project identity facts."
+                  helper="Owner-facing AI readiness read based on saved Google Business Profile and project identity facts."
                 />
                 <DetailRow
                   label="Plain-English read"
@@ -381,7 +381,7 @@ export function OwnerDetailSections({
                   AI navigation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
-                  Open the AI page for the machine-readiness read, supporting evidence, and next AI actions.
+                  Open the AI page for the AI readiness read, supporting evidence, and next AI actions.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
