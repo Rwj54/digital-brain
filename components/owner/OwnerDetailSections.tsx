@@ -271,12 +271,12 @@ export function OwnerDetailSections({
                 AI visibility
               </p>
               <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-strong)]">
-                Machine-readiness signals
+                AI readiness signals
               </h3>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
                 This is the owner-facing evidence layer for AI visibility. It
                 focuses on whether the business identity, category clarity, and
-                review signals give machines enough confidence to understand the
+                review signals help Google and AI systems clearly understand the
                 business.
               </p>
 
