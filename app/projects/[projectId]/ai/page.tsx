@@ -268,9 +268,12 @@ export default function ProjectAiPage({ params }: PageProps) {
     typeof aiSummary.topIssue === "string" ? aiSummary.topIssue : null,
   );
 
+  const aiHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   const whyItMatters = textValue(
     typeof aiSummary.whyItMatters === "string" ? aiSummary.whyItMatters : null,
-    "Machines need clear business identity and trust signals to understand this business well.",
+    `Machines need clear business identity and trust signals to understand ${aiHeadlineBusinessName} well.`,
   );
 
   const nextActionWho = textValue(
@@ -326,10 +329,6 @@ export default function ProjectAiPage({ params }: PageProps) {
     aiLabel,
   });
 
-  const aiHeadlineBusinessName =
-    businessName !== "Not set"
-      ? businessName
-      : dashboardContext?.projectDisplayName ?? "this business";
 
   return (
     <main className="min-h-screen bg-[var(--app-bg)] px-4 py-6 text-[var(--text-strong)] sm:px-6 sm:py-8">

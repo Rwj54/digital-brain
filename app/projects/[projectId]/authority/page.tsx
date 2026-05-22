@@ -370,8 +370,8 @@ export default function ProjectAuthorityPage({ params }: PageProps) {
             </h2>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--text-body)]">
               Begin with the high-priority work first. These are the actions
-              most likely to improve how strong and trustworthy this business
-              looks in its market.
+              most likely to improve how strong and trustworthy{" "}
+              {authorityHeadlineBusinessName} looks in its market.
             </p>
 
             <div className="mt-6">
