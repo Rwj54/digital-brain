@@ -341,7 +341,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
       ? `At the current pace ceiling, ${outcomesHeadlineBusinessName} could add up to about ${formatCount(maxReviews90d)} reviews in 90 days, and closing the full gap would still take about ${formatCount(monthsToCloseGap)} month${monthsToCloseGap === 1 ? "" : "s"}.`
       : maxReviews90d !== null
         ? `At the current pace ceiling, ${outcomesHeadlineBusinessName} could add up to about ${formatCount(maxReviews90d)} reviews in 90 days.`
-        : "Digital Brain does not yet have enough pace context to show the current ceiling clearly.";
+        : "Digital Brain needs more saved pace details to show the current ceiling clearly.";
 
   const hasEventSignals =
     typeof monthlyCustomerEvents === "number" && monthlyCustomerEvents > 0;
@@ -527,7 +527,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
                     Open outcomes setup
                   </Link>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--text-body)]">
-                    This project is still missing the owner’s monthly customer count or
+                    This project needs the owner’s monthly customer count or
                     review conversion rate. Use the editable dashboard to add those
                     details so this outcomes center can explain real business impact
                     more clearly.

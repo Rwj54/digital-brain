@@ -706,7 +706,7 @@ export function OwnerDetailSections({
                 {showOutcomesSetupCta && outcomesSetupHref ? (
                   <div className="mt-4">
                     <p className="text-sm leading-6 text-[var(--text-body)]">
-                      This project is still missing the owner’s monthly customer count or
+                      This project needs the owner’s monthly customer count or
                       review conversion rate. Use the editable dashboard to add those
                       inputs so the owner outcomes read becomes more useful.
                     </p>
