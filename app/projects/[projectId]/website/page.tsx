@@ -173,26 +173,26 @@ function buildWebsiteAnchorSummary(input: {
   } = input;
 
   if (!siteUrl) {
-    return "Digital Brain does not have a saved website URL yet, so website identity is still missing its core anchor.";
+    return "Digital Brain does not have a saved website URL yet, so the website connection is not set up yet.";
   }
 
   if (siteUrl && !targetDomain && derivedSiteDomain) {
-    return `A website URL is saved and points to ${derivedSiteDomain}, but the target domain is not explicitly locked yet.`;
+    return `A website URL is saved and points to ${derivedSiteDomain}, but the main domain still needs to be confirmed.`;
   }
 
   if (siteUrl && targetDomain && derivedSiteDomain && !hasDomainAlignment) {
-    return `The saved website URL points to ${derivedSiteDomain}, while the target domain is ${targetDomain}. Those two anchors still need to match exactly.`;
+    return `The saved website URL points to ${derivedSiteDomain}, while the target domain is ${targetDomain}. Those two website details still need to match.`;
   }
 
   if (siteUrl && targetDomain && !targetBrandName) {
-    return `The website and domain anchor are mostly set, but the saved brand name is still missing. The current website read is ${websiteReadinessLabel}.`;
+    return `The website and domain are mostly set, but the saved brand name still needs to be added. The current website read is ${websiteReadinessLabel}.`;
   }
 
   if (siteUrl && targetDomain && targetBrandName && hasDomainAlignment) {
-    return `The website URL, domain anchor, and brand name are all saved and aligned clearly enough for a strong website identity read.`;
+    return `The website URL, domain, and brand name are all saved and aligned clearly enough for a strong website identity read.`;
   }
 
-  return `The saved website anchor is partially set, and the current website read is ${websiteReadinessLabel}.`;
+  return `The saved website connection is partially set, and the current website read is ${websiteReadinessLabel}.`;
 }
 
 function buildWebsiteAlignmentSummary(input: {
