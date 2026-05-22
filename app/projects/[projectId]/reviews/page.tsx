@@ -205,23 +205,24 @@ function buildReviewTrustSummary(input: {
   rating: number | null;
   hasReviewSignals: boolean;
   reputationLabel: string;
+  businessName: string;
 }) {
-  const { totalReviews, rating, hasReviewSignals, reputationLabel } = input;
+  const { totalReviews, rating, hasReviewSignals, reputationLabel, businessName } = input;
 
   if (!hasReviewSignals) {
     return "Saved review trust signals are still too thin for a stronger reputation footing.";
   }
 
   if (totalReviews !== null && rating !== null && totalReviews >= 25 && rating >= 4.2) {
-    return `Saved review count and rating already give this business a usable trust base. The current review read is ${reputationLabel}.`;
+    return `Saved review count and rating already give ${businessName} a usable trust base. The current review read is ${reputationLabel}.`;
   }
 
   if (totalReviews !== null && rating !== null) {
-    return `This business has saved review signals, but the trust base is still thinner than it should be at ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`;
+    return `${businessName} has saved review signals, but the trust base is still thinner than it should be at ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`;
   }
 
   if (totalReviews !== null) {
-    return `This business has ${formatCount(totalReviews)} saved reviews, but rating quality is still not fully visible. The current review read is ${reputationLabel}.`;
+    return `${businessName} has ${formatCount(totalReviews)} saved reviews, but rating quality is still not fully visible. The current review read is ${reputationLabel}.`;
   }
 
   return `Saved review trust signals are present, and the current review read is ${reputationLabel}.`;
@@ -232,12 +233,14 @@ function buildReviewComparisonSummary(input: {
   topCompetitorName: string | null;
   topCompetitorReviews: number | null;
   gapReviews: number | null;
+  businessName: string;
 }) {
   const {
     currentReviews,
     topCompetitorName,
     topCompetitorReviews,
     gapReviews,
+    businessName,
   } = input;
 
   if (currentReviews === null || topCompetitorReviews === null) {
@@ -246,13 +249,13 @@ function buildReviewComparisonSummary(input: {
 
   if (gapReviews === null || gapReviews <= 0) {
     return topCompetitorName
-      ? `This business is already matching or exceeding ${topCompetitorName} on saved review count.`
-      : "This business is already matching or exceeding the strongest tracked competitor on saved review count.";
+      ? `${businessName} is already matching or exceeding ${topCompetitorName} on saved review count.`
+      : `${businessName} is already matching or exceeding the strongest tracked competitor on saved review count.`;
   }
 
   return topCompetitorName
-    ? `This business currently has ${formatCount(currentReviews)} reviews, while ${topCompetitorName} has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`
-    : `This business currently has ${formatCount(currentReviews)} reviews, while the strongest tracked competitor has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`;
+    ? `${businessName} currently has ${formatCount(currentReviews)} reviews, while ${topCompetitorName} has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`
+    : `${businessName} currently has ${formatCount(currentReviews)} reviews, while the strongest tracked competitor has ${formatCount(topCompetitorReviews)}. That leaves a saved review gap of ${formatCount(gapReviews)}.`;
 }
 
 export default function ProjectReviewsPage({ params }: PageProps) {
@@ -358,11 +361,15 @@ export default function ProjectReviewsPage({ params }: PageProps) {
   const reviewGap =
     dashboardContext?.dashboard.outcomesSummary.gapReviews ?? null;
 
+  const reviewsBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   const reviewTrustSummary = buildReviewTrustSummary({
     totalReviews,
     rating,
     hasReviewSignals,
     reputationLabel,
+    businessName: reviewsBusinessName,
   });
 
   const hasReliableReviewComparison =
@@ -372,6 +379,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
     topCompetitorName,
     topCompetitorReviews,
     gapReviews: reviewGap,
+    businessName: reviewsBusinessName,
   });
 
   return (
@@ -496,7 +504,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
                 {hasReliableReviewComparison
                   ? reviewComparisonSummary
-                  : "Digital Brain has this business's saved review count, but it does not yet have enough reliable competitor review data to make a local review-gap comparison."}
+                  : `Digital Brain has ${reviewsBusinessName}'s saved review count, but it does not yet have enough reliable competitor review data to make a local review-gap comparison.`}
               </p>
               {hasReliableReviewComparison ? (
                 <div className="mt-4 flex flex-wrap gap-2">
