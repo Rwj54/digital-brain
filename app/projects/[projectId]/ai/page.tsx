@@ -182,18 +182,18 @@ function buildAiIdentitySummary(input: {
   const hasProjectCategory = projectCategory !== "Not set";
 
   if (!hasBusinessName) {
-    return "The saved AI identity foundation is still missing the GBP business name, so machine understanding is still very limited.";
+    return "The saved AI identity foundation is still missing the Google Business Profile name, so Google and AI systems have less to work with.";
   }
 
   if (!hasPrimaryCategory) {
-    return "The saved business name exists, but the primary category is still missing, so category clarity for machine understanding is still weak.";
+    return "The saved business name exists, but the primary category is still missing, so Google and AI systems have a less clear picture of what the business does.";
   }
 
   if (!hasTargetBrandName || !hasProjectCategory) {
-    return `The saved GBP identity signals are present, and review trust signals read as ${reviewSignals}, but the project-level identity anchors are still not fully complete. The current AI read is ${aiLabel}.`;
+    return `The saved Google Business Profile details are present, and review proof reads as ${reviewSignals}, but the project details are still not fully complete. The current AI read is ${aiLabel}.`;
   }
 
-  return `The saved business name, primary category, project brand, project category, and review trust signals are all present enough for a stronger early AI identity read. The current AI read is ${aiLabel}.`;
+  return `The saved business name, primary category, project brand, project category, and review proof are all present enough for a stronger early AI identity read. The current AI read is ${aiLabel}.`;
 }
 
 function textValue(value: string | null | undefined, fallback = "Not set") {
@@ -261,7 +261,7 @@ export default function ProjectAiPage({ params }: PageProps) {
     typeof aiSummary.plainLanguageSummary === "string"
       ? aiSummary.plainLanguageSummary
       : null,
-    "Digital Brain does not yet have enough information for a stronger AI visibility read.",
+    "Digital Brain needs more saved business details for a stronger AI visibility read.",
   );
 
   const topIssue = textValue(
