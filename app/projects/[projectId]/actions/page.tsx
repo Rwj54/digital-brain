@@ -450,8 +450,8 @@ export default function ActionsPage({ params }: PageProps) {
           <section className="border-b border-[var(--border)] py-6">
             <SectionLabel>Your first action plan is not ready yet</SectionLabel>
             <p className="mt-3 max-w-3xl text-base leading-7 text-[var(--text-body)]">
-              This business does not have a saved action plan yet. Once the
-              next refresh completes, this page will become a clearer working
+              {actionsHeadlineBusinessName} does not have a saved action plan yet.
+              Once the next refresh completes, this page will become a clearer working
               order for what to do first. Until then, use the centers below to
               check identity clarity, reviews, local visibility, website and
               domain footing, AI visibility readiness, and early outcomes.
