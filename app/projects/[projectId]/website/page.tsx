@@ -219,25 +219,25 @@ function buildWebsiteAlignmentSummary(input: {
   } = input;
 
   if (!hasSiteUrl) {
-    return "No website URL is saved yet, so there is no trustworthy website anchor to align against.";
+    return "No website URL is saved yet, so there is no trustworthy website connection to check.";
   }
 
   if (hasSiteUrl && !hasTargetDomain && hasDerivedSiteDomain) {
-    return `Digital Brain can derive ${derivedSiteDomain} from the saved website URL, but the target domain still needs to be locked explicitly.`;
+    return `Digital Brain can derive ${derivedSiteDomain} from the saved website URL, but the target domain still needs to be confirmed.`;
   }
 
   if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && !hasDomainAlignment) {
-    return `The saved website URL currently resolves to ${derivedSiteDomain}, while the saved target domain is ${targetDomain}. Those two identity anchors still disagree.`;
+    return `The saved website URL currently resolves to ${derivedSiteDomain}, while the saved target domain is ${targetDomain}. Those two website details still do not match.`;
   }
 
   if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && hasDomainAlignment && !hasBrandName) {
-    return "The website URL and domain anchor now agree, but the business brand name still needs to be saved to complete the identity layer.";
+    return "The website URL and domain now agree, but the business brand name still needs to be saved to complete the identity layer.";
   }
 
   if (hasSiteUrl && hasTargetDomain && hasDerivedSiteDomain && hasDomainAlignment && hasBrandName) {
     return targetBrandName
-      ? `The website URL, target domain, and saved brand name (${targetBrandName}) are aligned clearly enough for a strong website identity footing.`
-      : "The website URL, target domain, and saved brand name are aligned clearly enough for a strong website identity footing.";
+      ? `The website URL, target domain, and saved brand name (${targetBrandName}) are aligned clearly enough for a strong website identity read.`
+      : "The website URL, target domain, and saved brand name are aligned clearly enough for a strong website identity read.";
   }
 
   return `The saved website identity is partially anchored, and the current website read is ${websiteReadinessLabel}.`;
@@ -407,7 +407,7 @@ export default function ProjectWebsitePage({ params }: PageProps) {
           </div>
 
           <div className="mt-5 border-t border-[var(--border)] pt-5">
-            <SectionLabel>What the saved website anchor shows</SectionLabel>
+            <SectionLabel>What the saved website connection shows</SectionLabel>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
               {websiteAnchorSummary}
             </p>
