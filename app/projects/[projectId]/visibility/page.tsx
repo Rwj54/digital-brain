@@ -63,8 +63,9 @@ function buildRankTrendSummary(input: {
   previousRank: number | null | undefined;
   keyword: string;
   metro: string;
+  businessName: string;
 }) {
-  const { latestRank, previousRank, keyword, metro } = input;
+  const { latestRank, previousRank, keyword, metro, businessName } = input;
   const searchLabel = `${keyword} in ${metro}`;
 
   if (typeof latestRank !== "number") {
@@ -77,15 +78,15 @@ function buildRankTrendSummary(input: {
 
   if (latestRank < previousRank) {
     const gain = previousRank - latestRank;
-    return `This business moved up ${gain} spot${gain === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
+    return `${businessName} moved up ${gain} spot${gain === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
   }
 
   if (latestRank > previousRank) {
     const loss = latestRank - previousRank;
-    return `This business moved down ${loss} spot${loss === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
+    return `${businessName} moved down ${loss} spot${loss === 1 ? "" : "s"} since the last saved snapshot for ${searchLabel}.`;
   }
 
-  return `This business is holding the same saved position for ${searchLabel}.`;
+  return `${businessName} is holding the same saved position for ${searchLabel}.`;
 }
 
 function buildMarketFootingSummary(input: {
@@ -94,29 +95,30 @@ function buildMarketFootingSummary(input: {
   keyword: string;
   metro: string;
   visibilityRead: string;
+  businessName: string;
 }) {
-  const { latestRank, bestRank, keyword, metro, visibilityRead } = input;
+  const { latestRank, bestRank, keyword, metro, visibilityRead, businessName } = input;
   const searchLabel = `${keyword} in ${metro}`;
 
   if (typeof latestRank !== "number") {
-    return `Digital Brain does not have enough saved rank data yet to describe this business's current footing for ${searchLabel}.`;
+    return `Digital Brain does not have enough saved rank data yet to describe ${businessName}'s current footing for ${searchLabel}.`;
   }
 
   if (latestRank <= 3) {
     return typeof bestRank === "number"
-      ? `This business currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank} and a best saved rank of #${bestRank}.`
-      : `This business currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank}.`;
+      ? `${businessName} currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank} and a best saved rank of #${bestRank}.`
+      : `${businessName} currently has strong saved visibility for ${searchLabel}, with a latest rank of #${latestRank}.`;
   }
 
   if (latestRank <= 10) {
     return typeof bestRank === "number"
-      ? `This business is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}, and the best saved rank is #${bestRank}.`
-      : `This business is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}.`;
+      ? `${businessName} is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}, and the best saved rank is #${bestRank}.`
+      : `${businessName} is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}.`;
   }
 
   return typeof bestRank === "number"
-    ? `This business still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, the best saved rank is #${bestRank}, and the current visibility read is ${visibilityRead}.`
-    : `This business still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, and the current visibility read is ${visibilityRead}.`;
+    ? `${businessName} still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, the best saved rank is #${bestRank}, and the current visibility read is ${visibilityRead}.`
+    : `${businessName} still has weak saved visibility for ${searchLabel}. The latest saved rank is #${latestRank}, and the current visibility read is ${visibilityRead}.`;
 }
 
 function numericValue(value: number | null | undefined) {
@@ -335,7 +337,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     : "The clearest next visibility move";
 
   const setupIntro = isSetupBlocked
-    ? "Start by choosing one real search phrase and market for this business. Visibility cannot be measured clearly until that tracked search exists."
+    ? `Start by choosing one real search phrase and market for ${visibilityHeadlineBusinessName}. Visibility cannot be measured clearly until that tracked search exists.`
     : isTrackingInactive
       ? "Start by activating the saved tracked search. Visibility cannot be measured clearly until tracking is active."
       : "Start with the biggest visibility gap first. Stronger local footing begins with a real tracked search, a clear market, and a practical next action.";
@@ -346,6 +348,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     previousRank,
     keyword,
     metro,
+    businessName: visibilityHeadlineBusinessName,
   });
   const marketFootingSummary = buildMarketFootingSummary({
     latestRank,
@@ -353,6 +356,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     keyword,
     metro,
     visibilityRead,
+    businessName: visibilityHeadlineBusinessName,
   });
 
   return (
