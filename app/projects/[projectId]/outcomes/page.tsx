@@ -383,7 +383,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
     ? hasConversionSignal
       ? "Outcome tracking exists, but it still needs to deepen over time."
       : "Outcome tracking exists, but the conversion picture is still not clear enough."
-    : "Business-result tracking is not connected clearly enough yet.";
+    : "Business-result tracking still needs clearer customer and conversion details.";
 
   const whyItMatters = hasEventSignals
     ? hasConversionSignal
@@ -402,7 +402,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
   const nextActionReason = hasEventSignals
     ? hasConversionSignal
       ? "The next win is to make business impact easier to see and easier to trust over time."
-      : "The project already has some event signals. The next step is turning that into a clearer outcomes story for the owner."
+      : "The project already has some customer activity saved. The next step is turning that into a clearer outcomes story for the owner."
     : "The fastest path to a useful outcomes center is to connect real customer-event tracking first.";
 
   const outcomesSetupHref = dashboardContext?.clientId
@@ -458,7 +458,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
   const evidence = dedupeEvidence([
     hasEventSignals
       ? `Monthly customer events are currently ${formatCount(monthlyCustomerEvents)}.`
-      : "Monthly customer-event tracking is still missing or too thin.",
+      : "Monthly customer-activity tracking still needs more detail.",
     hasConversionSignal
       ? `Review conversion rate is currently ${formatConversionRate(reviewConversionRate)}.`
       : "Conversion footing is still not clear enough.",
