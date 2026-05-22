@@ -326,6 +326,9 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
       ? outcomesSummary.monthsToCloseGap
       : null;
 
+  const outcomesHeadlineBusinessName =
+    dashboardContext?.projectDisplayName ?? "this business";
+
   const catchUpRealitySummary =
     desiredTarget90d !== null && realisticTarget90d !== null
       ? desiredTarget90d > realisticTarget90d
@@ -335,9 +338,9 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
 
   const paceCeilingSummary =
     maxReviews90d !== null && monthsToCloseGap !== null
-      ? `At the current pace ceiling, this business could add up to about ${formatCount(maxReviews90d)} reviews in 90 days, and closing the full gap would still take about ${formatCount(monthsToCloseGap)} month${monthsToCloseGap === 1 ? "" : "s"}.`
+      ? `At the current pace ceiling, ${outcomesHeadlineBusinessName} could add up to about ${formatCount(maxReviews90d)} reviews in 90 days, and closing the full gap would still take about ${formatCount(monthsToCloseGap)} month${monthsToCloseGap === 1 ? "" : "s"}.`
       : maxReviews90d !== null
-        ? `At the current pace ceiling, this business could add up to about ${formatCount(maxReviews90d)} reviews in 90 days.`
+        ? `At the current pace ceiling, ${outcomesHeadlineBusinessName} could add up to about ${formatCount(maxReviews90d)} reviews in 90 days.`
         : "Digital Brain does not yet have enough pace context to show the current ceiling clearly.";
 
   const hasEventSignals =
@@ -451,9 +454,6 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
       setSaving(false);
     }
   }
-
-  const outcomesHeadlineBusinessName =
-    dashboardContext?.projectDisplayName ?? "this business";
 
   const evidence = dedupeEvidence([
     hasEventSignals
@@ -768,7 +768,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
               <SectionLabel>What this means in practice</SectionLabel>
               <p className="mt-3 text-base leading-7 text-[var(--text-body)]">
                 {realisticTarget90d !== null && perWeek !== null
-                  ? `At the current ${textValue(eventLabelPlural, "Events")} volume and conversion rate, this business can likely generate about ${formatCount(realisticTarget90d)} reviews over the next 90 days, which is roughly ${formatCount(perWeek)} per week.`
+                  ? `At the current ${textValue(eventLabelPlural, "Events")} volume and conversion rate, ${outcomesHeadlineBusinessName} can likely generate about ${formatCount(realisticTarget90d)} reviews over the next 90 days, which is roughly ${formatCount(perWeek)} per week.`
                   : "Once outcomes inputs are present, this section translates them into a practical review-growth pace the owner can actually follow."}
               </p>
               {topCompetitorName || topCompetitorReviews !== null || monthsToCloseGap !== null ? (
