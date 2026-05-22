@@ -182,15 +182,15 @@ function buildAiIdentitySummary(input: {
   const hasProjectCategory = projectCategory !== "Not set";
 
   if (!hasBusinessName) {
-    return "The saved AI identity foundation is still missing the Google Business Profile name, so Google and AI systems have less to work with.";
+    return "The saved AI identity foundation needs the Google Business Profile name, so Google and AI systems have more to work with.";
   }
 
   if (!hasPrimaryCategory) {
-    return "The saved business name exists, but the primary category is still missing, so Google and AI systems have a less clear picture of what the business does.";
+    return "The saved business name exists, but the primary category needs to be added so Google and AI systems have a clearer picture of what the business does.";
   }
 
   if (!hasTargetBrandName || !hasProjectCategory) {
-    return `The saved Google Business Profile details are present, and review proof reads as ${reviewSignals}, but the project details are still not fully complete. The current AI read is ${aiLabel}.`;
+    return `The saved Google Business Profile details are present, and review proof reads as ${reviewSignals}, but the project details need to be completed. The current AI read is ${aiLabel}.`;
   }
 
   return `The saved business name, primary category, project brand, project category, and review proof are all present enough for a stronger early AI identity read. The current AI read is ${aiLabel}.`;
