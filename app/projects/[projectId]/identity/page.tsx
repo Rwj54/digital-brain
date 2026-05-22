@@ -348,7 +348,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     identityRead = "Identity foundation needs website and domain alignment";
     plainLanguageSummary =
       websiteSummary.plainLanguageSummary ||
-      "The website and domain anchor still need attention before the identity foundation feels stable.";
+      "The website and domain details still need attention before the identity foundation feels stable.";
     topIssue = websiteSummary.topIssue;
     whyItMatters = websiteSummary.whyItMatters;
     nextActionWho = websiteSummary.nextAction.whoShouldDoIt;
@@ -366,7 +366,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     whyItMatters =
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
-        : "When names do not line up, machines can be less confident they are looking at the same business.";
+        : "When names do not line up, Google and AI systems can be less confident they are looking at the same business.";
     nextActionWho =
       aiSummary.nextAction &&
       typeof aiSummary.nextAction.whoShouldDoIt === "string"
@@ -393,7 +393,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     whyItMatters =
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
-        : "Category inconsistency can weaken machine understanding of what the business actually does.";
+        : "Category inconsistency can make it harder for Google and AI systems to understand what the business actually does.";
     nextActionWho =
       aiSummary.nextAction &&
       typeof aiSummary.nextAction.whoShouldDoIt === "string"
