@@ -369,27 +369,27 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
 
   const outcomesRead = hasEventSignals
     ? hasConversionSignal
-      ? "Business outcome signals are starting to connect"
-      : "Customer-event signals exist, but conversion footing is still thin"
-    : "Business outcome signals are still thin";
+      ? "Business results are starting to connect"
+      : "Customer activity is saved, but the conversion picture is still unclear"
+    : "Business-result tracking still needs setup";
 
   const plainLanguageSummary = hasEventSignals
     ? hasConversionSignal
-      ? "The project now has some real business-outcome footing. That makes it easier to connect visibility work to real customer activity."
-      : "Customer-event data exists, but the project still needs a clearer conversion view so owners can see whether reputation and visibility work are turning into results."
-    : "This project still needs stronger customer-event tracking before the owner can clearly see business results from visibility work.";
+      ? "The project now has enough business-result tracking to start connecting visibility work to real customer activity."
+      : "Customer activity is saved, but the project still needs a clearer conversion view so owners can see whether reputation and visibility work are turning into results."
+    : "This project still needs stronger customer-activity tracking before the owner can clearly see business results from visibility work.";
 
   const topIssue = hasEventSignals
     ? hasConversionSignal
       ? "Outcome tracking exists, but it still needs to deepen over time."
-      : "Outcome tracking exists, but conversion footing is still not clear enough."
-    : "Business outcome signals are not connected strongly enough yet.";
+      : "Outcome tracking exists, but the conversion picture is still not clear enough."
+    : "Business-result tracking is not connected clearly enough yet.";
 
   const whyItMatters = hasEventSignals
     ? hasConversionSignal
-      ? "When customer-event and conversion signals exist, the owner can start connecting search visibility work to real business results."
-      : "Customer events alone are not enough. Owners also need a clearer read on whether those events are turning into meaningful results."
-    : "Without customer-event signals, the owner cannot clearly see whether visibility work is making a real business difference.";
+      ? "When customer activity and conversion data exist, the owner can start connecting search visibility work to real business results."
+      : "Customer activity alone is not enough. Owners also need a clearer read on whether that activity is turning into meaningful results."
+    : "Without customer-activity tracking, the owner cannot clearly see whether visibility work is making a real business difference.";
 
   const nextActionTitle = hasEventSignals
     ? hasConversionSignal
@@ -527,9 +527,9 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
                     Open outcomes setup
                   </Link>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--text-body)]">
-                    This project is still missing the owner’s monthly event count or
+                    This project is still missing the owner’s monthly customer count or
                     review conversion rate. Use the editable dashboard to add those
-                    inputs so this outcomes center can explain real business impact
+                    details so this outcomes center can explain real business impact
                     more clearly.
                   </p>
                 </div>
@@ -1010,7 +1010,7 @@ export default function ProjectOutcomesPage({ params }: PageProps) {
                 <DetailRow
                   label="Outcomes read"
                   value={outcomesRead}
-                  helper="This is the current outcomes read based on saved event and conversion signals."
+                  helper="This is the current outcomes read based on saved customer activity and conversion data."
                 />
                 <DetailRow
                   label="Who should do it"
