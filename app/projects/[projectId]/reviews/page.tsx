@@ -210,7 +210,7 @@ function buildReviewTrustSummary(input: {
   const { totalReviews, rating, hasReviewSignals, reputationLabel, businessName } = input;
 
   if (!hasReviewSignals) {
-    return "Saved review trust signals are still too thin for a stronger reputation footing.";
+    return "Saved review proof still needs more depth before the reputation read can feel stronger.";
   }
 
   if (totalReviews !== null && rating !== null && totalReviews >= 25 && rating >= 4.2) {
@@ -218,14 +218,14 @@ function buildReviewTrustSummary(input: {
   }
 
   if (totalReviews !== null && rating !== null) {
-    return `${businessName} has saved review signals, but the trust base is still thinner than it should be at ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`;
+    return `${businessName} has saved reviews and rating data, but the review base still needs more depth at ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`;
   }
 
   if (totalReviews !== null) {
     return `${businessName} has ${formatCount(totalReviews)} saved reviews, but rating quality is still not fully visible. The current review read is ${reputationLabel}.`;
   }
 
-  return `Saved review trust signals are present, and the current review read is ${reputationLabel}.`;
+  return `Saved review proof is present, and the current review read is ${reputationLabel}.`;
 }
 
 function buildReviewComparisonSummary(input: {
@@ -244,7 +244,7 @@ function buildReviewComparisonSummary(input: {
   } = input;
 
   if (currentReviews === null || topCompetitorReviews === null) {
-    return "Digital Brain does not yet have enough saved competitor review data to show a reliable local comparison.";
+    return "Digital Brain needs more reliable competitor review data before it can show a clear local comparison.";
   }
 
   if (gapReviews === null || gapReviews <= 0) {
@@ -309,24 +309,24 @@ export default function ProjectReviewsPage({ params }: PageProps) {
   const reputationLabel = hasReviewSignals
     ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
       ? "Good review footing"
-      : "Review footing is present but still thin"
-    : "Review footing is still weak";
+      : "Review base is present but needs more depth"
+    : "Review base still needs work";
 
   const plainLanguageSummary = hasReviewSignals
     ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
       ? "The business has a usable review foundation, but keeping review growth active will strengthen trust over time."
-      : "The business has some review trust signals, but the review foundation is not yet strong enough to feel durable."
-    : "The business still needs more review trust signals before this reputation layer feels strong.";
+      : "The business has some review proof, but the review foundation is not yet strong enough to feel durable."
+    : "The business still needs more review proof before this reputation layer feels strong.";
 
   const topIssue = hasReviewSignals
     ? totalReviews !== null && totalReviews >= 25 && rating !== null && rating >= 4.2
       ? "The review foundation exists, but it still needs steady maintenance."
-      : "Review trust signals are present, but the review footing is still thinner than it should be."
-    : "Review trust signals are still too limited.";
+      : "Review proof is present, but the review base still needs more depth."
+    : "Review proof is still too limited.";
 
   const whyItMatters = hasReviewSignals
-    ? "Reviews help reinforce that the business is real, trusted, and active. Stronger review footing improves trust for both people and machines."
-    : "Without stronger review signals, the business trust foundation remains weaker for owners, searchers, and machine-readiness systems.";
+    ? "Reviews help reinforce that the business is real, trusted, and active. A stronger review base improves trust for both people and search systems."
+    : "Without stronger review proof, the business trust foundation remains weaker for owners, searchers, and search systems.";
 
   const nextActionTitle =
     hasReviewSignals && totalReviews !== null && totalReviews >= 25
@@ -337,13 +337,13 @@ export default function ProjectReviewsPage({ params }: PageProps) {
   const nextActionDifficulty = hasReviewSignals ? "Medium" : "Easy";
   const nextActionReason = hasReviewSignals
     ? "Consistent 5-star reviews protect the rating, build customer trust, and show Google this is an active, growing business."
-    : "The fastest way to improve reputation footing is to ask happy customers for reviews in a steady, repeatable way.";
+    : "The fastest way to improve reputation strength is to ask happy customers for reviews in a steady, repeatable way.";
 
   const evidence = dedupeEvidence([
     ...(Array.isArray(aiSummary.evidence) ? aiSummary.evidence : []),
     hasReviewSignals
-      ? `Review signals are present with ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`
-      : "Review signals are still missing or very thin.",
+      ? `Review proof is present with ${formatCount(totalReviews)} reviews and a ${formatRating(rating)} rating.`
+      : "Review proof still needs more depth.",
     totalReviews !== null && totalReviews > 0
       ? "Review count is now part of the saved trust foundation."
       : "Review count is not yet giving the business a strong trust cushion.",
@@ -504,7 +504,7 @@ export default function ProjectReviewsPage({ params }: PageProps) {
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-body)]">
                 {hasReliableReviewComparison
                   ? reviewComparisonSummary
-                  : `Digital Brain has ${reviewsBusinessName}'s saved review count, but it does not yet have enough reliable competitor review data to make a local review-gap comparison.`}
+                  : `Digital Brain has ${reviewsBusinessName}'s saved review count, but it needs more reliable competitor review data to make a local review-gap comparison.`}
               </p>
               {hasReliableReviewComparison ? (
                 <div className="mt-4 flex flex-wrap gap-2">
