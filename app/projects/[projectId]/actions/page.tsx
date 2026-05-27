@@ -731,6 +731,19 @@ export default function ActionsPage({ params }: PageProps) {
                   to scan. Start with the first move, then work down the list.
                 </p>
 
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link
+                    href={`/projects/${projectId}/owner#next-steps`}
+                    className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+                    style={{
+                      border: "1px solid var(--border)",
+                      backgroundColor: "transparent",
+                    }}
+                  >
+                    Track completion on owner page
+                  </Link>
+                </div>
+
                 <div className="mt-6">
                   {nextMoves.map((item, index) => (
                     <article
