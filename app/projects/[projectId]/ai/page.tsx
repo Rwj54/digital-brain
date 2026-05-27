@@ -273,7 +273,7 @@ export default function ProjectAiPage({ params }: PageProps) {
 
   const whyItMatters = textValue(
     typeof aiSummary.whyItMatters === "string" ? aiSummary.whyItMatters : null,
-    `Machines need clear business identity and trust signals to understand ${aiHeadlineBusinessName} well.`,
+    `Google and AI systems need clear business identity and trust proof to understand ${aiHeadlineBusinessName} well.`,
   );
 
   const nextActionWho = textValue(
