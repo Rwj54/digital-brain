@@ -332,12 +332,12 @@ export default function ProjectIdentityPage({ params }: PageProps) {
         )
       : null;
 
-  let identityRead = "Early identity footing looks good";
+  let identityRead = "Early identity read looks good";
   let plainLanguageSummary =
-    "The saved business name, category, website, and domain signals are giving Digital Brain a usable identity foundation.";
+    "The saved business name, category, website, and domain details give Digital Brain a usable identity read.";
   let topIssue = "No major identity mismatch is visible from the saved data.";
   let whyItMatters =
-    "When business naming, category, and website identity line up, Digital Brain can trust the business foundation more confidently.";
+    "When business naming, category, and website details line up, Digital Brain can trust the business identity more confidently.";
   let nextActionWho = websiteSummary.nextAction.whoShouldDoIt;
   let nextActionDifficulty = websiteSummary.nextAction.difficulty;
   if (
@@ -345,16 +345,16 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     !websiteSummary.hasTargetDomain ||
     !domainAligned
   ) {
-    identityRead = "Identity foundation needs website and domain alignment";
+    identityRead = "Business identity needs website and domain alignment";
     plainLanguageSummary =
       websiteSummary.plainLanguageSummary ||
-      "The website and domain details still need attention before the identity foundation feels stable.";
+      "The website and domain details need attention before the business identity read feels stable.";
     topIssue = websiteSummary.topIssue;
     whyItMatters = websiteSummary.whyItMatters;
     nextActionWho = websiteSummary.nextAction.whoShouldDoIt;
     nextActionDifficulty = websiteSummary.nextAction.difficulty;
   } else if (hasNamingInputs && namingAligned === false) {
-    identityRead = "Identity foundation needs business-name alignment";
+    identityRead = "Business identity needs name alignment";
     plainLanguageSummary =
       typeof aiSummary.plainLanguageSummary === "string"
         ? aiSummary.plainLanguageSummary
@@ -362,7 +362,7 @@ export default function ProjectIdentityPage({ params }: PageProps) {
     topIssue =
       typeof aiSummary.topIssue === "string"
         ? aiSummary.topIssue
-        : "GBP business name and project brand name do not clearly match.";
+        : "Google Business Profile name and project brand name do not clearly match.";
     whyItMatters =
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
@@ -381,15 +381,15 @@ export default function ProjectIdentityPage({ params }: PageProps) {
         ? aiSummary.nextAction.difficulty
         : "Easy";
   } else if (hasCategoryInputs && categoryAligned === false) {
-    identityRead = "Identity foundation needs category alignment";
+    identityRead = "Business identity needs category alignment";
     plainLanguageSummary =
       typeof aiSummary.plainLanguageSummary === "string"
         ? aiSummary.plainLanguageSummary
-        : "Category wording across the project and GBP still needs review.";
+        : "Category wording across the project and Google Business Profile needs review.";
     topIssue =
       typeof aiSummary.topIssue === "string"
         ? aiSummary.topIssue
-        : "Project category and GBP primary category may not be aligned.";
+        : "Project category and Google Business Profile primary category may not be aligned.";
     whyItMatters =
       typeof aiSummary.whyItMatters === "string"
         ? aiSummary.whyItMatters
