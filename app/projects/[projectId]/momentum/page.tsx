@@ -513,6 +513,22 @@ export default function ProjectMomentumPage() {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
+                  href={`/projects/${projectId}/owner`}
+                  className="border px-4 py-2 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  Back to owner page
+                </Link>
+
+                <Link
+                  href={`/projects/${projectId}/actions`}
+                  className="border px-4 py-2 text-sm font-semibold text-[var(--text-strong)]"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  Open actions page
+                </Link>
+
+                <Link
                   href={`/projects/${projectId}/authority`}
                   className="border px-4 py-2 text-sm font-semibold text-[var(--text-strong)]"
                   style={{ borderColor: "var(--border)" }}
@@ -546,15 +562,6 @@ export default function ProjectMomentumPage() {
                 >
                   {trendLoading ? "Refreshing…" : "Refresh momentum"}
                 </button>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Project ID
-                </p>
-                <p className="mt-1 text-sm font-medium text-[var(--text-strong)]">
-                  {projectId}
-                </p>
               </div>
             </div>
           </div>
