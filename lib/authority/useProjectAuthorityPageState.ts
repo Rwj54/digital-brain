@@ -53,13 +53,14 @@ export type ActionItem = {
 export type ActionsSuccessResponse = {
   ok: true;
   projectId: string;
-  capturedAt: string | null;
-  version: string;
-  actions: ActionItem[];
-  authorityScore?: number | null;
-  authorityTier?: string | null;
-  momentumScore?: number | null;
-  momentumLabel?: string | null;
+  actionsRow: {
+    id: string;
+    project_id: string;
+    captured_at: string | null;
+    version: string | null;
+    actions_json: ActionItem[] | null;
+    created_at: string | null;
+  } | null;
 };
 
 export type ActionsErrorResponse = {
@@ -220,11 +221,15 @@ export function useProjectAuthorityPageState(
       throw new Error(actionsJson.ok ? "Failed to load actions." : actionsJson.error);
     }
 
+    const actionsRow = actionsJson.actionsRow ?? null;
+
     setDashboardContext(dashboardJson);
     setHistoryRows(Array.isArray(historyJson.rows) ? historyJson.rows : []);
-    setActions(Array.isArray(actionsJson.actions) ? actionsJson.actions : []);
-    setActionsVersion(actionsJson.version ?? null);
-    setActionsCapturedAt(actionsJson.capturedAt ?? null);
+    setActions(
+      Array.isArray(actionsRow?.actions_json) ? actionsRow.actions_json : [],
+    );
+    setActionsVersion(actionsRow?.version ?? null);
+    setActionsCapturedAt(actionsRow?.captured_at ?? null);
   }, []);
 
   useEffect(() => {
