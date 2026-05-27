@@ -101,37 +101,180 @@ function getCategoryTone(category: string) {
   };
 }
 
-function getActionDestinationHref(projectId: string, category: string) {
-  if (category === "reviews") {
+type ActionIntent =
+  | "reviews"
+  | "profile"
+  | "website"
+  | "competition"
+  | "visibility"
+  | "activity"
+  | "general";
+
+function normalizeActionSearchText(...values: Array<string | undefined>) {
+  return values
+    .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
+    .filter(Boolean)
+    .join(" ");
+}
+
+function classifyActionIntent(action: ProjectActionItem): ActionIntent {
+  const category = normalizeActionSearchText(action.category);
+  const title = normalizeActionSearchText(action.title);
+  const detail = normalizeActionSearchText(action.detail);
+  const textOnlySearchText = normalizeActionSearchText(title, detail);
+  const categorySearchText = normalizeActionSearchText(category, title, detail);
+
+  if (
+    category === "reviews" ||
+    textOnlySearchText.includes("review") ||
+    textOnlySearchText.includes("rating")
+  ) {
+    return "reviews";
+  }
+
+  if (
+    category === "website" ||
+    category === "technical" ||
+    textOnlySearchText.includes("website") ||
+    textOnlySearchText.includes("site") ||
+    textOnlySearchText.includes("domain") ||
+    textOnlySearchText.includes("page")
+  ) {
+    return "website";
+  }
+
+  if (
+    textOnlySearchText.includes("post") ||
+    textOnlySearchText.includes("update") ||
+    textOnlySearchText.includes("activity") ||
+    textOnlySearchText.includes("fresh")
+  ) {
+    return "activity";
+  }
+
+  if (
+    textOnlySearchText.includes("profile") ||
+    textOnlySearchText.includes("business profile") ||
+    textOnlySearchText.includes("gbp") ||
+    textOnlySearchText.includes("google business") ||
+    textOnlySearchText.includes("category") ||
+    textOnlySearchText.includes("description") ||
+    textOnlySearchText.includes("photo") ||
+    textOnlySearchText.includes("q&a") ||
+    textOnlySearchText.includes("questions") ||
+    textOnlySearchText.includes("hours") ||
+    textOnlySearchText.includes("phone")
+  ) {
+    return "profile";
+  }
+
+  if (
+    textOnlySearchText.includes("rank") ||
+    textOnlySearchText.includes("ranking") ||
+    textOnlySearchText.includes("visibility") ||
+    textOnlySearchText.includes("keyword") ||
+    textOnlySearchText.includes("search")
+  ) {
+    return "visibility";
+  }
+
+  if (
+    category === "competition" ||
+    categorySearchText.includes("competitor") ||
+    categorySearchText.includes("competition") ||
+    categorySearchText.includes("market")
+  ) {
+    return "competition";
+  }
+
+  return "general";
+}
+
+function getActionDestinationHref(projectId: string, action: ProjectActionItem) {
+  const intent = classifyActionIntent(action);
+
+  if (intent === "reviews") {
     return `/projects/${projectId}/reviews`;
   }
 
-  if (category === "competition" || category === "rank") {
+  if (intent === "profile") {
+    return `/projects/${projectId}/identity`;
+  }
+
+  if (intent === "website") {
+    return `/projects/${projectId}/website`;
+  }
+
+  if (intent === "competition") {
+    return `/projects/${projectId}/competitors`;
+  }
+
+  if (intent === "visibility") {
     return `/projects/${projectId}/visibility`;
+  }
+
+  if (intent === "activity") {
+    return `/projects/${projectId}/authority`;
   }
 
   return `/projects/${projectId}/owner`;
 }
 
-function getActionDestinationLabel(category: string) {
-  if (category === "reviews") {
+function getActionDestinationLabel(action: ProjectActionItem) {
+  const intent = classifyActionIntent(action);
+
+  if (intent === "reviews") {
     return "Open reviews page";
   }
 
-  if (category === "competition" || category === "rank") {
+  if (intent === "profile") {
+    return "Open identity page";
+  }
+
+  if (intent === "website") {
+    return "Open website page";
+  }
+
+  if (intent === "competition") {
+    return "Open competitors page";
+  }
+
+  if (intent === "visibility") {
     return "Open visibility page";
+  }
+
+  if (intent === "activity") {
+    return "Open authority page";
   }
 
   return "Open owner page";
 }
 
-function getActionDestinationHelper(category: string) {
-  if (category === "reviews") {
+function getActionDestinationHelper(action: ProjectActionItem) {
+  const intent = classifyActionIntent(action);
+
+  if (intent === "reviews") {
     return "This action is best handled from the reviews page.";
   }
 
-  if (category === "competition" || category === "rank") {
+  if (intent === "profile") {
+    return "This action is best handled from the identity page.";
+  }
+
+  if (intent === "website") {
+    return "This action is best handled from the website page.";
+  }
+
+  if (intent === "competition") {
+    return "This action is best handled from the competitors page.";
+  }
+
+  if (intent === "visibility") {
     return "This action is best handled from the visibility page.";
+  }
+
+  if (intent === "activity") {
+    return "This action is best handled from the authority page.";
   }
 
   return "This action is best reviewed from the owner page first.";
@@ -297,20 +440,20 @@ function ActionGroup({
                   </InlineTag>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--text-body)]">
-                  {getActionDestinationHelper(action.category)}
+                  {getActionDestinationHelper(action)}
                 </p>
               </div>
 
               <div className="md:pl-6">
                 <Link
-                  href={getActionDestinationHref(projectId, action.category)}
+                  href={getActionDestinationHref(projectId, action)}
                   className="inline-flex px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
                   style={{
                     border: "1px solid var(--border)",
                     backgroundColor: "transparent",
                   }}
                 >
-                  {getActionDestinationLabel(action.category)}
+                  {getActionDestinationLabel(action)}
                 </Link>
               </div>
             </article>
