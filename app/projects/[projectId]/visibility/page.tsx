@@ -101,7 +101,7 @@ function buildMarketFootingSummary(input: {
   const searchLabel = `${keyword} in ${metro}`;
 
   if (typeof latestRank !== "number") {
-    return `Digital Brain does not have enough saved rank data yet to describe ${businessName}'s current footing for ${searchLabel}.`;
+    return `Digital Brain does not have enough saved rank data yet to describe ${businessName}'s current visibility position for ${searchLabel}.`;
   }
 
   if (latestRank <= 3) {
@@ -112,8 +112,8 @@ function buildMarketFootingSummary(input: {
 
   if (latestRank <= 10) {
     return typeof bestRank === "number"
-      ? `${businessName} is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}, and the best saved rank is #${bestRank}.`
-      : `${businessName} is visible for ${searchLabel}, but it has not reached the strongest footing yet. The latest saved rank is #${latestRank}.`;
+      ? `${businessName} is visible for ${searchLabel}, but it has not reached its strongest ranking position yet. The latest saved rank is #${latestRank}, and the best saved rank is #${bestRank}.`
+      : `${businessName} is visible for ${searchLabel}, but it has not reached its strongest ranking position yet. The latest saved rank is #${latestRank}.`;
   }
 
   return typeof bestRank === "number"
@@ -318,13 +318,13 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     ? `Set one tracked search for ${visibilityHeadlineBusinessName} before visibility can be measured clearly.`
     : isTrackingInactive
       ? `Finish tracked-search activation for ${visibilityHeadlineBusinessName} before visibility can be measured clearly.`
-      : `See whether ${visibilityHeadlineBusinessName} has real local ranking footing in the market that matters most.`;
+      : `See whether ${visibilityHeadlineBusinessName} has real local ranking strength in the market that matters most.`;
 
   const heroSupportLine = isSetupBlocked
     ? "This project does not have a tracked keyword and market yet, so Digital Brain cannot build a reliable visibility read."
     : isTrackingInactive
       ? "This project has a saved tracked search, but tracking is not active yet, so the visibility read is still in setup mode."
-      : "This page shows the tracked keyword, current ranking footing, and the clearest next move to strengthen local visibility.";
+      : "This page shows the tracked keyword, current ranking position, and the clearest next move to strengthen local visibility.";
 
   const trackingStatus = isSetupBlocked
     ? "Not configured"
@@ -340,7 +340,7 @@ export default function ProjectVisibilityPage({ params }: PageProps) {
     ? `Start by choosing one real search phrase and market for ${visibilityHeadlineBusinessName}. Visibility cannot be measured clearly until that tracked search exists.`
     : isTrackingInactive
       ? "Start by activating the saved tracked search. Visibility cannot be measured clearly until tracking is active."
-      : "Start with the biggest visibility gap first. Stronger local footing begins with a real tracked search, a clear market, and a practical next action.";
+      : "Start with the biggest visibility gap first. Stronger local ranking begins with a real tracked search, a clear market, and a practical next action.";
 
   const rankMovement = formatRankMovement(latestRank, previousRank);
   const rankTrendSummary = buildRankTrendSummary({
