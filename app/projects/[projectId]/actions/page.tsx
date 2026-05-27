@@ -22,6 +22,16 @@ function categoryLabel(category: string) {
   return category;
 }
 
+function intentLabel(intent: ActionIntent) {
+  if (intent === "reviews") return "Reviews";
+  if (intent === "profile") return "Business profile";
+  if (intent === "website") return "Website";
+  if (intent === "competition") return "Competitors";
+  if (intent === "visibility") return "Visibility";
+  if (intent === "activity") return "Business activity";
+  return "General";
+}
+
 function formatPriority(priority: string) {
   if (!priority) return "Unknown";
   return priority.charAt(0).toUpperCase() + priority.slice(1);
@@ -406,6 +416,7 @@ function ActionGroup({
         {items.map((action, index) => {
           const priorityTone = getPriorityTone(action.priority);
           const categoryTone = getCategoryTone(action.category);
+          const actionIntent = classifyActionIntent(action);
 
           return (
             <article
@@ -438,6 +449,7 @@ function ActionGroup({
                   >
                     {categoryLabel(action.category)}
                   </InlineTag>
+                  <InlineTag>Action focus: {intentLabel(actionIntent)}</InlineTag>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--text-body)]">
                   {getActionDestinationHelper(action)}
