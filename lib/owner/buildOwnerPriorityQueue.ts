@@ -126,7 +126,9 @@ function classifyActionIntent(action: ProjectAction): ActionIntent {
     textOnlySearchText.includes("description") ||
     textOnlySearchText.includes("photo") ||
     textOnlySearchText.includes("q&a") ||
-    textOnlySearchText.includes("questions")
+    textOnlySearchText.includes("questions") ||
+    textOnlySearchText.includes("hours") ||
+    textOnlySearchText.includes("phone")
   ) {
     return "profile";
   }
@@ -319,6 +321,57 @@ function buildWhyNow(priority: "high" | "medium" | "low", intent: ActionIntent):
   return "This is worth addressing soon because it supports stronger local visibility.";
 }
 
+function getPriorityWeight(priority: string): number {
+  if (priority === "high") return 0;
+  if (priority === "medium") return 1;
+  if (priority === "low") return 2;
+
+  return 3;
+}
+
+function getIntentWeight(intent: string): number {
+  if (intent === "reviews") return 0;
+  if (intent === "activity") return 1;
+  if (intent === "profile") return 2;
+  if (intent === "visibility") return 3;
+  if (intent === "website") return 4;
+  if (intent === "competition") return 5;
+  if (intent === "authority") return 6;
+
+  return 7;
+}
+
+function getPriorityRanking(priority: OwnerPriority): {
+  priorityWeight: number;
+  intentWeight: number;
+  confidenceWeight: number;
+  originalSortOrder: number;
+} {
+  const rawPriority =
+    typeof priority.task_data.priority === "string"
+      ? priority.task_data.priority
+      : "";
+
+  return {
+    priorityWeight: getPriorityWeight(rawPriority),
+    intentWeight: getIntentWeight(priority.task_type),
+    confidenceWeight: -priority.confidence_level,
+    originalSortOrder: priority.sort_order,
+  };
+}
+
+function compareOwnerPriorities(a: OwnerPriority, b: OwnerPriority): number {
+  const left = getPriorityRanking(a);
+  const right = getPriorityRanking(b);
+
+  return (
+    left.priorityWeight - right.priorityWeight ||
+    left.intentWeight - right.intentWeight ||
+    left.confidenceWeight - right.confidenceWeight ||
+    left.originalSortOrder - right.originalSortOrder
+  );
+}
+
 function mapActionToOwnerPriority(
   action: ProjectAction,
   sortOrder: number,
@@ -473,6 +526,7 @@ function buildBalancedPriorityQueue(
   }
 
   return Array.from(uniquePriorities.values())
+    .sort(compareOwnerPriorities)
     .slice(0, 3)
     .map((priority, index) => ({
       ...priority,
