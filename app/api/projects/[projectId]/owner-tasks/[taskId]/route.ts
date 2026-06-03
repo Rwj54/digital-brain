@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { resolveOwnerTaskImpactIntent } from "@/lib/owner/taskImpactComparisonSources";
 
 type RouteContext = {
   params: Promise<{
@@ -33,6 +34,19 @@ type OwnerTaskStatusRow = {
   id: string;
   status: string;
 };
+
+type GbpProfileBaselineRow = {
+  total_reviews: number | null;
+  rating: number | null;
+  last_fetched_at: string | null;
+};
+
+type CompetitorReviewBaselineRow = {
+  competitor_name: string | null;
+  total_reviews: number | null;
+};
+
+type SupabaseServiceRoleClient = ReturnType<typeof getServiceRoleSupabase>;
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -96,22 +110,35 @@ function todayDateUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getTaskDataValue(taskData: Record<string, unknown>, key: string): string | null {
+function getTaskDataValue(
+  taskData: Record<string, unknown>,
+  key: string,
+): string | null {
   const value = taskData[key];
 
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-async function upsertOwnerTaskImpact(params: {
-  supabase: ReturnType<typeof getServiceRoleSupabase>;
-  projectId: string;
+function normalizeNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function calculateReviewGap(
+  currentReviews: number | null,
+  topCompetitorReviews: number | null,
+): number | null {
+  if (currentReviews === null || topCompetitorReviews === null) {
+    return null;
+  }
+
+  return Math.max(0, topCompetitorReviews - currentReviews);
+}
+
+function buildTaskBaselineMetadata(params: {
   task: OwnerTaskRow;
   completedAt: string;
 }) {
-  const impactWindowDays = 30;
-  const capturedAt = todayDateUTC();
-
-  const baselineMetrics = {
+  return {
     task_title: params.task.title,
     task_type: params.task.task_type,
     task_priority: getTaskDataValue(params.task.task_data, "priority"),
@@ -123,6 +150,112 @@ async function upsertOwnerTaskImpact(params: {
     completed_at: params.completedAt,
     baseline_captured_at: new Date().toISOString(),
   };
+}
+
+async function loadReviewBaselineMetrics(params: {
+  supabase: SupabaseServiceRoleClient;
+  projectId: string;
+}) {
+  const [
+    { data: gbpProfiles, error: gbpError },
+    { data: competitors, error: competitorError },
+  ] = await Promise.all([
+    params.supabase
+      .from("gbp_profiles")
+      .select("total_reviews, rating, last_fetched_at")
+      .eq("project_id", params.projectId)
+      .order("last_fetched_at", { ascending: false })
+      .limit(1)
+      .returns<GbpProfileBaselineRow[]>(),
+    params.supabase
+      .from("gbp_competitor_metrics")
+      .select("competitor_name, total_reviews")
+      .eq("project_id", params.projectId)
+      .order("total_reviews", { ascending: false })
+      .limit(1)
+      .returns<CompetitorReviewBaselineRow[]>(),
+  ]);
+
+  if (gbpError) {
+    throw new Error(`Failed to load review baseline profile data: ${gbpError.message}`);
+  }
+
+  if (competitorError) {
+    throw new Error(
+      `Failed to load review baseline competitor data: ${competitorError.message}`,
+    );
+  }
+
+  const gbpProfile = gbpProfiles?.[0] ?? null;
+  const topCompetitor = competitors?.[0] ?? null;
+
+  const baselineCurrentReviews = normalizeNumber(gbpProfile?.total_reviews);
+  const baselineCurrentRating = normalizeNumber(gbpProfile?.rating);
+  const baselineTopCompetitorReviews = normalizeNumber(
+    topCompetitor?.total_reviews,
+  );
+
+  return {
+    baseline_review_data_available:
+      baselineCurrentReviews !== null || baselineTopCompetitorReviews !== null,
+    baseline_current_reviews: baselineCurrentReviews,
+    baseline_current_rating: baselineCurrentRating,
+    baseline_profile_last_fetched_at: gbpProfile?.last_fetched_at ?? null,
+    baseline_top_competitor_name: topCompetitor?.competitor_name ?? null,
+    baseline_top_competitor_reviews: baselineTopCompetitorReviews,
+    baseline_review_gap: calculateReviewGap(
+      baselineCurrentReviews,
+      baselineTopCompetitorReviews,
+    ),
+  };
+}
+
+async function buildBaselineMetrics(params: {
+  supabase: SupabaseServiceRoleClient;
+  projectId: string;
+  task: OwnerTaskRow;
+  completedAt: string;
+}) {
+  const taskBaselineMetadata = buildTaskBaselineMetadata({
+    task: params.task,
+    completedAt: params.completedAt,
+  });
+  const intent = resolveOwnerTaskImpactIntent(taskBaselineMetadata);
+
+  if (intent !== "reviews") {
+    return {
+      ...taskBaselineMetadata,
+      baseline_intent: intent,
+    };
+  }
+
+  const reviewBaselineMetrics = await loadReviewBaselineMetrics({
+    supabase: params.supabase,
+    projectId: params.projectId,
+  });
+
+  return {
+    ...taskBaselineMetadata,
+    baseline_intent: intent,
+    ...reviewBaselineMetrics,
+  };
+}
+
+async function upsertOwnerTaskImpact(params: {
+  supabase: SupabaseServiceRoleClient;
+  projectId: string;
+  task: OwnerTaskRow;
+  completedAt: string;
+}) {
+  const impactWindowDays = 30;
+  const capturedAt = todayDateUTC();
+
+  const baselineMetrics = await buildBaselineMetrics({
+    supabase: params.supabase,
+    projectId: params.projectId,
+    task: params.task,
+    completedAt: params.completedAt,
+  });
 
   const { error } = await params.supabase.from("owner_task_impacts").upsert(
     {
@@ -164,20 +297,22 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const supabase = getServiceRoleSupabase();
 
-    const [{ data: taskData, error: taskError }, { data: allTasks, error: allTasksError }] =
-      await Promise.all([
-        supabase
-          .from("owner_tasks")
-          .select(TASK_SELECT)
-          .eq("project_id", projectId)
-          .eq("id", taskId)
-          .single<OwnerTaskRow>(),
-        supabase
-          .from("owner_tasks")
-          .select("id, status")
-          .eq("project_id", projectId)
-          .returns<OwnerTaskStatusRow[]>(),
-      ]);
+    const [
+      { data: taskData, error: taskError },
+      { data: allTasks, error: allTasksError },
+    ] = await Promise.all([
+      supabase
+        .from("owner_tasks")
+        .select(TASK_SELECT)
+        .eq("project_id", projectId)
+        .eq("id", taskId)
+        .single<OwnerTaskRow>(),
+      supabase
+        .from("owner_tasks")
+        .select("id, status")
+        .eq("project_id", projectId)
+        .returns<OwnerTaskStatusRow[]>(),
+    ]);
 
     if (taskError) {
       throw new Error(`Failed to load owner task: ${taskError.message}`);
