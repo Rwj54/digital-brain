@@ -128,4 +128,52 @@ using (
   )
 );
 
+
+-- ============================================================
+-- TABLE: owner_task_impacts
+-- ============================================================
+
+create table if not exists public.owner_task_impacts (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  owner_task_id uuid not null references public.owner_tasks(id) on delete cascade,
+  captured_at date not null default current_date,
+  impact_window_days integer not null default 30,
+  status text not null default 'waiting_for_window',
+  source text not null default 'owner_task_completion',
+  baseline_metrics jsonb not null default '{}'::jsonb,
+  comparison_metrics jsonb not null default '{}'::jsonb,
+  impact_summary text,
+  confidence_level numeric,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now(),
+  constraint owner_task_impacts_impact_window_days_positive
+    check (impact_window_days > 0)
+);
+
+create unique index if not exists owner_task_impacts_owner_task_id_captured_at_window_key
+on public.owner_task_impacts (owner_task_id, captured_at, impact_window_days);
+
+create index if not exists owner_task_impacts_project_id_captured_at_idx
+on public.owner_task_impacts (project_id, captured_at desc);
+
+create index if not exists owner_task_impacts_owner_task_id_idx
+on public.owner_task_impacts (owner_task_id);
+
+alter table public.owner_task_impacts enable row level security;
+
+drop policy if exists "read owner task impacts" on public.owner_task_impacts;
+
+create policy "read owner task impacts"
+on public.owner_task_impacts
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.projects p
+    where p.id = owner_task_impacts.project_id
+  )
+);
+
 commit;
