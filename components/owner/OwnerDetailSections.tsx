@@ -137,6 +137,50 @@ function getImpactWatchText(impact: OwnerTaskImpact | null): string {
   return "This task has an impact record attached for future outcome comparison. No outcome impact has been claimed yet.";
 }
 
+function formatComparisonPolicy(impact: OwnerTaskImpact): string {
+  if (impact.comparisonPlan.claimPolicy === "compare_only_no_attribution") {
+    return "Conservative comparison";
+  }
+
+  if (impact.comparisonPlan.claimPolicy === "context_only_no_claim") {
+    return "Context only";
+  }
+
+  return "Future source needed";
+}
+
+function formatComparisonCapability(impact: OwnerTaskImpact): string {
+  if (impact.comparisonPlan.canCompareNow) {
+    return "Can compare later";
+  }
+
+  if (impact.comparisonPlan.claimPolicy === "future_required_no_claim") {
+    return "Needs future source";
+  }
+
+  return "Context only";
+}
+
+function getComparisonSourceLabels(impact: OwnerTaskImpact): string[] {
+  const plan = impact.comparisonPlan;
+  const primarySources = plan.canCompareNow
+    ? plan.allowedSources
+    : plan.contextSources;
+
+  return primarySources.slice(0, 3).map((source) => source.ownerLabel);
+}
+
+function getComparisonNoClaimLanguage(impact: OwnerTaskImpact): string {
+  const plan = impact.comparisonPlan;
+  const source =
+    plan.allowedSources[0] ?? plan.contextSources[0] ?? plan.futureSources[0];
+
+  return (
+    source?.noClaimLanguage ??
+    "Digital Brain can preserve this task for future comparison, but it should not claim the action caused a result without stronger proof."
+  );
+}
+
 export function OwnerDetailSections({
   dashboard,
   tasksData,
@@ -854,72 +898,75 @@ export function OwnerDetailSections({
               <div className="mt-6 space-y-6">
                 {steps.map((step) => {
                   const stepImpact = getStepImpact(step, impactsData);
+                  const comparisonSourceLabels = stepImpact
+                    ? getComparisonSourceLabels(stepImpact)
+                    : [];
 
                   return (
                     <div
                       key={`detail-${step.key}`}
-                    className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-[var(--text-strong)]">
-                        {step.title}
+                      className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-base font-semibold text-[var(--text-strong)]">
+                          {step.title}
+                        </p>
+                        <InlineTag tone={getSummaryTone("visibility")}>
+                          {step.status === "completed"
+                            ? "Completed"
+                            : step.status === "recommended"
+                              ? "Recommended"
+                              : "Open"}
+                        </InlineTag>
+                      </div>
+
+                      <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
+                        {step.reason}
                       </p>
-                      <InlineTag tone={getSummaryTone("visibility")}>
-                        {step.status === "completed"
-                          ? "Completed"
-                          : step.status === "recommended"
-                            ? "Recommended"
-                            : "Open"}
-                      </InlineTag>
-                    </div>
 
-                    <p className="mt-3 text-sm leading-7 text-[var(--text-body)]">
-                      {step.reason}
-                    </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <InlineTag>Who: {step.who}</InlineTag>
+                        <InlineTag>Time: {step.time}</InlineTag>
+                        <InlineTag>Difficulty: {step.difficulty}</InlineTag>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <InlineTag>Who: {step.who}</InlineTag>
-                      <InlineTag>Time: {step.time}</InlineTag>
-                      <InlineTag>Difficulty: {step.difficulty}</InlineTag>
-                    </div>
+                      <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            Expected benefit
+                          </dt>
+                          <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                            {step.expectedBenefit}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            What success looks like
+                          </dt>
+                          <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                            {step.proofOfCompletion}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            Confidence
+                          </dt>
+                          <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                            {step.confidenceLabel}
+                          </dd>
+                        </div>
+                      </dl>
 
-                    <dl className="mt-4 grid gap-4 sm:grid-cols-3">
-                      <div>
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                          Expected benefit
-                        </dt>
-                        <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {step.expectedBenefit}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                          What success looks like
-                        </dt>
-                        <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {step.proofOfCompletion}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                          Confidence
-                        </dt>
-                        <dd className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {step.confidenceLabel}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    {getStepCompletionProofNote(step) ? (
-                      <div className="mt-4 border-t border-[var(--border)] pt-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                          Completion proof
-                        </p>
-                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {getStepCompletionProofNote(step)}
-                        </p>
-                      </div>
-                    ) : null}
+                      {getStepCompletionProofNote(step) ? (
+                        <div className="mt-4 border-t border-[var(--border)] pt-4">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            Completion proof
+                          </p>
+                          <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                            {getStepCompletionProofNote(step)}
+                          </p>
+                        </div>
+                      ) : null}
 
                       {stepImpact ? (
                         <div className="mt-4 border-t border-[var(--border)] pt-4">
@@ -946,6 +993,47 @@ export function OwnerDetailSections({
                               {stepImpact.readiness.isWindowReady ? "Yes" : "No"}
                             </InlineTag>
                           </div>
+
+                          <div className="mt-4 border-t border-[var(--border)] pt-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                Future comparison plan
+                              </p>
+                              <InlineTag>
+                                {formatComparisonCapability(stepImpact)}
+                              </InlineTag>
+                              <InlineTag>{formatComparisonPolicy(stepImpact)}</InlineTag>
+                            </div>
+                            <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                              {stepImpact.comparisonPlan.ownerSummary}
+                            </p>
+
+                            {comparisonSourceLabels.length > 0 ? (
+                              <div className="mt-3">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                  Comparison signals
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {comparisonSourceLabels.map((label) => (
+                                    <InlineTag key={`${step.key}-${label}`}>
+                                      {label}
+                                    </InlineTag>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {stepImpact.comparisonPlan.blockedReason ? (
+                              <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                                {stepImpact.comparisonPlan.blockedReason}
+                              </p>
+                            ) : null}
+
+                            <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                              {getComparisonNoClaimLanguage(stepImpact)}
+                            </p>
+                          </div>
+
                           <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
                             This is timing metadata only. Digital Brain has not
                             claimed this action improved rankings, reviews, or
@@ -986,6 +1074,21 @@ export function OwnerDetailSections({
                 helper="Impact watches whose waiting window has elapsed. This does not claim the action worked yet."
               />
               <DetailRow
+                label="Comparable later"
+                value={String(impactsData.summary.comparableNow)}
+                helper="Impact watches with a safe comparison source already mapped. This still does not claim attribution."
+              />
+              <DetailRow
+                label="Context only"
+                value={String(impactsData.summary.contextOnly)}
+                helper="Impact watches that can show context but should not be presented as proof."
+              />
+              <DetailRow
+                label="Future source needed"
+                value={String(impactsData.summary.futureRequired)}
+                helper="Impact watches that need future outcome data before comparison is useful."
+              />
+              <DetailRow
                 label="Impact records"
                 value={String(impactsData.summary.totalImpacts)}
                 helper="Historical owner action records being preserved for outcome attribution."
@@ -1016,6 +1119,16 @@ export function OwnerDetailSections({
                           : "No completed action impact records are being watched yet."
                     }
                     color="var(--warning)"
+                  />
+                  <DetailBullet
+                    text={
+                      impactsData.summary.comparableNow > 0
+                        ? `${formatCount(
+                            impactsData.summary.comparableNow,
+                          )} impact watch(es) already have conservative comparison signals mapped for later.`
+                        : "No impact watches have a safe comparison source mapped yet."
+                    }
+                    color="var(--brand-700)"
                   />
                   <DetailBullet
                     text="The decision engine stays in the background while the owner sees only the next useful move."
