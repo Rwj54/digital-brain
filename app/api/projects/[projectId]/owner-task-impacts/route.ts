@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildOwnerTaskImpactComparisonPlanFromBaseline,
+  type OwnerTaskImpactComparisonPlan,
+} from "../../../../../lib/owner/taskImpactComparisonSources";
 
 type RouteContext = {
   params: Promise<{
@@ -38,6 +42,7 @@ type OwnerTaskImpactReadiness = {
 
 type OwnerTaskImpactResponseRow = OwnerTaskImpactRow & {
   readiness: OwnerTaskImpactReadiness;
+  comparisonPlan: OwnerTaskImpactComparisonPlan;
 };
 
 function getEnv(name: string): string {
@@ -165,12 +170,15 @@ function buildImpactReadiness(impact: OwnerTaskImpactRow): OwnerTaskImpactReadin
   };
 }
 
-function withReadiness(
+function withComputedMetadata(
   impact: OwnerTaskImpactRow,
 ): OwnerTaskImpactResponseRow {
   return {
     ...impact,
     readiness: buildImpactReadiness(impact),
+    comparisonPlan: buildOwnerTaskImpactComparisonPlanFromBaseline(
+      impact.baseline_metrics,
+    ),
   };
 }
 
@@ -187,6 +195,15 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
   const computedWindowReady = impacts.filter(
     (impact) => impact.readiness.computedStatus === "window_ready",
   ).length;
+  const comparableNow = impacts.filter(
+    (impact) => impact.comparisonPlan.canCompareNow,
+  ).length;
+  const contextOnly = impacts.filter(
+    (impact) => impact.comparisonPlan.claimPolicy === "context_only_no_claim",
+  ).length;
+  const futureRequired = impacts.filter(
+    (impact) => impact.comparisonPlan.claimPolicy === "future_required_no_claim",
+  ).length;
 
   return {
     totalImpacts: impacts.length,
@@ -194,6 +211,9 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
     windowReady,
     completed,
     computedWindowReady,
+    comparableNow,
+    contextOnly,
+    futureRequired,
   };
 }
 
@@ -241,7 +261,7 @@ export async function GET(request: Request, context: RouteContext) {
       throw new Error(`Failed to load owner task impacts: ${error.message}`);
     }
 
-    const impacts = (data ?? []).map(withReadiness);
+    const impacts = (data ?? []).map(withComputedMetadata);
 
     return NextResponse.json({
       ok: true,
