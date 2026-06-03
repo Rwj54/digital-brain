@@ -1,3 +1,5 @@
+import type { OwnerTaskImpactComparisonPlan } from "./taskImpactComparisonSources";
+
 export type OwnerPriority = {
   title: string;
   plain_language_reason: string;
@@ -233,6 +235,7 @@ export type OwnerTaskImpact = {
   created_at: string;
   updated_at: string;
   readiness: OwnerTaskImpactReadiness;
+  comparisonPlan: OwnerTaskImpactComparisonPlan;
 };
 
 export type OwnerTaskImpactsResponse = {
@@ -250,6 +253,9 @@ export type OwnerTaskImpactsResponse = {
     windowReady: number;
     completed: number;
     computedWindowReady: number;
+    comparableNow: number;
+    contextOnly: number;
+    futureRequired: number;
   };
   impacts: OwnerTaskImpact[];
 };
