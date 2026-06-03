@@ -211,6 +211,13 @@ export type OwnerTasksResponse = {
   tasks: OwnerTask[];
 };
 
+export type OwnerTaskImpactReadiness = {
+  eligibleOn: string | null;
+  daysRemaining: number | null;
+  isWindowReady: boolean;
+  computedStatus: "waiting_for_window" | "window_ready" | "completed" | "tracked";
+};
+
 export type OwnerTaskImpact = {
   id: string;
   project_id: string;
@@ -225,6 +232,7 @@ export type OwnerTaskImpact = {
   confidence_level: number | null;
   created_at: string;
   updated_at: string;
+  readiness: OwnerTaskImpactReadiness;
 };
 
 export type OwnerTaskImpactsResponse = {
@@ -241,6 +249,7 @@ export type OwnerTaskImpactsResponse = {
     waitingForWindow: number;
     windowReady: number;
     completed: number;
+    computedWindowReady: number;
   };
   impacts: OwnerTaskImpact[];
 };

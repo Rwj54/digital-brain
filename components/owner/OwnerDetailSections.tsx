@@ -70,7 +70,9 @@ function getStepImpact(
   );
 }
 
-function formatImpactStatus(status: string): string {
+function formatImpactStatus(impact: OwnerTaskImpact): string {
+  const status = impact.readiness.computedStatus || impact.status;
+
   if (status === "waiting_for_window") return "Watching";
   if (status === "window_ready") return "Ready to compare";
   if (status === "completed") return "Compared";
@@ -78,24 +80,61 @@ function formatImpactStatus(status: string): string {
   return "Tracked";
 }
 
+function formatDaysRemaining(daysRemaining: number | null): string {
+  if (daysRemaining === null) {
+    return "Timing not available";
+  }
+
+  if (daysRemaining === 0) {
+    return "Ready now";
+  }
+
+  if (daysRemaining === 1) {
+    return "1 day left";
+  }
+
+  return `${daysRemaining} days left`;
+}
+
+function formatImpactEligibleDate(value: string | null): string {
+  if (!value) {
+    return "Not set";
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return formatDate(value);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 function getImpactWatchText(impact: OwnerTaskImpact | null): string {
   if (!impact) {
     return "No impact watch has been started for this task yet.";
   }
 
-  if (impact.status === "waiting_for_window") {
-    return `Digital Brain is watching this action for ${impact.impact_window_days} days before comparing what changed.`;
-  }
-
-  if (impact.status === "window_ready") {
-    return "The watch window is ready for comparison.";
-  }
-
-  if (impact.status === "completed" && impact.impact_summary) {
+  if (impact.readiness.computedStatus === "completed" && impact.impact_summary) {
     return impact.impact_summary;
   }
 
-  return "This task has an impact record attached for future outcome comparison.";
+  if (impact.readiness.isWindowReady) {
+    return "The watch window is ready for comparison. Digital Brain has not claimed the action worked yet; it only knows the waiting period is complete.";
+  }
+
+  if (impact.readiness.eligibleOn) {
+    return `Digital Brain is watching this action until ${formatImpactEligibleDate(
+      impact.readiness.eligibleOn,
+    )} before comparing what changed. No outcome impact has been claimed yet.`;
+  }
+
+  return "This task has an impact record attached for future outcome comparison. No outcome impact has been claimed yet.";
 }
 
 export function OwnerDetailSections({
@@ -813,9 +852,12 @@ export function OwnerDetailSections({
               </p>
 
               <div className="mt-6 space-y-6">
-                {steps.map((step) => (
-                  <div
-                    key={`detail-${step.key}`}
+                {steps.map((step) => {
+                  const stepImpact = getStepImpact(step, impactsData);
+
+                  return (
+                    <div
+                      key={`detail-${step.key}`}
                     className="border-t border-[var(--border)] pt-5 first:border-t-0 first:pt-0"
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -879,25 +921,41 @@ export function OwnerDetailSections({
                       </div>
                     ) : null}
 
-                    {getStepImpact(step, impactsData) ? (
-                      <div className="mt-4 border-t border-[var(--border)] pt-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                            Impact watch
+                      {stepImpact ? (
+                        <div className="mt-4 border-t border-[var(--border)] pt-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                              Impact watch
+                            </p>
+                            <InlineTag>{formatImpactStatus(stepImpact)}</InlineTag>
+                          </div>
+                          <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                            {getImpactWatchText(stepImpact)}
                           </p>
-                          <InlineTag>
-                            {formatImpactStatus(
-                              getStepImpact(step, impactsData)?.status ?? "",
-                            )}
-                          </InlineTag>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <InlineTag>
+                              Eligible: {formatImpactEligibleDate(stepImpact.readiness.eligibleOn)}
+                            </InlineTag>
+                            <InlineTag>
+                              {formatDaysRemaining(
+                                stepImpact.readiness.daysRemaining,
+                              )}
+                            </InlineTag>
+                            <InlineTag>
+                              Ready to compare:{" "}
+                              {stepImpact.readiness.isWindowReady ? "Yes" : "No"}
+                            </InlineTag>
+                          </div>
+                          <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                            This is timing metadata only. Digital Brain has not
+                            claimed this action improved rankings, reviews, or
+                            business outcomes yet.
+                          </p>
                         </div>
-                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
-                          {getImpactWatchText(getStepImpact(step, impactsData))}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -923,6 +981,11 @@ export function OwnerDetailSections({
                 helper="Completed action records waiting for their comparison window."
               />
               <DetailRow
+                label="Ready to compare"
+                value={String(impactsData.summary.computedWindowReady)}
+                helper="Impact watches whose waiting window has elapsed. This does not claim the action worked yet."
+              />
+              <DetailRow
                 label="Impact records"
                 value={String(impactsData.summary.totalImpacts)}
                 helper="Historical owner action records being preserved for outcome attribution."
@@ -942,11 +1005,15 @@ export function OwnerDetailSections({
                   />
                   <DetailBullet
                     text={
-                      impactsData.summary.totalImpacts > 0
+                      impactsData.summary.computedWindowReady > 0
                         ? `${formatCount(
-                            impactsData.summary.waitingForWindow,
-                          )} completed action record(s) are being watched for later outcome comparison.`
-                        : "No completed action impact records are being watched yet."
+                            impactsData.summary.computedWindowReady,
+                          )} completed action record(s) are ready for a future comparison pass.`
+                        : impactsData.summary.totalImpacts > 0
+                          ? `${formatCount(
+                              impactsData.summary.waitingForWindow,
+                            )} completed action record(s) are being watched for later outcome comparison.`
+                          : "No completed action impact records are being watched yet."
                     }
                     color="var(--warning)"
                   />
