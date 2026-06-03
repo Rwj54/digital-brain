@@ -92,6 +92,62 @@ function buildTaskCounts(tasks: OwnerTaskStatusRow[] | null) {
   };
 }
 
+function todayDateUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getTaskDataValue(taskData: Record<string, unknown>, key: string): string | null {
+  const value = taskData[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function upsertOwnerTaskImpact(params: {
+  supabase: ReturnType<typeof getServiceRoleSupabase>;
+  projectId: string;
+  task: OwnerTaskRow;
+  completedAt: string;
+}) {
+  const impactWindowDays = 30;
+  const capturedAt = todayDateUTC();
+
+  const baselineMetrics = {
+    task_title: params.task.title,
+    task_type: params.task.task_type,
+    task_priority: getTaskDataValue(params.task.task_data, "priority"),
+    task_category: getTaskDataValue(params.task.task_data, "category"),
+    inferred_intent: getTaskDataValue(params.task.task_data, "inferred_intent"),
+    completion_proof_present: Boolean(
+      getTaskDataValue(params.task.task_data, "completion_proof_note"),
+    ),
+    completed_at: params.completedAt,
+    baseline_captured_at: new Date().toISOString(),
+  };
+
+  const { error } = await params.supabase.from("owner_task_impacts").upsert(
+    {
+      project_id: params.projectId,
+      owner_task_id: params.task.id,
+      captured_at: capturedAt,
+      impact_window_days: impactWindowDays,
+      status: "waiting_for_window",
+      source: "owner_task_completion",
+      baseline_metrics: baselineMetrics,
+      comparison_metrics: {},
+      impact_summary: null,
+      confidence_level: null,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "owner_task_id,captured_at,impact_window_days",
+    },
+  );
+
+  if (error) {
+    throw new Error(`Failed to create owner task impact row: ${error.message}`);
+  }
+}
+
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { projectId, taskId } = await context.params;
@@ -227,6 +283,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (taskError) {
       throw new Error(`Failed to update owner task: ${taskError.message}`);
+    }
+
+    if (nextStatus === "completed" && completedAt) {
+      await upsertOwnerTaskImpact({
+        supabase,
+        projectId,
+        task: taskData,
+        completedAt,
+      });
     }
 
     const { data: allTasks, error: allTasksError } = await supabase
