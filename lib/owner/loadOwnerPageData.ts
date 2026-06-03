@@ -2,6 +2,7 @@ import {
   type OwnerAiSummaryResponse,
   type OwnerDashboardResponse,
   type OwnerPageData,
+  type OwnerTaskImpactsResponse,
   type OwnerTasksResponse,
   type OwnerVisibilitySummaryResponse,
   type OwnerWebsiteSummaryResponse,
@@ -32,6 +33,7 @@ export async function loadOwnerPageData(
   const [
     dashboardJson,
     tasksJson,
+    impactsJson,
     visibilityJson,
     websiteJson,
     aiJson,
@@ -42,6 +44,10 @@ export async function loadOwnerPageData(
     ),
     fetchOwnerJson<OwnerTasksResponse>(
       buildOwnerApiPath(projectId, "owner-tasks"),
+      "Failed to load owner dashboard.",
+    ),
+    fetchOwnerJson<OwnerTaskImpactsResponse>(
+      buildOwnerApiPath(projectId, "owner-task-impacts"),
       "Failed to load owner dashboard.",
     ),
     fetchOwnerJson<OwnerVisibilitySummaryResponse>(
@@ -69,5 +75,6 @@ export async function loadOwnerPageData(
       },
     },
     tasksData: tasksJson,
+    impactsData: impactsJson,
   };
 }

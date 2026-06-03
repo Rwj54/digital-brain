@@ -16,6 +16,7 @@ export default function OwnerDashboardPage({ params }: Props) {
   const {
     dashboard,
     tasksData,
+    impactsData,
     loading,
     savingTaskId,
     error,
@@ -42,7 +43,7 @@ export default function OwnerDashboardPage({ params }: Props) {
     );
   }
 
-  if (error || !dashboard || !tasksData) {
+  if (error || !dashboard || !tasksData || !impactsData) {
     return (
       <main className="min-h-screen bg-[var(--app-bg)] px-4 py-8 text-[var(--text-strong)] sm:px-6">
         <div className="mx-auto max-w-7xl">
@@ -79,6 +80,7 @@ export default function OwnerDashboardPage({ params }: Props) {
         <OwnerDetailSections
           dashboard={dashboard}
           tasksData={tasksData}
+          impactsData={impactsData}
           steps={steps}
           detailTab={detailTab}
           onDetailTabChange={setDetailTab}

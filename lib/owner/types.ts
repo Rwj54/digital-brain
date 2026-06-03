@@ -211,6 +211,40 @@ export type OwnerTasksResponse = {
   tasks: OwnerTask[];
 };
 
+export type OwnerTaskImpact = {
+  id: string;
+  project_id: string;
+  owner_task_id: string;
+  captured_at: string;
+  impact_window_days: number;
+  status: string;
+  source: string;
+  baseline_metrics: Record<string, unknown>;
+  comparison_metrics: Record<string, unknown>;
+  impact_summary: string | null;
+  confidence_level: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OwnerTaskImpactsResponse = {
+  ok: boolean;
+  projectId: string;
+  filters: {
+    ownerTaskId: string | null;
+    status: string;
+    limit: number;
+  };
+  count: number;
+  summary: {
+    totalImpacts: number;
+    waitingForWindow: number;
+    windowReady: number;
+    completed: number;
+  };
+  impacts: OwnerTaskImpact[];
+};
+
 export type OwnerPageDashboard = Omit<OwnerDashboardResponse, "dashboard"> & {
   dashboard: Omit<
     OwnerDashboardResponse["dashboard"],
@@ -225,6 +259,7 @@ export type OwnerPageDashboard = Omit<OwnerDashboardResponse, "dashboard"> & {
 export type OwnerPageData = {
   dashboard: OwnerPageDashboard;
   tasksData: OwnerTasksResponse;
+  impactsData: OwnerTaskImpactsResponse;
 };
 
 export type Props = {

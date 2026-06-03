@@ -6,6 +6,7 @@ import { loadOwnerPageData } from "@/lib/owner/loadOwnerPageData";
 import {
   type OwnerPageDashboard,
   type OwnerTask,
+  type OwnerTaskImpactsResponse,
   type OwnerTasksResponse,
   type Props,
 } from "@/lib/owner/types";
@@ -19,6 +20,7 @@ type OwnerOutcomesSummaryResponse = {
 type UseOwnerPageStateResult = {
   dashboard: OwnerPageDashboard | null;
   tasksData: OwnerTasksResponse | null;
+  impactsData: OwnerTaskImpactsResponse | null;
   loading: boolean;
   savingTaskId: string | null;
   error: string;
@@ -31,6 +33,8 @@ export function useOwnerPageState(
   const [projectId, setProjectId] = useState<string>("");
   const [dashboard, setDashboard] = useState<OwnerPageDashboard | null>(null);
   const [tasksData, setTasksData] = useState<OwnerTasksResponse | null>(null);
+  const [impactsData, setImpactsData] =
+    useState<OwnerTaskImpactsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
@@ -88,6 +92,7 @@ export function useOwnerPageState(
 
         setDashboard(mergedDashboard);
         setTasksData(data.tasksData);
+        setImpactsData(data.impactsData);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load owner dashboard.",
@@ -149,6 +154,7 @@ export function useOwnerPageState(
   return {
     dashboard,
     tasksData,
+    impactsData,
     loading,
     savingTaskId,
     error,

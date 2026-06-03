@@ -24,6 +24,8 @@ import {
 import {
   type DetailTab,
   type OwnerPageDashboard,
+  type OwnerTaskImpact,
+  type OwnerTaskImpactsResponse,
   type OwnerTasksResponse,
   type RenderStep,
 } from "@/lib/owner/types";
@@ -38,6 +40,7 @@ import {
 type Props = {
   dashboard: OwnerPageDashboard;
   tasksData: OwnerTasksResponse;
+  impactsData: OwnerTaskImpactsResponse;
   steps: RenderStep[];
   detailTab: DetailTab;
   onDetailTabChange: (tab: DetailTab) => void;
@@ -53,9 +56,52 @@ function getStepCompletionProofNote(step: RenderStep): string {
   return typeof note === "string" ? note.trim() : "";
 }
 
+function getStepImpact(
+  step: RenderStep,
+  impactsData: OwnerTaskImpactsResponse,
+): OwnerTaskImpact | null {
+  if (step.kind !== "task") {
+    return null;
+  }
+
+  return (
+    impactsData.impacts.find((impact) => impact.owner_task_id === step.task.id) ??
+    null
+  );
+}
+
+function formatImpactStatus(status: string): string {
+  if (status === "waiting_for_window") return "Watching";
+  if (status === "window_ready") return "Ready to compare";
+  if (status === "completed") return "Compared";
+
+  return "Tracked";
+}
+
+function getImpactWatchText(impact: OwnerTaskImpact | null): string {
+  if (!impact) {
+    return "No impact watch has been started for this task yet.";
+  }
+
+  if (impact.status === "waiting_for_window") {
+    return `Digital Brain is watching this action for ${impact.impact_window_days} days before comparing what changed.`;
+  }
+
+  if (impact.status === "window_ready") {
+    return "The watch window is ready for comparison.";
+  }
+
+  if (impact.status === "completed" && impact.impact_summary) {
+    return impact.impact_summary;
+  }
+
+  return "This task has an impact record attached for future outcome comparison.";
+}
+
 export function OwnerDetailSections({
   dashboard,
   tasksData,
+  impactsData,
   steps,
   detailTab,
   onDetailTabChange,
@@ -832,6 +878,24 @@ export function OwnerDetailSections({
                         </p>
                       </div>
                     ) : null}
+
+                    {getStepImpact(step, impactsData) ? (
+                      <div className="mt-4 border-t border-[var(--border)] pt-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            Impact watch
+                          </p>
+                          <InlineTag>
+                            {formatImpactStatus(
+                              getStepImpact(step, impactsData)?.status ?? "",
+                            )}
+                          </InlineTag>
+                        </div>
+                        <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                          {getImpactWatchText(getStepImpact(step, impactsData))}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -853,6 +917,16 @@ export function OwnerDetailSections({
                 value={String(dashboard.dashboard.summary.priorityCount)}
                 helper="Owner snapshot recommendations currently available."
               />
+              <DetailRow
+                label="Impact watches"
+                value={String(impactsData.summary.waitingForWindow)}
+                helper="Completed action records waiting for their comparison window."
+              />
+              <DetailRow
+                label="Impact records"
+                value={String(impactsData.summary.totalImpacts)}
+                helper="Historical owner action records being preserved for outcome attribution."
+              />
               <div className="border-t border-[var(--border)] py-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   What this tells you now
@@ -865,6 +939,16 @@ export function OwnerDetailSections({
                   <DetailBullet
                     text="Completion tracking helps prove momentum and reinforce confidence."
                     color="var(--success)"
+                  />
+                  <DetailBullet
+                    text={
+                      impactsData.summary.totalImpacts > 0
+                        ? `${formatCount(
+                            impactsData.summary.waitingForWindow,
+                          )} completed action record(s) are being watched for later outcome comparison.`
+                        : "No completed action impact records are being watched yet."
+                    }
+                    color="var(--warning)"
                   />
                   <DetailBullet
                     text="The decision engine stays in the background while the owner sees only the next useful move."
