@@ -4,6 +4,11 @@ import {
   buildOwnerTaskImpactComparisonPlanFromBaseline,
   type OwnerTaskImpactComparisonPlan,
 } from "../../../../../lib/owner/taskImpactComparisonSources";
+import {
+  buildOwnerTaskReviewComparison,
+  type OwnerTaskReviewComparison,
+  type OwnerTaskReviewCurrentMetrics,
+} from "../../../../../lib/owner/taskImpactReviewComparison";
 
 type RouteContext = {
   params: Promise<{
@@ -43,7 +48,21 @@ type OwnerTaskImpactReadiness = {
 type OwnerTaskImpactResponseRow = OwnerTaskImpactRow & {
   readiness: OwnerTaskImpactReadiness;
   comparisonPlan: OwnerTaskImpactComparisonPlan;
+  reviewComparison: OwnerTaskReviewComparison | null;
 };
+
+type GbpReviewCurrentRow = {
+  total_reviews: number | null;
+  rating: number | null;
+  last_fetched_at: string | null;
+};
+
+type CompetitorReviewCurrentRow = {
+  competitor_name: string | null;
+  total_reviews: number | null;
+};
+
+type SupabaseServiceRoleClient = ReturnType<typeof getServiceRoleSupabase>;
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -90,6 +109,21 @@ function normalizeLimit(value: string | null): number {
   }
 
   return Math.min(Math.max(parsed, 1), 100);
+}
+
+function normalizeNumber(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function calculateReviewGap(
+  currentReviews: number | null,
+  topCompetitorReviews: number | null,
+): number | null {
+  if (currentReviews === null || topCompetitorReviews === null) {
+    return null;
+  }
+
+  return Math.max(0, topCompetitorReviews - currentReviews);
 }
 
 function startOfUtcDay(date: Date): Date {
@@ -170,15 +204,97 @@ function buildImpactReadiness(impact: OwnerTaskImpactRow): OwnerTaskImpactReadin
   };
 }
 
-function withComputedMetadata(
-  impact: OwnerTaskImpactRow,
-): OwnerTaskImpactResponseRow {
+async function loadCurrentReviewMetrics(params: {
+  supabase: SupabaseServiceRoleClient;
+  projectId: string;
+}): Promise<OwnerTaskReviewCurrentMetrics> {
+  const [
+    { data: gbpProfiles, error: gbpError },
+    { data: competitors, error: competitorError },
+  ] = await Promise.all([
+    params.supabase
+      .from("gbp_profiles")
+      .select("total_reviews, rating, last_fetched_at")
+      .eq("project_id", params.projectId)
+      .order("last_fetched_at", { ascending: false })
+      .limit(1)
+      .returns<GbpReviewCurrentRow[]>(),
+    params.supabase
+      .from("gbp_competitor_metrics")
+      .select("competitor_name, total_reviews")
+      .eq("project_id", params.projectId)
+      .order("total_reviews", { ascending: false })
+      .limit(1)
+      .returns<CompetitorReviewCurrentRow[]>(),
+  ]);
+
+  if (gbpError) {
+    throw new Error(`Failed to load current review profile data: ${gbpError.message}`);
+  }
+
+  if (competitorError) {
+    throw new Error(
+      `Failed to load current review competitor data: ${competitorError.message}`,
+    );
+  }
+
+  const gbpProfile = gbpProfiles?.[0] ?? null;
+  const topCompetitor = competitors?.[0] ?? null;
+  const currentReviews = normalizeNumber(gbpProfile?.total_reviews);
+  const currentRating = normalizeNumber(gbpProfile?.rating);
+  const currentTopCompetitorReviews = normalizeNumber(
+    topCompetitor?.total_reviews,
+  );
+
   return {
-    ...impact,
-    readiness: buildImpactReadiness(impact),
-    comparisonPlan: buildOwnerTaskImpactComparisonPlanFromBaseline(
-      impact.baseline_metrics,
+    currentReviews,
+    currentRating,
+    currentProfileLastFetchedAt: gbpProfile?.last_fetched_at ?? null,
+    currentTopCompetitorName: topCompetitor?.competitor_name ?? null,
+    currentTopCompetitorReviews,
+    currentReviewGap: calculateReviewGap(
+      currentReviews,
+      currentTopCompetitorReviews,
     ),
+  };
+}
+
+function buildReviewComparison(params: {
+  impact: OwnerTaskImpactRow;
+  readiness: OwnerTaskImpactReadiness;
+  comparisonPlan: OwnerTaskImpactComparisonPlan;
+  currentReviewMetrics: OwnerTaskReviewCurrentMetrics;
+}): OwnerTaskReviewComparison | null {
+  if (params.comparisonPlan.intent !== "reviews") {
+    return null;
+  }
+
+  return buildOwnerTaskReviewComparison({
+    baselineMetrics: params.impact.baseline_metrics,
+    currentMetrics: params.currentReviewMetrics,
+    isWindowReady: params.readiness.isWindowReady,
+  });
+}
+
+function withComputedMetadata(params: {
+  impact: OwnerTaskImpactRow;
+  currentReviewMetrics: OwnerTaskReviewCurrentMetrics;
+}): OwnerTaskImpactResponseRow {
+  const readiness = buildImpactReadiness(params.impact);
+  const comparisonPlan = buildOwnerTaskImpactComparisonPlanFromBaseline(
+    params.impact.baseline_metrics,
+  );
+
+  return {
+    ...params.impact,
+    readiness,
+    comparisonPlan,
+    reviewComparison: buildReviewComparison({
+      impact: params.impact,
+      readiness,
+      comparisonPlan,
+      currentReviewMetrics: params.currentReviewMetrics,
+    }),
   };
 }
 
@@ -204,6 +320,12 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
   const futureRequired = impacts.filter(
     (impact) => impact.comparisonPlan.claimPolicy === "future_required_no_claim",
   ).length;
+  const reviewComparisons = impacts.filter(
+    (impact) => impact.reviewComparison !== null,
+  ).length;
+  const reviewComparisonsReady = impacts.filter(
+    (impact) => impact.reviewComparison?.canCompare,
+  ).length;
 
   return {
     totalImpacts: impacts.length,
@@ -214,6 +336,8 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
     comparableNow,
     contextOnly,
     futureRequired,
+    reviewComparisons,
+    reviewComparisonsReady,
   };
 }
 
@@ -255,13 +379,21 @@ export async function GET(request: Request, context: RouteContext) {
       query = query.eq("status", statusFilter);
     }
 
-    const { data, error } = await query.returns<OwnerTaskImpactRow[]>();
+    const [{ data, error }, currentReviewMetrics] = await Promise.all([
+      query.returns<OwnerTaskImpactRow[]>(),
+      loadCurrentReviewMetrics({ supabase, projectId }),
+    ]);
 
     if (error) {
       throw new Error(`Failed to load owner task impacts: ${error.message}`);
     }
 
-    const impacts = (data ?? []).map(withComputedMetadata);
+    const impacts = (data ?? []).map((impact) =>
+      withComputedMetadata({
+        impact,
+        currentReviewMetrics,
+      }),
+    );
 
     return NextResponse.json({
       ok: true,
