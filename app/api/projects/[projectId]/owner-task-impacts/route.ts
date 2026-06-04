@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  buildOwnerTaskImpactComparisonEligibility,
+  type OwnerTaskImpactComparisonEligibility,
+} from "../../../../../lib/owner/taskImpactComparisonEligibility";
+import {
   buildOwnerTaskImpactComparisonPlanFromBaseline,
   type OwnerTaskImpactComparisonPlan,
 } from "../../../../../lib/owner/taskImpactComparisonSources";
@@ -49,6 +53,7 @@ type OwnerTaskImpactResponseRow = OwnerTaskImpactRow & {
   readiness: OwnerTaskImpactReadiness;
   comparisonPlan: OwnerTaskImpactComparisonPlan;
   reviewComparison: OwnerTaskReviewComparison | null;
+  comparisonEligibility: OwnerTaskImpactComparisonEligibility;
 };
 
 type GbpReviewCurrentRow = {
@@ -284,17 +289,25 @@ function withComputedMetadata(params: {
   const comparisonPlan = buildOwnerTaskImpactComparisonPlanFromBaseline(
     params.impact.baseline_metrics,
   );
+  const reviewComparison = buildReviewComparison({
+    impact: params.impact,
+    readiness,
+    comparisonPlan,
+    currentReviewMetrics: params.currentReviewMetrics,
+  });
+  const comparisonEligibility = buildOwnerTaskImpactComparisonEligibility({
+    storedStatus: params.impact.status,
+    readiness,
+    comparisonPlan,
+    reviewComparison,
+  });
 
   return {
     ...params.impact,
     readiness,
     comparisonPlan,
-    reviewComparison: buildReviewComparison({
-      impact: params.impact,
-      readiness,
-      comparisonPlan,
-      currentReviewMetrics: params.currentReviewMetrics,
-    }),
+    reviewComparison,
+    comparisonEligibility,
   };
 }
 
@@ -326,6 +339,22 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
   const reviewComparisonsReady = impacts.filter(
     (impact) => impact.reviewComparison?.canCompare,
   ).length;
+  const comparisonReadsEligible = impacts.filter(
+    (impact) => impact.comparisonEligibility.isEligibleForComparisonRead,
+  ).length;
+  const comparisonMetricsWriteEligible = impacts.filter(
+    (impact) =>
+      impact.comparisonEligibility.isEligibleForComparisonMetricsWrite,
+  ).length;
+  const impactSummaryWriteEligible = impacts.filter(
+    (impact) => impact.comparisonEligibility.canWriteImpactSummary,
+  ).length;
+  const confidenceWriteEligible = impacts.filter(
+    (impact) => impact.comparisonEligibility.canWriteConfidenceLevel,
+  ).length;
+  const statusPromotionEligible = impacts.filter(
+    (impact) => impact.comparisonEligibility.canPromoteStoredStatus,
+  ).length;
 
   return {
     totalImpacts: impacts.length,
@@ -338,6 +367,11 @@ function buildImpactSummary(impacts: OwnerTaskImpactResponseRow[]) {
     futureRequired,
     reviewComparisons,
     reviewComparisonsReady,
+    comparisonReadsEligible,
+    comparisonMetricsWriteEligible,
+    impactSummaryWriteEligible,
+    confidenceWriteEligible,
+    statusPromotionEligible,
   };
 }
 
