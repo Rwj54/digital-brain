@@ -1,3 +1,4 @@
+import type { OwnerTaskImpactComparisonEligibility } from "./taskImpactComparisonEligibility";
 import type { OwnerTaskImpactComparisonPlan } from "./taskImpactComparisonSources";
 import type { OwnerTaskReviewComparison } from "./taskImpactReviewComparison";
 
@@ -238,6 +239,7 @@ export type OwnerTaskImpact = {
   readiness: OwnerTaskImpactReadiness;
   comparisonPlan: OwnerTaskImpactComparisonPlan;
   reviewComparison: OwnerTaskReviewComparison | null;
+  comparisonEligibility: OwnerTaskImpactComparisonEligibility;
 };
 
 export type OwnerTaskImpactsResponse = {
@@ -260,6 +262,11 @@ export type OwnerTaskImpactsResponse = {
     futureRequired: number;
     reviewComparisons: number;
     reviewComparisonsReady: number;
+    comparisonReadsEligible: number;
+    comparisonMetricsWriteEligible: number;
+    impactSummaryWriteEligible: number;
+    confidenceWriteEligible: number;
+    statusPromotionEligible: number;
   };
   impacts: OwnerTaskImpact[];
 };
