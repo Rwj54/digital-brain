@@ -161,6 +161,61 @@ function getComparisonNoClaimLanguage(impact: OwnerTaskImpact): string {
   );
 }
 
+function formatComparisonEligibilityStatus(impact: OwnerTaskImpact): string {
+  const eligibility = impact.comparisonEligibility;
+
+  if (eligibility.isEligibleForComparisonMetricsWrite) {
+    return "Metrics write eligible";
+  }
+
+  if (eligibility.isEligibleForComparisonRead) {
+    return "Read eligible";
+  }
+
+  if (eligibility.decision === "waiting_for_watch_window") {
+    return "Waiting for window";
+  }
+
+  if (eligibility.decision === "already_completed") {
+    return "Already completed";
+  }
+
+  if (eligibility.decision === "future_source_required") {
+    return "Future source needed";
+  }
+
+  if (eligibility.decision === "context_only_no_write") {
+    return "Context only";
+  }
+
+  return "Not ready";
+}
+
+function formatBooleanLabel(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+function formatComparisonEligibilityRequirement(item: string): string {
+  if (item === "Wait until readiness.isWindowReady is true.") {
+    return "Wait until the watch window is complete.";
+  }
+
+  if (
+    item ===
+    "Keep owner-facing copy clear that no outcome impact has been claimed."
+  ) {
+    return "Keep the owner-facing message clear that no outcome impact has been claimed.";
+  }
+
+  return item;
+}
+
+function getComparisonEligibilityChecklist(impact: OwnerTaskImpact): string[] {
+  return impact.comparisonEligibility.requiredBeforeWrite
+    .slice(0, 4)
+    .map(formatComparisonEligibilityRequirement);
+}
+
 function formatReviewNumber(value: number | null): string {
   if (value === null) {
     return "Not available";
@@ -278,6 +333,9 @@ export function OwnerTaskEvidenceSection({
             const stepImpact = getStepImpact(step, impactsData);
             const comparisonSourceLabels = stepImpact
               ? getComparisonSourceLabels(stepImpact)
+              : [];
+            const comparisonEligibilityChecklist = stepImpact
+              ? getComparisonEligibilityChecklist(stepImpact)
               : [];
             const reviewBaselineLabels = stepImpact
               ? getReviewComparisonBaselineLabels(stepImpact)
@@ -417,6 +475,82 @@ export function OwnerTaskEvidenceSection({
                       </p>
                     </div>
 
+                    <div className="mt-4 border-t border-[var(--border)] pt-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                          Comparison write gate
+                        </p>
+                        <InlineTag>
+                          {formatComparisonEligibilityStatus(stepImpact)}
+                        </InlineTag>
+                        <InlineTag>Read-only gate</InlineTag>
+                      </div>
+                      <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                        {stepImpact.comparisonEligibility.ownerSummary}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <InlineTag>
+                          Read eligible:{" "}
+                          {formatBooleanLabel(
+                            stepImpact.comparisonEligibility
+                              .isEligibleForComparisonRead,
+                          )}
+                        </InlineTag>
+                        <InlineTag>
+                          Metrics write eligible:{" "}
+                          {formatBooleanLabel(
+                            stepImpact.comparisonEligibility
+                              .isEligibleForComparisonMetricsWrite,
+                          )}
+                        </InlineTag>
+                        <InlineTag>
+                          Summary write:{" "}
+                          {formatBooleanLabel(
+                            stepImpact.comparisonEligibility
+                              .canWriteImpactSummary,
+                          )}
+                        </InlineTag>
+                        <InlineTag>
+                          Confidence write:{" "}
+                          {formatBooleanLabel(
+                            stepImpact.comparisonEligibility
+                              .canWriteConfidenceLevel,
+                          )}
+                        </InlineTag>
+                        <InlineTag>
+                          Status promotion:{" "}
+                          {formatBooleanLabel(
+                            stepImpact.comparisonEligibility
+                              .canPromoteStoredStatus,
+                          )}
+                        </InlineTag>
+                      </div>
+
+                      {comparisonEligibilityChecklist.length > 0 ? (
+                        <div className="mt-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            Required before any write
+                          </p>
+                          <ul className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-body)]">
+                            {comparisonEligibilityChecklist.map((item) => (
+                              <li key={`${step.key}-${item}`}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {stepImpact.comparisonEligibility.blockedReason ? (
+                        <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                          {stepImpact.comparisonEligibility.blockedReason}
+                        </p>
+                      ) : null}
+
+                      <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                        {stepImpact.comparisonEligibility.noClaimLanguage}
+                      </p>
+                    </div>
+
                     {stepImpact.reviewComparison ? (
                       <div className="mt-4 border-t border-[var(--border)] pt-4">
                         <div className="flex flex-wrap items-center gap-2">
@@ -536,6 +670,31 @@ export function OwnerTaskEvidenceSection({
           helper="Impact watches with a safe comparison source already mapped. This still does not claim attribution."
         />
         <DetailRow
+          label="Comparison reads eligible"
+          value={String(impactsData.summary.comparisonReadsEligible)}
+          helper="Impact watches eligible for a read-only comparison read. This does not write outcome claims."
+        />
+        <DetailRow
+          label="Metrics-write eligible"
+          value={String(impactsData.summary.comparisonMetricsWriteEligible)}
+          helper="Impact watches that pass the conservative gate for future comparison metric writes only."
+        />
+        <DetailRow
+          label="Summary writes allowed"
+          value={String(impactsData.summary.impactSummaryWriteEligible)}
+          helper="Impact watches currently allowed to write impact summaries. This should remain zero until that boundary is accepted."
+        />
+        <DetailRow
+          label="Confidence writes allowed"
+          value={String(impactsData.summary.confidenceWriteEligible)}
+          helper="Impact watches currently allowed to write confidence levels. This should remain zero until that boundary is accepted."
+        />
+        <DetailRow
+          label="Status promotions allowed"
+          value={String(impactsData.summary.statusPromotionEligible)}
+          helper="Impact watches currently allowed to promote stored status. This should remain zero until that boundary is accepted."
+        />
+        <DetailRow
           label="Review reads"
           value={String(impactsData.summary.reviewComparisons)}
           helper="Review impact watches with read-only baseline and current review data available."
@@ -596,6 +755,10 @@ export function OwnerTaskEvidenceSection({
                   : "No review comparison reads are available yet."
               }
               color="var(--brand-700)"
+            />
+            <DetailBullet
+              text="The comparison write gate shows when Digital Brain should wait, read only, or avoid writing stronger impact claims."
+              color="var(--brand-600)"
             />
             <DetailBullet
               text="The decision engine stays in the background while the owner sees only the next useful move."
