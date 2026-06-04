@@ -181,6 +181,96 @@ function getComparisonNoClaimLanguage(impact: OwnerTaskImpact): string {
   );
 }
 
+function formatReviewNumber(value: number | null): string {
+  if (value === null) {
+    return "Not available";
+  }
+
+  return formatCount(value);
+}
+
+function formatReviewRatingValue(value: number | null): string {
+  if (value === null) {
+    return "Not available";
+  }
+
+  return formatRating(value);
+}
+
+function formatReviewComparisonStatus(impact: OwnerTaskImpact): string {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return "Not available";
+  }
+
+  if (comparison.canCompare) {
+    return "Ready to compare";
+  }
+
+  if (!comparison.isWindowReady) {
+    return "Waiting for window";
+  }
+
+  return "Needs more data";
+}
+
+function getReviewComparisonReadinessText(impact: OwnerTaskImpact): string {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return "No review comparison read is available for this task yet.";
+  }
+
+  if (comparison.canCompare) {
+    return comparison.ownerSummary;
+  }
+
+  if (!comparison.isWindowReady) {
+    return "Digital Brain saved the review baseline and can see the current review read, but it should wait for the watch window before presenting this as a comparison.";
+  }
+
+  return comparison.ownerSummary;
+}
+
+function getReviewComparisonBaselineLabels(impact: OwnerTaskImpact): string[] {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return [];
+  }
+
+  return [
+    `Baseline reviews: ${formatReviewNumber(
+      comparison.baseline.baselineCurrentReviews,
+    )}`,
+    `Baseline rating: ${formatReviewRatingValue(
+      comparison.baseline.baselineCurrentRating,
+    )}`,
+    `Baseline review gap: ${formatReviewNumber(
+      comparison.baseline.baselineReviewGap,
+    )}`,
+  ];
+}
+
+function getReviewComparisonCurrentLabels(impact: OwnerTaskImpact): string[] {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return [];
+  }
+
+  return [
+    `Current reviews: ${formatReviewNumber(comparison.current.currentReviews)}`,
+    `Current rating: ${formatReviewRatingValue(
+      comparison.current.currentRating,
+    )}`,
+    `Current review gap: ${formatReviewNumber(
+      comparison.current.currentReviewGap,
+    )}`,
+  ];
+}
+
 export function OwnerDetailSections({
   dashboard,
   tasksData,
@@ -654,11 +744,11 @@ export function OwnerDetailSections({
                             ? websiteTone.solid
                             : index === 1
                               ? "var(--warning)"
-                              : index === 2
+                            : index === 2
                                 ? "var(--brand-600)"
-                                : index === 3
+                              : index === 3
                                   ? "var(--accent-blue-600)"
-                                  : "var(--success)"
+                                : "var(--success)"
                         }
                       />
                     ),
@@ -901,6 +991,12 @@ export function OwnerDetailSections({
                   const comparisonSourceLabels = stepImpact
                     ? getComparisonSourceLabels(stepImpact)
                     : [];
+                  const reviewBaselineLabels = stepImpact
+                    ? getReviewComparisonBaselineLabels(stepImpact)
+                    : [];
+                  const reviewCurrentLabels = stepImpact
+                    ? getReviewComparisonCurrentLabels(stepImpact)
+                    : [];
 
                   return (
                     <div
@@ -1034,6 +1130,80 @@ export function OwnerDetailSections({
                             </p>
                           </div>
 
+                          {stepImpact.reviewComparison ? (
+                            <div className="mt-4 border-t border-[var(--border)] pt-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                  Review comparison read
+                                </p>
+                                <InlineTag>
+                                  {formatReviewComparisonStatus(stepImpact)}
+                                </InlineTag>
+                                <InlineTag>Read-only</InlineTag>
+                              </div>
+                              <p className="mt-2 text-sm leading-7 text-[var(--text-body)]">
+                                {getReviewComparisonReadinessText(stepImpact)}
+                              </p>
+
+                              {reviewBaselineLabels.length > 0 ? (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                    Saved baseline
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {reviewBaselineLabels.map((label) => (
+                                      <InlineTag key={`${step.key}-${label}`}>
+                                        {label}
+                                      </InlineTag>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {reviewCurrentLabels.length > 0 ? (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                    Current read
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {reviewCurrentLabels.map((label) => (
+                                      <InlineTag key={`${step.key}-${label}`}>
+                                        {label}
+                                      </InlineTag>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {stepImpact.reviewComparison.canCompare ? (
+                                <div className="mt-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                                    Conservative comparison
+                                  </p>
+                                  <ul className="mt-2 space-y-2 text-sm leading-6 text-[var(--text-body)]">
+                                    {stepImpact.reviewComparison.signals.map(
+                                      (signal) => (
+                                        <li key={`${step.key}-${signal.key}`}>
+                                          {signal.ownerRead}
+                                        </li>
+                                      ),
+                                    )}
+                                  </ul>
+                                </div>
+                              ) : null}
+
+                              {stepImpact.reviewComparison.blockedReason ? (
+                                <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                                  {stepImpact.reviewComparison.blockedReason}
+                                </p>
+                              ) : null}
+
+                              <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                                {stepImpact.reviewComparison.noClaimLanguage}
+                              </p>
+                            </div>
+                          ) : null}
+
                           <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
                             This is timing metadata only. Digital Brain has not
                             claimed this action improved rankings, reviews, or
@@ -1079,6 +1249,16 @@ export function OwnerDetailSections({
                 helper="Impact watches with a safe comparison source already mapped. This still does not claim attribution."
               />
               <DetailRow
+                label="Review reads"
+                value={String(impactsData.summary.reviewComparisons)}
+                helper="Review impact watches with read-only baseline and current review data available."
+              />
+              <DetailRow
+                label="Review reads ready"
+                value={String(impactsData.summary.reviewComparisonsReady)}
+                helper="Review reads whose watch window has elapsed and can be compared conservatively."
+              />
+              <DetailRow
                 label="Context only"
                 value={String(impactsData.summary.contextOnly)}
                 helper="Impact watches that can show context but should not be presented as proof."
@@ -1122,11 +1302,11 @@ export function OwnerDetailSections({
                   />
                   <DetailBullet
                     text={
-                      impactsData.summary.comparableNow > 0
+                      impactsData.summary.reviewComparisons > 0
                         ? `${formatCount(
-                            impactsData.summary.comparableNow,
-                          )} impact watch(es) already have conservative comparison signals mapped for later.`
-                        : "No impact watches have a safe comparison source mapped yet."
+                            impactsData.summary.reviewComparisons,
+                          )} review comparison read(s) have saved baseline and current review data available.`
+                        : "No review comparison reads are available yet."
                     }
                     color="var(--brand-700)"
                   />
