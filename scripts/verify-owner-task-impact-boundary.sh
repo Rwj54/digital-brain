@@ -8,17 +8,19 @@ USE_VERCEL_CURL="${USE_VERCEL_CURL:-0}"
 
 OWNER_IMPACTS_URL="${BASE_URL}/api/projects/${PROJECT_ID}/owner-task-impacts?ownerTaskId=${OWNER_TASK_ID}"
 PREVIEW_URL="${BASE_URL}/api/projects/${PROJECT_ID}/owner-task-impact-comparison-write-plan?ownerTaskId=${OWNER_TASK_ID}"
+POST_URL="${BASE_URL}/api/projects/${PROJECT_ID}/owner-task-impact-comparison-write-plan?ownerTaskId=${OWNER_TASK_ID}"
 
 OWNER_IMPACTS_JSON="$(mktemp)"
 PREVIEW_JSON="$(mktemp)"
+POST_JSON="$(mktemp)"
 
 cleanup() {
-  rm -f "$OWNER_IMPACTS_JSON" "$PREVIEW_JSON"
+  rm -f "$OWNER_IMPACTS_JSON" "$PREVIEW_JSON" "$POST_JSON"
 }
 
 trap cleanup EXIT
 
-fetch_json() {
+fetch_json_get() {
   local url="$1"
 
   if [ "$USE_VERCEL_CURL" = "1" ]; then
@@ -28,20 +30,32 @@ fetch_json() {
   fi
 }
 
+fetch_json_post() {
+  local url="$1"
+
+  if [ "$USE_VERCEL_CURL" = "1" ]; then
+    npx -y vercel@latest curl "$url" -X POST
+  else
+    curl -sSL -X POST "$url"
+  fi
+}
+
 printf '\nVerifying owner task impact no-write boundary\n'
 printf 'Base URL: %s\n' "$BASE_URL"
 printf 'Project: %s\n' "$PROJECT_ID"
 printf 'Owner task: %s\n' "$OWNER_TASK_ID"
 
-fetch_json "$OWNER_IMPACTS_URL" > "$OWNER_IMPACTS_JSON"
-fetch_json "$PREVIEW_URL" > "$PREVIEW_JSON"
+fetch_json_get "$OWNER_IMPACTS_URL" > "$OWNER_IMPACTS_JSON"
+fetch_json_get "$PREVIEW_URL" > "$PREVIEW_JSON"
+fetch_json_post "$POST_URL" > "$POST_JSON"
 
-python3 - "$OWNER_IMPACTS_JSON" "$PREVIEW_JSON" <<'PY'
+python3 - "$OWNER_IMPACTS_JSON" "$PREVIEW_JSON" "$POST_JSON" <<'PY'
 import json
 import sys
 
 owner_path = sys.argv[1]
 preview_path = sys.argv[2]
+post_path = sys.argv[3]
 
 with open(owner_path, "r", encoding="utf-8") as file:
     owner = json.load(file)
@@ -49,11 +63,17 @@ with open(owner_path, "r", encoding="utf-8") as file:
 with open(preview_path, "r", encoding="utf-8") as file:
     preview = json.load(file)
 
+with open(post_path, "r", encoding="utf-8") as file:
+    post = json.load(file)
+
 errors = []
 
 def require(condition, message):
     if not condition:
         errors.append(message)
+
+def require_boundary_false(boundary, key, label):
+    require(boundary.get(key) is False, f"{label} {key} is not false")
 
 require(owner.get("ok") is True, "owner-task-impacts did not return ok:true")
 require(preview.get("ok") is True, "preview route did not return ok:true")
@@ -65,11 +85,11 @@ require(summary.get("confidenceWriteEligible") == 0, "confidenceWriteEligible is
 require(summary.get("statusPromotionEligible") == 0, "statusPromotionEligible is not 0")
 
 write_boundary = preview.get("writeBoundary") or {}
-require(write_boundary.get("databaseWritesPerformed") is False, "databaseWritesPerformed is not false")
-require(write_boundary.get("shouldWriteImpactSummary") is False, "shouldWriteImpactSummary is not false")
-require(write_boundary.get("shouldWriteConfidenceLevel") is False, "shouldWriteConfidenceLevel is not false")
-require(write_boundary.get("shouldPromoteStoredStatus") is False, "shouldPromoteStoredStatus is not false")
-require(write_boundary.get("attributionClaimAllowed") is False, "attributionClaimAllowed is not false")
+require_boundary_false(write_boundary, "databaseWritesPerformed", "preview writeBoundary")
+require_boundary_false(write_boundary, "shouldWriteImpactSummary", "preview writeBoundary")
+require_boundary_false(write_boundary, "shouldWriteConfidenceLevel", "preview writeBoundary")
+require_boundary_false(write_boundary, "shouldPromoteStoredStatus", "preview writeBoundary")
+require_boundary_false(write_boundary, "attributionClaimAllowed", "preview writeBoundary")
 
 impact = preview.get("impact") or {}
 require(impact.get("impact_summary") is None, "impact_summary is not null")
@@ -95,6 +115,37 @@ require(write_plan.get("proposedImpactSummary") is None, "write plan proposedImp
 require(write_plan.get("proposedConfidenceLevel") is None, "write plan proposedConfidenceLevel is not null")
 require(write_plan.get("proposedStoredStatus") is None, "write plan proposedStoredStatus is not null")
 
+require(post.get("ok") is False, "POST skeleton did not return ok:false")
+require(post.get("mode") == "blocked_no_write", "POST skeleton mode is not blocked_no_write")
+
+post_write_boundary = post.get("writeBoundary") or {}
+require_boundary_false(post_write_boundary, "databaseWritesPerformed", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "writeRouteEnabled", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "shouldWriteComparisonMetrics", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "shouldWriteImpactSummary", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "shouldWriteConfidenceLevel", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "shouldPromoteStoredStatus", "POST writeBoundary")
+require_boundary_false(post_write_boundary, "attributionClaimAllowed", "POST writeBoundary")
+
+post_impact = post.get("impact") or {}
+require(post_impact.get("impact_summary") is None, "POST impact_summary is not null")
+require(post_impact.get("confidence_level") is None, "POST confidence_level is not null")
+
+post_comparison_metrics = post_impact.get("comparison_metrics")
+require(isinstance(post_comparison_metrics, dict), "POST comparison_metrics is not an object")
+require(len(post_comparison_metrics) == 0, "POST comparison_metrics is not empty at this no-write checkpoint")
+
+require(
+    post.get("comparisonWritePlanDecision") == "not_eligible",
+    "POST comparisonWritePlanDecision is not not_eligible",
+)
+
+require(
+    post.get("noClaimLanguage")
+    == "Digital Brain can compare signals after the watch window, but it should not claim this task caused the change without stronger proof.",
+    "POST noClaimLanguage changed from accepted no-attribution language",
+)
+
 if errors:
     print("\nFAILED owner task impact no-write boundary verification")
     for error in errors:
@@ -105,7 +156,10 @@ print("\nPASSED owner task impact no-write boundary verification")
 print(f"- owner-task-impacts ok: {owner.get('ok')}")
 print(f"- preview ok: {preview.get('ok')}")
 print(f"- preview mode: {preview.get('mode')}")
-print(f"- databaseWritesPerformed: {write_boundary.get('databaseWritesPerformed')}")
+print(f"- preview databaseWritesPerformed: {write_boundary.get('databaseWritesPerformed')}")
+print(f"- POST ok: {post.get('ok')}")
+print(f"- POST mode: {post.get('mode')}")
+print(f"- POST databaseWritesPerformed: {post_write_boundary.get('databaseWritesPerformed')}")
 print(f"- impact_summary: {impact.get('impact_summary')}")
 print(f"- confidence_level: {impact.get('confidence_level')}")
 print(f"- comparisonWritePlan mode: {write_plan.get('mode')}")
