@@ -10,6 +10,7 @@
     "verify:owner-task-impact-boundary": "./scripts/verify-owner-task-impact-boundary.sh",
     "verify:owner-task-impact-comparison-metrics-payload": "node --no-warnings scripts/verify-owner-task-impact-comparison-metrics-payload.mjs",
     "verify:owner-task-impact-route-eligible-no-write": "node --no-warnings scripts/verify-owner-task-impact-route-eligible-no-write.mjs",
+    "verify:owner-task-impact-write-execution-plan": "node --no-warnings scripts/verify-owner-task-impact-write-execution-plan.mjs",
     "verify:owner-task-impact-safety": "./scripts/verify-owner-task-impact-safety.sh"
   },
   "dependencies": {
