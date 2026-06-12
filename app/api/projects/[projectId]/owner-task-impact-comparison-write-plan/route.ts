@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { prepareOwnerTaskImpactComparisonMetricsUpdatePayload } from "@/lib/owner/taskImpactComparisonMetricsWrite";
 import {
   buildOwnerTaskImpactComparisonWritePlanPreview,
   loadOwnerTaskCurrentReviewMetrics,
@@ -252,7 +253,18 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json(
         {
           ok: false,
+          mode: "blocked_no_write",
           error: "Missing projectId.",
+          writeBoundary: {
+            databaseWritesPerformed: false,
+            writeRouteEnabled: false,
+            shouldWriteComparisonMetrics: false,
+            shouldWriteImpactSummary: false,
+            shouldWriteConfidenceLevel: false,
+            shouldPromoteStoredStatus: false,
+            attributionClaimAllowed: false,
+          },
+          comparisonMetricsPayloadPreparation: null,
         },
         { status: 400 },
       );
@@ -277,6 +289,7 @@ export async function POST(request: Request, context: RouteContext) {
             shouldPromoteStoredStatus: false,
             attributionClaimAllowed: false,
           },
+          comparisonMetricsPayloadPreparation: null,
         },
         { status: 400 },
       );
@@ -301,6 +314,10 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const writeBoundary = buildWriteBoundary(preview);
+    const comparisonMetricsPayloadPreparation =
+      prepareOwnerTaskImpactComparisonMetricsUpdatePayload(
+        preview.comparisonWritePlan,
+      );
 
     if (!preview.comparisonWritePlan.shouldWriteComparisonMetrics) {
       return NextResponse.json(
@@ -310,6 +327,7 @@ export async function POST(request: Request, context: RouteContext) {
           projectId,
           filters,
           writeBoundary,
+          comparisonMetricsPayloadPreparation,
           blockedReason:
             preview.comparisonWritePlan.blockedReason ??
             "Comparison metrics are not eligible for writing.",
@@ -329,6 +347,7 @@ export async function POST(request: Request, context: RouteContext) {
         projectId,
         filters,
         writeBoundary,
+        comparisonMetricsPayloadPreparation,
         blockedReason:
           "Comparison metrics writes are intentionally disabled at this boundary.",
         comparisonWritePlanDecision: preview.comparisonWritePlan.decision,
@@ -365,6 +384,7 @@ export async function POST(request: Request, context: RouteContext) {
           shouldPromoteStoredStatus: false,
           attributionClaimAllowed: false,
         },
+        comparisonMetricsPayloadPreparation: null,
       },
       { status: 500 },
     );
