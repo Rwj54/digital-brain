@@ -127,6 +127,34 @@ require_boundary_false(post_write_boundary, "shouldWriteConfidenceLevel", "POST 
 require_boundary_false(post_write_boundary, "shouldPromoteStoredStatus", "POST writeBoundary")
 require_boundary_false(post_write_boundary, "attributionClaimAllowed", "POST writeBoundary")
 
+post_payload_preparation = post.get("comparisonMetricsPayloadPreparation")
+require(
+    isinstance(post_payload_preparation, dict),
+    "POST comparisonMetricsPayloadPreparation is not an object",
+)
+
+post_payload_preparation = post_payload_preparation or {}
+require(
+    post_payload_preparation.get("mode") == "prepare_payload_only_no_write",
+    "POST comparisonMetricsPayloadPreparation mode is not prepare_payload_only_no_write",
+)
+require(
+    post_payload_preparation.get("decision") == "not_eligible",
+    "POST comparisonMetricsPayloadPreparation decision is not not_eligible",
+)
+require(
+    post_payload_preparation.get("canWriteComparisonMetrics") is False,
+    "POST comparisonMetricsPayloadPreparation canWriteComparisonMetrics is not false",
+)
+require(
+    post_payload_preparation.get("databaseWritesPerformed") is False,
+    "POST comparisonMetricsPayloadPreparation databaseWritesPerformed is not false",
+)
+require(
+    post_payload_preparation.get("updatePayload") is None,
+    "POST comparisonMetricsPayloadPreparation updatePayload is not null",
+)
+
 post_impact = post.get("impact") or {}
 require(post_impact.get("impact_summary") is None, "POST impact_summary is not null")
 require(post_impact.get("confidence_level") is None, "POST confidence_level is not null")
@@ -160,6 +188,10 @@ print(f"- preview databaseWritesPerformed: {write_boundary.get('databaseWritesPe
 print(f"- POST ok: {post.get('ok')}")
 print(f"- POST mode: {post.get('mode')}")
 print(f"- POST databaseWritesPerformed: {post_write_boundary.get('databaseWritesPerformed')}")
+print(f"- payloadPreparation mode: {post_payload_preparation.get('mode')}")
+print(f"- payloadPreparation decision: {post_payload_preparation.get('decision')}")
+print(f"- payloadPreparation canWriteComparisonMetrics: {post_payload_preparation.get('canWriteComparisonMetrics')}")
+print(f"- payloadPreparation updatePayload: {post_payload_preparation.get('updatePayload')}")
 print(f"- impact_summary: {impact.get('impact_summary')}")
 print(f"- confidence_level: {impact.get('confidence_level')}")
 print(f"- comparisonWritePlan mode: {write_plan.get('mode')}")
