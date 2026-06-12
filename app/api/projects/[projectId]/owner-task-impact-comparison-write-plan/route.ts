@@ -5,6 +5,7 @@ import {
   loadOwnerTaskCurrentReviewMetrics,
   OWNER_TASK_IMPACT_SELECT,
   type OwnerTaskImpactRow,
+  type OwnerTaskImpactWithComparisonWritePlan,
 } from "@/lib/owner/taskImpactComparisonMetadata";
 
 type RouteContext = {
@@ -14,6 +15,11 @@ type RouteContext = {
 };
 
 type SupabaseServiceRoleClient = ReturnType<typeof getServiceRoleSupabase>;
+
+type ImpactFilters = {
+  impactId: string | null;
+  ownerTaskId: string | null;
+};
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -30,6 +36,56 @@ function getServiceRoleSupabase() {
     getEnv("NEXT_PUBLIC_SUPABASE_URL"),
     getEnv("SUPABASE_SERVICE_ROLE_KEY"),
   );
+}
+
+function normalizeString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function getFiltersFromSearchParams(request: Request): ImpactFilters {
+  const { searchParams } = new URL(request.url);
+
+  return {
+    impactId: searchParams.get("impactId"),
+    ownerTaskId: searchParams.get("ownerTaskId") ?? searchParams.get("taskId"),
+  };
+}
+
+async function getFiltersFromPostRequest(request: Request): Promise<ImpactFilters> {
+  const searchFilters = getFiltersFromSearchParams(request);
+
+  if (searchFilters.impactId || searchFilters.ownerTaskId) {
+    return searchFilters;
+  }
+
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return {
+      impactId: null,
+      ownerTaskId: null,
+    };
+  }
+
+  const body: unknown = await request.json().catch(() => null);
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      impactId: null,
+      ownerTaskId: null,
+    };
+  }
+
+  const bodyRecord = body as Record<string, unknown>;
+
+  return {
+    impactId: normalizeString(bodyRecord.impactId),
+    ownerTaskId:
+      normalizeString(bodyRecord.ownerTaskId) ??
+      normalizeString(bodyRecord.taskId),
+  };
 }
 
 async function loadImpact(params: {
@@ -61,6 +117,65 @@ async function loadImpact(params: {
   return data?.[0] ?? null;
 }
 
+async function buildPreview(params: {
+  supabase: SupabaseServiceRoleClient;
+  projectId: string;
+  impactId: string | null;
+  ownerTaskId: string | null;
+  generatedAt: string;
+}): Promise<OwnerTaskImpactWithComparisonWritePlan | null> {
+  const [impact, currentReviewMetrics] = await Promise.all([
+    loadImpact({
+      supabase: params.supabase,
+      projectId: params.projectId,
+      impactId: params.impactId,
+      ownerTaskId: params.ownerTaskId,
+    }),
+    loadOwnerTaskCurrentReviewMetrics({
+      supabase: params.supabase,
+      projectId: params.projectId,
+    }),
+  ]);
+
+  if (!impact) {
+    return null;
+  }
+
+  return buildOwnerTaskImpactComparisonWritePlanPreview({
+    impact,
+    currentReviewMetrics,
+    generatedAt: params.generatedAt,
+  });
+}
+
+function buildWriteBoundary(preview: OwnerTaskImpactWithComparisonWritePlan) {
+  return {
+    databaseWritesPerformed: false,
+    writeRouteEnabled: false,
+    shouldWriteComparisonMetrics:
+      preview.comparisonWritePlan.shouldWriteComparisonMetrics,
+    shouldWriteImpactSummary: false,
+    shouldWriteConfidenceLevel: false,
+    shouldPromoteStoredStatus: false,
+    attributionClaimAllowed: false,
+  };
+}
+
+function buildMissingImpactResponse(params: {
+  projectId: string;
+  filters: ImpactFilters;
+}) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: "Owner task impact not found.",
+      projectId: params.projectId,
+      filters: params.filters,
+    },
+    { status: 404 },
+  );
+}
+
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { projectId } = await context.params;
@@ -75,12 +190,9 @@ export async function GET(request: Request, context: RouteContext) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const impactId = searchParams.get("impactId");
-    const ownerTaskId =
-      searchParams.get("ownerTaskId") ?? searchParams.get("taskId");
+    const filters = getFiltersFromSearchParams(request);
 
-    if (!impactId && !ownerTaskId) {
+    if (!filters.impactId && !filters.ownerTaskId) {
       return NextResponse.json(
         {
           ok: false,
@@ -93,57 +205,27 @@ export async function GET(request: Request, context: RouteContext) {
     const supabase = getServiceRoleSupabase();
     const generatedAt = new Date().toISOString();
 
-    const [impact, currentReviewMetrics] = await Promise.all([
-      loadImpact({
-        supabase,
-        projectId,
-        impactId,
-        ownerTaskId,
-      }),
-      loadOwnerTaskCurrentReviewMetrics({
-        supabase,
-        projectId,
-      }),
-    ]);
-
-    if (!impact) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Owner task impact not found.",
-          projectId,
-          filters: {
-            impactId,
-            ownerTaskId,
-          },
-        },
-        { status: 404 },
-      );
-    }
-
-    const preview = buildOwnerTaskImpactComparisonWritePlanPreview({
-      impact,
-      currentReviewMetrics,
+    const preview = await buildPreview({
+      supabase,
+      projectId,
+      impactId: filters.impactId,
+      ownerTaskId: filters.ownerTaskId,
       generatedAt,
     });
+
+    if (!preview) {
+      return buildMissingImpactResponse({
+        projectId,
+        filters,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
       mode: "preview_only_no_write",
       projectId,
-      filters: {
-        impactId,
-        ownerTaskId,
-      },
-      writeBoundary: {
-        databaseWritesPerformed: false,
-        shouldWriteComparisonMetrics:
-          preview.comparisonWritePlan.shouldWriteComparisonMetrics,
-        shouldWriteImpactSummary: false,
-        shouldWriteConfidenceLevel: false,
-        shouldPromoteStoredStatus: false,
-        attributionClaimAllowed: false,
-      },
+      filters,
+      writeBoundary: buildWriteBoundary(preview),
       impact: preview,
     });
   } catch (error) {
@@ -156,6 +238,133 @@ export async function GET(request: Request, context: RouteContext) {
       {
         ok: false,
         error: message,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    const { projectId } = await context.params;
+
+    if (!projectId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Missing projectId.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const filters = await getFiltersFromPostRequest(request);
+
+    if (!filters.impactId && !filters.ownerTaskId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          mode: "blocked_no_write",
+          error: "Missing impactId or ownerTaskId.",
+          projectId,
+          filters,
+          writeBoundary: {
+            databaseWritesPerformed: false,
+            writeRouteEnabled: false,
+            shouldWriteComparisonMetrics: false,
+            shouldWriteImpactSummary: false,
+            shouldWriteConfidenceLevel: false,
+            shouldPromoteStoredStatus: false,
+            attributionClaimAllowed: false,
+          },
+        },
+        { status: 400 },
+      );
+    }
+
+    const supabase = getServiceRoleSupabase();
+    const generatedAt = new Date().toISOString();
+
+    const preview = await buildPreview({
+      supabase,
+      projectId,
+      impactId: filters.impactId,
+      ownerTaskId: filters.ownerTaskId,
+      generatedAt,
+    });
+
+    if (!preview) {
+      return buildMissingImpactResponse({
+        projectId,
+        filters,
+      });
+    }
+
+    const writeBoundary = buildWriteBoundary(preview);
+
+    if (!preview.comparisonWritePlan.shouldWriteComparisonMetrics) {
+      return NextResponse.json(
+        {
+          ok: false,
+          mode: "blocked_no_write",
+          projectId,
+          filters,
+          writeBoundary,
+          blockedReason:
+            preview.comparisonWritePlan.blockedReason ??
+            "Comparison metrics are not eligible for writing.",
+          comparisonWritePlanDecision: preview.comparisonWritePlan.decision,
+          requiredBeforeWrite: preview.comparisonWritePlan.requiredBeforeWrite,
+          noClaimLanguage: preview.comparisonWritePlan.noClaimLanguage,
+          impact: preview,
+        },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        mode: "eligible_but_write_disabled_no_write",
+        projectId,
+        filters,
+        writeBoundary,
+        blockedReason:
+          "Comparison metrics writes are intentionally disabled at this boundary.",
+        comparisonWritePlanDecision: preview.comparisonWritePlan.decision,
+        requiredBeforeWrite: [
+          "Accept a separate write boundary before enabling database updates.",
+          "Write only comparison_metrics.",
+          "Keep impact_summary null.",
+          "Keep confidence_level null.",
+          "Do not promote owner_task_impacts.status.",
+          "Keep owner-facing language compare-only and no-attribution.",
+        ],
+        noClaimLanguage: preview.comparisonWritePlan.noClaimLanguage,
+        impact: preview,
+      },
+      { status: 409 },
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to run owner task impact comparison write skeleton.";
+
+    return NextResponse.json(
+      {
+        ok: false,
+        mode: "blocked_no_write",
+        error: message,
+        writeBoundary: {
+          databaseWritesPerformed: false,
+          writeRouteEnabled: false,
+          shouldWriteComparisonMetrics: false,
+          shouldWriteImpactSummary: false,
+          shouldWriteConfidenceLevel: false,
+          shouldPromoteStoredStatus: false,
+          attributionClaimAllowed: false,
+        },
       },
       { status: 500 },
     );
