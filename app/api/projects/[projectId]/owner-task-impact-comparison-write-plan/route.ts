@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { prepareOwnerTaskImpactComparisonMetricsUpdatePayload } from "@/lib/owner/taskImpactComparisonMetricsWrite";
 import {
+  buildOwnerTaskImpactComparisonWriteBoundary,
+  buildOwnerTaskImpactComparisonWritePostResponse,
+  type OwnerTaskImpactComparisonWriteRouteFilters,
+} from "@/lib/owner/taskImpactComparisonWriteRouteResponse";
+import {
   buildOwnerTaskImpactComparisonWritePlanPreview,
   loadOwnerTaskCurrentReviewMetrics,
   OWNER_TASK_IMPACT_SELECT,
@@ -17,10 +22,7 @@ type RouteContext = {
 
 type SupabaseServiceRoleClient = ReturnType<typeof getServiceRoleSupabase>;
 
-type ImpactFilters = {
-  impactId: string | null;
-  ownerTaskId: string | null;
-};
+type ImpactFilters = OwnerTaskImpactComparisonWriteRouteFilters;
 
 function getEnv(name: string): string {
   const value = process.env[name];
@@ -54,7 +56,9 @@ function getFiltersFromSearchParams(request: Request): ImpactFilters {
   };
 }
 
-async function getFiltersFromPostRequest(request: Request): Promise<ImpactFilters> {
+async function getFiltersFromPostRequest(
+  request: Request,
+): Promise<ImpactFilters> {
   const searchFilters = getFiltersFromSearchParams(request);
 
   if (searchFilters.impactId || searchFilters.ownerTaskId) {
@@ -149,19 +153,6 @@ async function buildPreview(params: {
   });
 }
 
-function buildWriteBoundary(preview: OwnerTaskImpactWithComparisonWritePlan) {
-  return {
-    databaseWritesPerformed: false,
-    writeRouteEnabled: false,
-    shouldWriteComparisonMetrics:
-      preview.comparisonWritePlan.shouldWriteComparisonMetrics,
-    shouldWriteImpactSummary: false,
-    shouldWriteConfidenceLevel: false,
-    shouldPromoteStoredStatus: false,
-    attributionClaimAllowed: false,
-  };
-}
-
 function buildMissingImpactResponse(params: {
   projectId: string;
   filters: ImpactFilters;
@@ -226,7 +217,7 @@ export async function GET(request: Request, context: RouteContext) {
       mode: "preview_only_no_write",
       projectId,
       filters,
-      writeBoundary: buildWriteBoundary(preview),
+      writeBoundary: buildOwnerTaskImpactComparisonWriteBoundary(preview),
       impact: preview,
     });
   } catch (error) {
@@ -313,57 +304,18 @@ export async function POST(request: Request, context: RouteContext) {
       });
     }
 
-    const writeBoundary = buildWriteBoundary(preview);
     const comparisonMetricsPayloadPreparation =
       prepareOwnerTaskImpactComparisonMetricsUpdatePayload(
         preview.comparisonWritePlan,
       );
+    const response = buildOwnerTaskImpactComparisonWritePostResponse({
+      projectId,
+      filters,
+      preview,
+      comparisonMetricsPayloadPreparation,
+    });
 
-    if (!preview.comparisonWritePlan.shouldWriteComparisonMetrics) {
-      return NextResponse.json(
-        {
-          ok: false,
-          mode: "blocked_no_write",
-          projectId,
-          filters,
-          writeBoundary,
-          comparisonMetricsPayloadPreparation,
-          blockedReason:
-            preview.comparisonWritePlan.blockedReason ??
-            "Comparison metrics are not eligible for writing.",
-          comparisonWritePlanDecision: preview.comparisonWritePlan.decision,
-          requiredBeforeWrite: preview.comparisonWritePlan.requiredBeforeWrite,
-          noClaimLanguage: preview.comparisonWritePlan.noClaimLanguage,
-          impact: preview,
-        },
-        { status: 409 },
-      );
-    }
-
-    return NextResponse.json(
-      {
-        ok: false,
-        mode: "eligible_but_write_disabled_no_write",
-        projectId,
-        filters,
-        writeBoundary,
-        comparisonMetricsPayloadPreparation,
-        blockedReason:
-          "Comparison metrics writes are intentionally disabled at this boundary.",
-        comparisonWritePlanDecision: preview.comparisonWritePlan.decision,
-        requiredBeforeWrite: [
-          "Accept a separate write boundary before enabling database updates.",
-          "Write only comparison_metrics.",
-          "Keep impact_summary null.",
-          "Keep confidence_level null.",
-          "Do not promote owner_task_impacts.status.",
-          "Keep owner-facing language compare-only and no-attribution.",
-        ],
-        noClaimLanguage: preview.comparisonWritePlan.noClaimLanguage,
-        impact: preview,
-      },
-      { status: 409 },
-    );
+    return NextResponse.json(response.body, { status: response.status });
   } catch (error) {
     const message =
       error instanceof Error

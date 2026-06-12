@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "verify:owner-task-impact-boundary": "./scripts/verify-owner-task-impact-boundary.sh",
-    "verify:owner-task-impact-comparison-metrics-payload": "node --no-warnings scripts/verify-owner-task-impact-comparison-metrics-payload.mjs"
+    "verify:owner-task-impact-comparison-metrics-payload": "node --no-warnings scripts/verify-owner-task-impact-comparison-metrics-payload.mjs",
+    "verify:owner-task-impact-route-eligible-no-write": "node --no-warnings scripts/verify-owner-task-impact-route-eligible-no-write.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
