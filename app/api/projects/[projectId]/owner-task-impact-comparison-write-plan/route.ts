@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { prepareOwnerTaskImpactComparisonMetricsUpdatePayload } from "@/lib/owner/taskImpactComparisonMetricsWrite";
+import { buildOwnerTaskImpactComparisonMetricsWriteExecutionPlan } from "@/lib/owner/taskImpactComparisonMetricsWriteExecution";
 import {
   buildOwnerTaskImpactComparisonWriteBoundary,
   buildOwnerTaskImpactComparisonWritePostResponse,
@@ -256,6 +257,7 @@ export async function POST(request: Request, context: RouteContext) {
             attributionClaimAllowed: false,
           },
           comparisonMetricsPayloadPreparation: null,
+          comparisonMetricsWriteExecutionPlan: null,
         },
         { status: 400 },
       );
@@ -281,6 +283,7 @@ export async function POST(request: Request, context: RouteContext) {
             attributionClaimAllowed: false,
           },
           comparisonMetricsPayloadPreparation: null,
+          comparisonMetricsWriteExecutionPlan: null,
         },
         { status: 400 },
       );
@@ -308,11 +311,17 @@ export async function POST(request: Request, context: RouteContext) {
       prepareOwnerTaskImpactComparisonMetricsUpdatePayload(
         preview.comparisonWritePlan,
       );
+    const comparisonMetricsWriteExecutionPlan =
+      buildOwnerTaskImpactComparisonMetricsWriteExecutionPlan({
+        impact: preview,
+        comparisonMetricsPayloadPreparation,
+      });
     const response = buildOwnerTaskImpactComparisonWritePostResponse({
       projectId,
       filters,
       preview,
       comparisonMetricsPayloadPreparation,
+      comparisonMetricsWriteExecutionPlan,
     });
 
     return NextResponse.json(response.body, { status: response.status });
@@ -337,6 +346,7 @@ export async function POST(request: Request, context: RouteContext) {
           attributionClaimAllowed: false,
         },
         comparisonMetricsPayloadPreparation: null,
+        comparisonMetricsWriteExecutionPlan: null,
       },
       { status: 500 },
     );

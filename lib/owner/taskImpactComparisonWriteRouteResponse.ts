@@ -1,5 +1,6 @@
 import type { OwnerTaskImpactWithComparisonWritePlan } from "./taskImpactComparisonMetadata";
 import type { OwnerTaskImpactComparisonMetricsWritePayloadPreparation } from "./taskImpactComparisonMetricsWrite";
+import type { OwnerTaskImpactComparisonMetricsWriteExecutionPlan } from "./taskImpactComparisonMetricsWriteExecution";
 
 export type OwnerTaskImpactComparisonWriteRouteFilters = {
   impactId: string | null;
@@ -23,6 +24,7 @@ export type OwnerTaskImpactComparisonWritePostResponseBody = {
   filters: OwnerTaskImpactComparisonWriteRouteFilters;
   writeBoundary: OwnerTaskImpactComparisonWriteBoundary;
   comparisonMetricsPayloadPreparation: OwnerTaskImpactComparisonMetricsWritePayloadPreparation;
+  comparisonMetricsWriteExecutionPlan: OwnerTaskImpactComparisonMetricsWriteExecutionPlan;
   blockedReason: string;
   comparisonWritePlanDecision: OwnerTaskImpactWithComparisonWritePlan["comparisonWritePlan"]["decision"];
   requiredBeforeWrite: string[];
@@ -55,6 +57,7 @@ export function buildOwnerTaskImpactComparisonWritePostResponse(params: {
   filters: OwnerTaskImpactComparisonWriteRouteFilters;
   preview: OwnerTaskImpactWithComparisonWritePlan;
   comparisonMetricsPayloadPreparation: OwnerTaskImpactComparisonMetricsWritePayloadPreparation;
+  comparisonMetricsWriteExecutionPlan: OwnerTaskImpactComparisonMetricsWriteExecutionPlan;
 }): OwnerTaskImpactComparisonWritePostResponse {
   const writeBoundary = buildOwnerTaskImpactComparisonWriteBoundary(
     params.preview,
@@ -71,6 +74,8 @@ export function buildOwnerTaskImpactComparisonWritePostResponse(params: {
         writeBoundary,
         comparisonMetricsPayloadPreparation:
           params.comparisonMetricsPayloadPreparation,
+        comparisonMetricsWriteExecutionPlan:
+          params.comparisonMetricsWriteExecutionPlan,
         blockedReason:
           params.preview.comparisonWritePlan.blockedReason ??
           "Comparison metrics are not eligible for writing.",
@@ -93,6 +98,8 @@ export function buildOwnerTaskImpactComparisonWritePostResponse(params: {
       writeBoundary,
       comparisonMetricsPayloadPreparation:
         params.comparisonMetricsPayloadPreparation,
+      comparisonMetricsWriteExecutionPlan:
+        params.comparisonMetricsWriteExecutionPlan,
       blockedReason:
         "Comparison metrics writes are intentionally disabled at this boundary.",
       comparisonWritePlanDecision: params.preview.comparisonWritePlan.decision,

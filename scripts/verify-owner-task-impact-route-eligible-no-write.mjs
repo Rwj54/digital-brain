@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { prepareOwnerTaskImpactComparisonMetricsUpdatePayload } from "../lib/owner/taskImpactComparisonMetricsWrite.ts";
+import { buildOwnerTaskImpactComparisonMetricsWriteExecutionPlan } from "../lib/owner/taskImpactComparisonMetricsWriteExecution.ts";
 import { buildOwnerTaskImpactComparisonWritePostResponse } from "../lib/owner/taskImpactComparisonWriteRouteResponse.ts";
 
 const PROJECT_ID = "mock-project-id";
@@ -141,6 +142,11 @@ console.log("Verifying route-level eligible comparison write remains no-write");
 
 const comparisonMetricsPayloadPreparation =
   prepareOwnerTaskImpactComparisonMetricsUpdatePayload(eligibleWritePlan);
+const comparisonMetricsWriteExecutionPlan =
+  buildOwnerTaskImpactComparisonMetricsWriteExecutionPlan({
+    impact: preview,
+    comparisonMetricsPayloadPreparation,
+  });
 const response = buildOwnerTaskImpactComparisonWritePostResponse({
   projectId: PROJECT_ID,
   filters: {
@@ -149,6 +155,7 @@ const response = buildOwnerTaskImpactComparisonWritePostResponse({
   },
   preview,
   comparisonMetricsPayloadPreparation,
+  comparisonMetricsWriteExecutionPlan,
 });
 
 assert.equal(response.status, 409);
@@ -195,6 +202,49 @@ assert.equal(
 );
 
 assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.mode,
+  "execution_plan_only_no_write",
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.decision,
+  "ready_but_write_disabled",
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.canExecuteDatabaseWrite,
+  false,
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.databaseWritesPerformed,
+  false,
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.writeRouteEnabled,
+  false,
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.table,
+  "owner_task_impacts",
+);
+assert.deepEqual(response.body.comparisonMetricsWriteExecutionPlan.match, {
+  id: IMPACT_ID,
+  project_id: PROJECT_ID,
+});
+assert.deepEqual(
+  Object.keys(response.body.comparisonMetricsWriteExecutionPlan.updatePayload),
+  ["comparison_metrics"],
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.updatePayload
+    .comparison_metrics.claimPolicy,
+  "compare_only_no_attribution",
+);
+assert.equal(
+  response.body.comparisonMetricsWriteExecutionPlan.updatePayload
+    .comparison_metrics.isAttributionClaim,
+  false,
+);
+
+assert.equal(
   response.body.blockedReason,
   "Comparison metrics writes are intentionally disabled at this boundary.",
 );
@@ -230,4 +280,5 @@ console.log("- mode: eligible_but_write_disabled_no_write");
 console.log("- writeRouteEnabled: false");
 console.log("- databaseWritesPerformed: false");
 console.log("- payload keys: comparison_metrics only");
+console.log("- execution plan: ready_but_write_disabled");
 console.log("- no attribution claim allowed");
