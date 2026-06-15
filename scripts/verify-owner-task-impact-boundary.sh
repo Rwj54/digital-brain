@@ -155,7 +155,54 @@ require(
     "POST comparisonMetricsPayloadPreparation updatePayload is not null",
 )
 
+post_execution_plan = post.get("comparisonMetricsWriteExecutionPlan")
+require(
+    isinstance(post_execution_plan, dict),
+    "POST comparisonMetricsWriteExecutionPlan is not an object",
+)
+
+post_execution_plan = post_execution_plan or {}
+require(
+    post_execution_plan.get("mode") == "execution_plan_only_no_write",
+    "POST comparisonMetricsWriteExecutionPlan mode is not execution_plan_only_no_write",
+)
+require(
+    post_execution_plan.get("decision") == "payload_not_ready",
+    "POST comparisonMetricsWriteExecutionPlan decision is not payload_not_ready",
+)
+require(
+    post_execution_plan.get("canExecuteDatabaseWrite") is False,
+    "POST comparisonMetricsWriteExecutionPlan canExecuteDatabaseWrite is not false",
+)
+require(
+    post_execution_plan.get("databaseWritesPerformed") is False,
+    "POST comparisonMetricsWriteExecutionPlan databaseWritesPerformed is not false",
+)
+require(
+    post_execution_plan.get("writeRouteEnabled") is False,
+    "POST comparisonMetricsWriteExecutionPlan writeRouteEnabled is not false",
+)
+require(
+    post_execution_plan.get("table") == "owner_task_impacts",
+    "POST comparisonMetricsWriteExecutionPlan table is not owner_task_impacts",
+)
+require(
+    post_execution_plan.get("updatePayload") is None,
+    "POST comparisonMetricsWriteExecutionPlan updatePayload is not null",
+)
+
+post_execution_match = post_execution_plan.get("match") or {}
 post_impact = post.get("impact") or {}
+
+require(
+    post_execution_match.get("id") == post_impact.get("id"),
+    "POST comparisonMetricsWriteExecutionPlan match.id does not match impact.id",
+)
+require(
+    post_execution_match.get("project_id") == post_impact.get("project_id"),
+    "POST comparisonMetricsWriteExecutionPlan match.project_id does not match impact.project_id",
+)
+
 require(post_impact.get("impact_summary") is None, "POST impact_summary is not null")
 require(post_impact.get("confidence_level") is None, "POST confidence_level is not null")
 
@@ -192,6 +239,11 @@ print(f"- payloadPreparation mode: {post_payload_preparation.get('mode')}")
 print(f"- payloadPreparation decision: {post_payload_preparation.get('decision')}")
 print(f"- payloadPreparation canWriteComparisonMetrics: {post_payload_preparation.get('canWriteComparisonMetrics')}")
 print(f"- payloadPreparation updatePayload: {post_payload_preparation.get('updatePayload')}")
+print(f"- executionPlan mode: {post_execution_plan.get('mode')}")
+print(f"- executionPlan decision: {post_execution_plan.get('decision')}")
+print(f"- executionPlan databaseWritesPerformed: {post_execution_plan.get('databaseWritesPerformed')}")
+print(f"- executionPlan writeRouteEnabled: {post_execution_plan.get('writeRouteEnabled')}")
+print(f"- executionPlan updatePayload: {post_execution_plan.get('updatePayload')}")
 print(f"- impact_summary: {impact.get('impact_summary')}")
 print(f"- confidence_level: {impact.get('confidence_level')}")
 print(f"- comparisonWritePlan mode: {write_plan.get('mode')}")
