@@ -17,9 +17,13 @@ export type OwnerTaskImpactComparisonWriteBoundary = {
   attributionClaimAllowed: false;
 };
 
+export type OwnerTaskImpactComparisonWritePostResponseMode =
+  | "blocked_no_write"
+  | "eligible_future_write_dry_run_only_no_write";
+
 export type OwnerTaskImpactComparisonWritePostResponseBody = {
   ok: false;
-  mode: "blocked_no_write" | "eligible_but_write_disabled_no_write";
+  mode: OwnerTaskImpactComparisonWritePostResponseMode;
   projectId: string;
   filters: OwnerTaskImpactComparisonWriteRouteFilters;
   writeBoundary: OwnerTaskImpactComparisonWriteBoundary;
@@ -92,7 +96,7 @@ export function buildOwnerTaskImpactComparisonWritePostResponse(params: {
     status: 409,
     body: {
       ok: false,
-      mode: "eligible_but_write_disabled_no_write",
+      mode: "eligible_future_write_dry_run_only_no_write",
       projectId: params.projectId,
       filters: params.filters,
       writeBoundary,
@@ -101,7 +105,7 @@ export function buildOwnerTaskImpactComparisonWritePostResponse(params: {
       comparisonMetricsWriteExecutionPlan:
         params.comparisonMetricsWriteExecutionPlan,
       blockedReason:
-        "Comparison metrics writes are intentionally disabled at this boundary.",
+        "Comparison metrics writes are eligible for dry-run preview only; database writes are intentionally disabled at this boundary.",
       comparisonWritePlanDecision: params.preview.comparisonWritePlan.decision,
       requiredBeforeWrite: [
         "Accept a separate write boundary before enabling database updates.",

@@ -160,7 +160,10 @@ const response = buildOwnerTaskImpactComparisonWritePostResponse({
 
 assert.equal(response.status, 409);
 assert.equal(response.body.ok, false);
-assert.equal(response.body.mode, "eligible_but_write_disabled_no_write");
+assert.equal(
+  response.body.mode,
+  "eligible_future_write_dry_run_only_no_write",
+);
 
 assert.equal(response.body.writeBoundary.databaseWritesPerformed, false);
 assert.equal(response.body.writeBoundary.writeRouteEnabled, false);
@@ -246,7 +249,7 @@ assert.equal(
 
 assert.equal(
   response.body.blockedReason,
-  "Comparison metrics writes are intentionally disabled at this boundary.",
+  "Comparison metrics writes are eligible for dry-run preview only; database writes are intentionally disabled at this boundary.",
 );
 assert.equal(
   response.body.comparisonWritePlanDecision,
@@ -276,7 +279,7 @@ assert.ok(
 
 console.log("PASSED route-level eligible no-write verification");
 console.log("- status: 409");
-console.log("- mode: eligible_but_write_disabled_no_write");
+console.log("- mode: eligible_future_write_dry_run_only_no_write");
 console.log("- writeRouteEnabled: false");
 console.log("- databaseWritesPerformed: false");
 console.log("- payload keys: comparison_metrics only");
