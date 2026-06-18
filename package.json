@@ -15,7 +15,8 @@
     "verify:owner-task-impact-eligible-candidates": "node --no-warnings scripts/inspect-owner-task-impact-eligible-candidates.mjs",
     "verify:impact-watch-inspection-copy": "node --no-warnings scripts/verify-impact-watch-inspection-copy.mjs",
     "verify:owner-preview-merge-readiness": "node --no-warnings scripts/verify-owner-preview-merge-readiness.mjs",
-    "verify:owner-task-impact-safety": "./scripts/verify-owner-task-impact-safety.sh"
+    "verify:owner-task-impact-safety": "./scripts/verify-owner-task-impact-safety.sh",
+    "verify:owner-preview-accepted-state": "npm run verify:owner-task-impact-eligible-candidates && npm run verify:owner-task-impact-safety && npm run lint && npm run build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
