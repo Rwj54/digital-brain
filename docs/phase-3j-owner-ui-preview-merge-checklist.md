@@ -16,10 +16,28 @@ It should be merged only after a controlled merge review.
 
 ## Required pre-merge checks
 
+Preferred full accepted-state verification:
+
+- `npm run verify:owner-preview-accepted-state`
+
+This command runs:
+
 - `npm run verify:owner-task-impact-eligible-candidates`
 - `npm run verify:owner-task-impact-safety`
 - `npm run lint`
 - `npm run build`
+
+After the working tree is clean, run:
+
+- `npm run verify:owner-preview-merge-readiness`
+
+The merge-readiness guard confirms:
+
+- current branch is `phase-3j-owner-ui-preview`
+- working tree is clean
+- branch is not behind `origin/main`
+- merge checklist is present
+- direct merge to `main` is still not approved
 
 ## Required no-write boundaries
 
