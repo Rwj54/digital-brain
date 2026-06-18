@@ -488,6 +488,18 @@ export function OwnerTaskEvidenceSection({
             This section is read-only. It does not write comparison_metrics,
             impact_summary, confidence_level, or promote stored impact status.
           </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href={`/projects/${projectId}/impact-watches`}
+              className="px-4 py-3 text-sm font-semibold text-[var(--text-strong)]"
+              style={{
+                border: "1px solid var(--border)",
+                backgroundColor: "transparent",
+              }}
+            >
+              Open impact watch inspection
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 space-y-6">
