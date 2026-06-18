@@ -173,6 +173,42 @@ function getImpactRead(impact: OwnerTaskImpact): string {
   return impact.comparisonEligibility.ownerSummary;
 }
 
+function getBaselineChangePreviewLabel(impact: OwnerTaskImpact): string {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return "No review read";
+  }
+
+  if (comparison.canCompare) {
+    return "Preview ready";
+  }
+
+  if (!comparison.isWindowReady) {
+    return "Waiting for window";
+  }
+
+  return "Needs more data";
+}
+
+function getBaselineChangePreviewText(impact: OwnerTaskImpact): string {
+  const comparison = impact.reviewComparison;
+
+  if (!comparison) {
+    return "No review baseline/current read is available for this impact watch yet.";
+  }
+
+  if (comparison.canCompare) {
+    return comparison.ownerSummary;
+  }
+
+  if (!comparison.isWindowReady) {
+    return "Digital Brain can see the saved baseline and the current review read, but it should wait until the watch window is complete before showing changed-since-baseline signals.";
+  }
+
+  return comparison.blockedReason ?? comparison.ownerSummary;
+}
+
 function HeaderMeta({
   label,
   value,
@@ -333,7 +369,36 @@ function ImpactWatchRow({
             {formatCount(reviewComparison.baseline.baselineReviewGap)}. Current
             gap: {formatCount(reviewComparison.current.currentReviewGap)}.
           </p>
-          <p className="mt-2 text-xs leading-6 text-[var(--text-muted)]">
+
+          <div className="mt-4 border-t border-[var(--border)] pt-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Changed since baseline preview
+              </p>
+              <InlineTag>{getBaselineChangePreviewLabel(impact)}</InlineTag>
+              <InlineTag>Read-only</InlineTag>
+              <InlineTag>No attribution claim</InlineTag>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-body)]">
+              {getBaselineChangePreviewText(impact)}
+            </p>
+
+            {reviewComparison.canCompare ? (
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-body)]">
+                {reviewComparison.signals.map((signal) => (
+                  <li key={`${impact.id}-${signal.key}`}>{signal.ownerRead}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            {!reviewComparison.canCompare && reviewComparison.blockedReason ? (
+              <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
+                {reviewComparison.blockedReason}
+              </p>
+            ) : null}
+          </div>
+
+          <p className="mt-3 text-xs leading-6 text-[var(--text-muted)]">
             {reviewComparison.noClaimLanguage}
           </p>
         </div>
