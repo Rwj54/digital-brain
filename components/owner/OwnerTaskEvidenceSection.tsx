@@ -26,6 +26,14 @@ type Props = {
   steps: RenderStep[];
 };
 
+type ImpactWatchTimingSummary = {
+  statusLabel: string;
+  headline: string;
+  body: string;
+  timingLabel: string;
+  guardLabel: string;
+};
+
 function getStepCompletionProofNote(step: RenderStep): string {
   if (step.kind !== "task") {
     return "";
@@ -306,6 +314,98 @@ function getReviewComparisonCurrentLabels(impact: OwnerTaskImpact): string[] {
   ];
 }
 
+function getNextWaitingImpact(
+  impactsData: OwnerTaskImpactsResponse,
+): OwnerTaskImpact | null {
+  const waitingImpacts = impactsData.impacts
+    .filter((impact) => !impact.readiness.isWindowReady)
+    .filter((impact) => impact.readiness.eligibleOn)
+    .sort((first, second) => {
+      const firstDays = first.readiness.daysRemaining ?? Number.MAX_SAFE_INTEGER;
+      const secondDays =
+        second.readiness.daysRemaining ?? Number.MAX_SAFE_INTEGER;
+
+      if (firstDays !== secondDays) {
+        return firstDays - secondDays;
+      }
+
+      return String(first.readiness.eligibleOn).localeCompare(
+        String(second.readiness.eligibleOn),
+      );
+    });
+
+  return waitingImpacts[0] ?? null;
+}
+
+function getImpactWatchTimingSummary(
+  impactsData: OwnerTaskImpactsResponse,
+  nextWaitingImpact: OwnerTaskImpact | null,
+): ImpactWatchTimingSummary {
+  const summary = impactsData.summary;
+
+  if (summary.totalImpacts === 0) {
+    return {
+      statusLabel: "No watches yet",
+      headline: "Complete an action to start an impact watch",
+      body: "Digital Brain has not started watching any completed action yet. Once an owner completes a task, the system can preserve a baseline and wait before comparing what changed.",
+      timingLabel: "No timing yet",
+      guardLabel: "Writes disabled",
+    };
+  }
+
+  if (summary.comparisonMetricsWriteEligible > 0) {
+    return {
+      statusLabel: "Dry-run ready",
+      headline: `${formatCount(
+        summary.comparisonMetricsWriteEligible,
+      )} impact watch(es) pass the conservative metrics gate`,
+      body: "Digital Brain can prepare a comparison_metrics dry run for these records, but this owner surface still does not write results or claim the action caused the change.",
+      timingLabel: "Ready now",
+      guardLabel: "Writes disabled",
+    };
+  }
+
+  if (summary.computedWindowReady > 0) {
+    return {
+      statusLabel: "Window ready",
+      headline: `${formatCount(
+        summary.computedWindowReady,
+      )} impact watch(es) have finished waiting`,
+      body: "The waiting period has elapsed for at least one completed action. Digital Brain can show a conservative read, but it still should not claim proof or write impact summaries.",
+      timingLabel: "Ready to review",
+      guardLabel: "Read-only",
+    };
+  }
+
+  if (summary.waitingForWindow > 0) {
+    return {
+      statusLabel: "Watching",
+      headline: `${formatCount(
+        summary.waitingForWindow,
+      )} completed action record(s) are still being watched`,
+      body: nextWaitingImpact
+        ? `The next watch becomes eligible on ${formatImpactEligibleDate(
+            nextWaitingImpact.readiness.eligibleOn,
+          )}. Until then, this is timing metadata only.`
+        : "Digital Brain is preserving completed action records for future comparison, but the waiting window is not ready yet.",
+      timingLabel: nextWaitingImpact
+        ? formatDaysRemaining(nextWaitingImpact.readiness.daysRemaining)
+        : "Timing not available",
+      guardLabel: "No claim yet",
+    };
+  }
+
+  return {
+    statusLabel: "Tracked",
+    headline: `${formatCount(
+      summary.totalImpacts,
+    )} impact record(s) are preserved`,
+    body: "Digital Brain has saved impact records for future outcome comparison. Stronger impact writes remain disabled until a separate boundary is accepted.",
+    timingLabel: "Timing preserved",
+    guardLabel: "Writes disabled",
+  };
+}
+
 export function OwnerTaskEvidenceSection({
   projectId,
   priorityCount,
@@ -313,6 +413,12 @@ export function OwnerTaskEvidenceSection({
   impactsData,
   steps,
 }: Props) {
+  const nextWaitingImpact = getNextWaitingImpact(impactsData);
+  const impactWatchTimingSummary = getImpactWatchTimingSummary(
+    impactsData,
+    nextWaitingImpact,
+  );
+
   return (
     <>
       <div>
@@ -327,6 +433,62 @@ export function OwnerTaskEvidenceSection({
           explains what is being asked, who should do it, how hard it is, and
           what success looks like.
         </p>
+
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Impact watch timing
+            </p>
+            <InlineTag>{impactWatchTimingSummary.statusLabel}</InlineTag>
+            <InlineTag>{impactWatchTimingSummary.timingLabel}</InlineTag>
+            <InlineTag>{impactWatchTimingSummary.guardLabel}</InlineTag>
+          </div>
+          <h4 className="mt-2 text-xl font-semibold tracking-tight text-[var(--text-strong)]">
+            {impactWatchTimingSummary.headline}
+          </h4>
+          <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-body)]">
+            {impactWatchTimingSummary.body}
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Being watched
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+                {formatCount(impactsData.summary.waitingForWindow)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Completed action records still inside their watch window.
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Ready to compare
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+                {formatCount(impactsData.summary.computedWindowReady)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Waiting period complete, without claiming the action worked.
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Metrics-write gate
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+                {formatCount(impactsData.summary.comparisonMetricsWriteEligible)}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                Future comparison_metrics candidates only. Writes remain disabled.
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs leading-6 text-[var(--text-muted)]">
+            This section is read-only. It does not write comparison_metrics,
+            impact_summary, confidence_level, or promote stored impact status.
+          </p>
+        </div>
 
         <div className="mt-6 space-y-6">
           {steps.map((step) => {
