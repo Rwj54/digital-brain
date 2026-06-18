@@ -14,6 +14,7 @@
     "verify:owner-task-impact-write-execution-plan": "node --no-warnings scripts/verify-owner-task-impact-write-execution-plan.mjs",
     "verify:owner-task-impact-eligible-candidates": "node --no-warnings scripts/inspect-owner-task-impact-eligible-candidates.mjs",
     "verify:impact-watch-inspection-copy": "node --no-warnings scripts/verify-impact-watch-inspection-copy.mjs",
+    "verify:owner-preview-merge-readiness": "node --no-warnings scripts/verify-owner-preview-merge-readiness.mjs",
     "verify:owner-task-impact-safety": "./scripts/verify-owner-task-impact-safety.sh"
   },
   "dependencies": {
