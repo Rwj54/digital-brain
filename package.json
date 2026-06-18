@@ -12,6 +12,7 @@
     "verify:owner-task-impact-route-eligible-no-write": "node --no-warnings scripts/verify-owner-task-impact-route-eligible-no-write.mjs",
     "verify:owner-task-impact-route-response-modes": "node --no-warnings scripts/verify-owner-task-impact-route-response-modes.mjs",
     "verify:owner-task-impact-write-execution-plan": "node --no-warnings scripts/verify-owner-task-impact-write-execution-plan.mjs",
+    "verify:owner-task-impact-eligible-candidates": "node --no-warnings scripts/inspect-owner-task-impact-eligible-candidates.mjs",
     "verify:owner-task-impact-safety": "./scripts/verify-owner-task-impact-safety.sh"
   },
   "dependencies": {
